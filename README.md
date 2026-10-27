@@ -95,3 +95,16 @@ PyObjC only registers methods called from Objective-C (button and menu actions, 
 
 - A method whose name ends in `_` (for example `refresh_`, `tick_`, or a delegate method like `webView_didFinishNavigation_`) → put it in `app/core.py`.
 - Any other helper method → put it in the mixin file for its area (`data.py`, `tabs.py`, `sheet.py`, `location.py`).
+
+## Credits
+
+This app is built on other people's work. Thank you to:
+
+- **[athens-transit-rt](https://github.com/angelospk/athens-transit-rt)** by [@angelospk](https://github.com/angelospk) (MIT License). It provides both the live bus API (`transit.haroldpoi.dev`) and the static line/stop data. It is a Go port of **[athens-gtfs-realtime](https://github.com/foivospro/athens-gtfs-realtime)** by [@foivospro](https://github.com/foivospro).
+- **[OASA](https://www.oasa.gr/)** (Athens Urban Transport Organisation): the source of all the bus data, including the official arrival predictions from its telematics API.
+- **[MapLibre GL JS](https://maplibre.org/)** (BSD-3-Clause): map rendering.
+- **[CARTO](https://carto.com/attributions)** basemaps, with map data © **[OpenStreetMap](https://www.openstreetmap.org/copyright)** contributors (ODbL). The map shows this attribution in its corner.
+- **[PyObjC](https://pyobjc.readthedocs.io/)**: Python bindings for the macOS frameworks (AppKit, WebKit, CoreLocation).
+- **[Requests](https://requests.readthedocs.io/)**: HTTP requests.
+
+This is an unofficial project. It is not affiliated with or endorsed by OASA.
