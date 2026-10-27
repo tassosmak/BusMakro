@@ -1,0 +1,124 @@
+"""Tabs: Route (stops along the line) and Nearby (closest stops)."""
+import time
+from oasa.config import TABS, WALK_M_PER_MIN
+from oasa.debug import log
+from oasa.eta import distance_km, fmt_dist, fmt_eta
+
+
+class TabsMixin:
+    def update_tab_ui(self):
+        t = self.tab
+        multi = t == 1 and len(self.variant_keys) > 1
+        self.search.setHidden_(t != 0); self.stop_menu.setHidden_(t != 0)
+        self.arr_scroll.setHidden_(t != 0); self.route_scroll.setHidden_(t != 1); self.near_scroll.setHidden_(t != 2)
+        self.locate_button.setHidden_(t != 2)
+        self.variant_menu.setHidden_(not multi)
+        self.arrival_heading.setHidden_(multi)
+        self.arrival_heading.setStringValue_(
+            ['APPROACHING BUSES', f'STOPS ALONG LINE {self.current_line or ""}', 'NEAREST STOPS ON THIS LINE'][t])
+
+    def set_tab(self, i):
+        self.tab = i
+        self.tabs.setSelectedSegment_(i)
+        log(f'tab -> {TABS[i]}')
+        if i == 1:
+            self.rebuild_route()
+        elif i == 2:
+            self.rebuild_nearby()
+            if self.user_loc is None and not self.loc_tried:
+                self.loc_tried = True
+                self.start_location()
+        self.do_layout()
+        if i == 1:
+            self.scroll_route_to_selected()
+
+    # ---- Route tab: ordered stops with buses in between --------------------------
+    def pick_route_variant(self):
+        variants = self.line_data.get('variants', {})
+        if self.route_variant_user and self.route_variant in variants:
+            return self.route_variant
+        counts = {}
+        for v in (self.live or {}).get('vehicles', []):
+            counts[v.get('variant')] = counts.get(v.get('variant'), 0) + 1
+        sel = self.selected_stop_id
+        cands = [k for k, var in variants.items()
+                 if sel is None or sel in [str(x) for x in var.get('stops', [])]] or list(variants.keys())
+        best = max(cands, key=lambda k: counts.get(k, 0))
+        self.route_variant = best
+        return best
+
+    def rebuild_route(self):
+        ld = self.line_data
+        if not ld or not ld.get('variants'):
+            self.variant_keys = []
+            self.route_source.rows = [{'message': 'No route data for this line.'}]
+            self.route_table.reloadData()
+            return
+        variants, stops = ld['variants'], ld.get('stops', {})
+        vid = self.pick_route_variant()
+        self.variant_keys = list(variants.keys())
+        self.variant_menu.removeAllItems()
+        for i, k in enumerate(self.variant_keys):
+            st = [str(x) for x in variants[k].get('stops', [])]
+            last = stops.get(st[-1], {}).get('name', '?') if st else '?'
+            self.variant_menu.addItemWithTitle_(f'{i + 1}. {k} → {last}')
+        self.variant_menu.selectItemAtIndex_(self.variant_keys.index(vid))
+
+        route = [str(x) for x in variants[vid].get('stops', [])]
+        by_next = {}
+        for v in (self.live or {}).get('vehicles', []):
+            if v.get('variant') != vid or v.get('lat') is None or v.get('lon') is None:
+                continue
+            nxt = str(v.get('next_stop_id'))
+            if nxt not in route:
+                continue
+            s = stops.get(nxt, {})
+            d = distance_km(v['lat'], v['lon'], s['lat'], s['lon']) if s.get('lat') is not None and s.get('lon') is not None else 0.0
+            by_next.setdefault(nxt, []).append((d, v))
+        rows = []
+        for i, sid in enumerate(route):
+            for d, v in sorted(by_next.get(sid, []), key=lambda t: -t[0]):
+                rows.append({'kind': 'bus', 'id': str(v.get('id', '?')),
+                             'text': f'Bus {v.get("id", "?")} · {fmt_dist(d)} to next stop'})
+            rows.append({'kind': 'stop', 'sid': sid, 'name': stops.get(sid, {}).get('name', 'Unnamed stop'),
+                         'selected': sid == self.selected_stop_id, 'first': i == 0, 'last': i == len(route) - 1})
+        self.route_source.rows = rows or [{'message': 'No stops for this route.'}]
+        self.route_table.reloadData()
+        if self.tab == 1:
+            self.update_tab_ui()
+
+    def scroll_route_to_selected(self):
+        rows = self.route_source.rows
+        idx = next((i for i, r in enumerate(rows) if r.get('kind') == 'stop' and r.get('selected')), None)
+        if idx is not None:
+            self.route_table.scrollRowToVisible_(max(0, idx - 2))
+            self.route_table.scrollRowToVisible_(min(len(rows) - 1, idx + 2))
+
+    # ---- Nearby tab: nearest stops via CoreLocation (fallback: map centre) --------
+    def rebuild_nearby(self):
+        if not self.line_data:
+            self.near_source.rows = [{'message': 'Loading line…'}]
+        elif self.user_loc is None:
+            self.near_source.rows = [{'message': 'Tap “Locate me” to find the nearest stops.'}]
+        else:
+            lat, lon, src = self.user_loc
+            cand = []
+            for sid, s in self.line_data.get('stops', {}).items():
+                if s.get('lat') is None or s.get('lon') is None:
+                    continue
+                cand.append((distance_km(lat, lon, s['lat'], s['lon']), str(sid), s))
+            cand.sort(key=lambda t: t[0])
+            rows = []
+            now = time.time()
+            for i, (d, sid, s) in enumerate(cand[:6]):
+                ap = self.approaching_for(sid)
+                soon = min(ap, key=lambda r: r['eta_s']) if ap else None
+                rows.append({'kind': 'near', 'sid': sid, 'name': s.get('name', 'Unnamed stop'),
+                             'dist_txt': fmt_dist(d), 'closest': i == 0,
+                             'walk': f'~{max(1, round(d * 1000 / WALK_M_PER_MIN))} min walk',
+                             'bus_id': soon['id'] if soon else None,
+                             'eta_s': soon['eta_s'] if soon else None, 't0': now,
+                             'next_txt': (f'Bus {soon["id"]} · {fmt_eta(soon["eta_s"])}' if soon
+                                          else 'No approaching bus')})
+            self.near_source.rows = rows or [{'message': 'No stops with coordinates on this line.'}]
+        self.near_table.reloadData()

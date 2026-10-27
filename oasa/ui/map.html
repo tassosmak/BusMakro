@@ -1,0 +1,62 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+<style>html,body,#map{height:100%;width:100%;margin:0;background:#202124} .maplibregl-map{font:13px -apple-system,BlinkMacSystemFont,sans-serif}
+.maplibregl-ctrl-top-left,.maplibregl-ctrl-top-right{margin-top:96px}
+.stop-dot{width:12px;height:12px;border-radius:50%;background:#1677ff;border:2px solid white;box-shadow:0 1px 4px #0005;cursor:pointer}
+.selected-dot{width:15px;height:15px;border-radius:50%;background:#ff9500;border:3px solid white;box-shadow:0 1px 5px #0007;cursor:pointer}
+.bus-wrap{position:relative;width:31px;height:31px;cursor:pointer}
+.bus-rot{position:absolute;left:0;top:0;width:31px;height:31px;transition:transform .6s ease}
+.bus-arrow{position:absolute;left:50%;top:-9px;margin-left:-6px;width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:10px solid #198754;filter:drop-shadow(0 1px 2px #0006)}
+.bus-dot{position:absolute;left:0;top:0;display:flex;align-items:center;justify-content:center;width:27px;height:27px;border-radius:50%;background:#198754;border:2px solid white;color:white;font-size:14px;box-shadow:0 1px 5px #0005}
+.bus-wrap.pinned .bus-dot{border-color:#ff9500;box-shadow:0 0 0 3px #ff950066}
+.user-dot{width:14px;height:14px;border-radius:50%;background:#0a84ff;border:3px solid white;box-shadow:0 0 0 8px #0a84ff33}</style></head><body><div id="map"></div>
+<script>
+function post(m){try{window.webkit.messageHandlers.oasa.postMessage(m)}catch(e){}}
+['log','warn','error'].forEach(k=>{const o=console[k];console[k]=(...a)=>{o.apply(console,a);post({type:'console',level:k,msg:a.map(String).join(' ')})}});
+window.addEventListener('error',e=>post({type:'console',level:'error',msg:String(e.message)}));
+</script>
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script><script>
+const KEY='__CARTO_KEY__';
+const STYLES={light:'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json?key='+KEY,dark:'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json?key='+KEY};
+const darkMode=matchMedia('(prefers-color-scheme: dark)');
+const map=new maplibregl.Map({container:'map',style:darkMode.matches?STYLES.dark:STYLES.light,center:[23.7275,37.9838],zoom:11,attributionControl:false});
+map.addControl(new maplibregl.NavigationControl({showCompass:false}),'top-right');
+map.addControl(new maplibregl.AttributionControl({compact:true}),'top-left');
+map.on('error',e=>post({type:'error',msg:String((e&&e.error&&e.error.message)||e)}));
+map.on('load',()=>post({type:'map',msg:'style loaded'}));
+map.on('idle',()=>post({type:'map',msg:'idle (all tiles rendered)'}));
+darkMode.addEventListener('change',()=>map.setStyle(darkMode.matches?STYLES.dark:STYLES.light));
+let stops={},buses={},pinned=null,padB=0,rafOn=false,userM=null;
+const BUS_MS=1800;
+function mk(cls,text,lon,lat,title,z){const el=document.createElement('div');el.className=cls;if(text)el.textContent=text;el.title=title||'';el.style.zIndex=z||0;const m=new maplibregl.Marker({element:el}).setLngLat([lon,lat]).addTo(map);return {m,el};}
+function clear(o){Object.values(o).forEach(x=>x.m.remove());return {}}
+window.setStops=function(items,selectedId,fit,padBottom){
+  stops=clear(stops);
+  items.forEach(s=>{if(s.lat==null||s.lon==null)return;const sel=s.id===selectedId;const x=mk(sel?'selected-dot':'stop-dot','',s.lon,s.lat,s.name,sel?1000:0);x.el.addEventListener('click',ev=>{ev.stopPropagation();post({type:'stop',id:String(s.id)})});stops[String(s.id)]=x;});
+  if(fit&&items.length){const b=new maplibregl.LngLatBounds();items.forEach(s=>{if(s.lat!=null&&s.lon!=null)b.extend([s.lon,s.lat])});if(!b.isEmpty())map.fitBounds(b,{padding:{top:110,left:30,right:30,bottom:(padBottom||0)+30},duration:600,maxZoom:15});}
+};
+function bearing(a,b){const r=Math.PI/180,y=Math.sin((b[0]-a[0])*r)*Math.cos(b[1]*r);const x=Math.cos(a[1]*r)*Math.sin(b[1]*r)-Math.sin(a[1]*r)*Math.cos(b[1]*r)*Math.cos((b[0]-a[0])*r);return (Math.atan2(y,x)/r+360)%360;}
+function ease(t){return t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2}
+function step(now){let active=false;Object.values(buses).forEach(x=>{const t=Math.min(1,(now-x.t0)/BUS_MS);if(t<1)active=true;const e=ease(t);x.cur=[x.from[0]+(x.to[0]-x.from[0])*e,x.from[1]+(x.to[1]-x.from[1])*e];x.m.setLngLat(x.cur);});if(active)requestAnimationFrame(step);else rafOn=false;}
+function kick(){if(rafOn)return;rafOn=true;requestAnimationFrame(step);}
+function mkBus(id,to){const el=document.createElement('div');el.className='bus-wrap';el.title='Bus '+id;el.style.zIndex=2000;el.innerHTML='<div class="bus-rot"><div class="bus-arrow"></div></div><div class="bus-dot">🚌</div>';const m=new maplibregl.Marker({element:el}).setLngLat(to).addTo(map);el.addEventListener('click',ev=>{ev.stopPropagation();post({type:'bus',id:id})});return {m,el,rot:el.querySelector('.bus-rot'),cur:to,from:to,to:to,t0:0,angle:0,hdg:null};}
+window.setBuses=function(items){
+  const seen=new Set();
+  items.forEach(b=>{if(b.lat==null||b.lon==null)return;const id=String(b.id),to=[b.lon,b.lat];seen.add(id);
+    let x=buses[id];
+    if(!x){x=buses[id]=mkBus(id,to);}
+    else{x.from=x.cur;x.to=to;x.t0=performance.now();const moved=Math.hypot((to[0]-x.from[0])*Math.cos(to[1]*Math.PI/180),to[1]-x.from[1])*111320;if(moved>5)x.hdg=bearing(x.from,to);}
+    if(typeof b.heading==='number'&&!isNaN(b.heading))x.hdg=b.heading;
+    if(x.hdg!=null){const d=((x.hdg-x.angle+540)%360)-180;x.angle+=d;x.rot.style.transform='rotate('+x.angle+'deg)';x.rot.style.opacity=1;}else x.rot.style.opacity=0;
+    x.el.classList.toggle('pinned',id===pinned);
+  });
+  Object.keys(buses).forEach(id=>{if(!seen.has(id)){buses[id].m.remove();delete buses[id];}});
+  if(pinned&&buses[pinned])map.easeTo({center:buses[pinned].to,duration:BUS_MS,easing:t=>t,padding:{top:80,left:0,right:0,bottom:padB}});
+  kick();
+};
+window.setPinned=function(id,pb){pinned=id||null;padB=pb||0;Object.keys(buses).forEach(k=>buses[k].el.classList.toggle('pinned',k===pinned));if(pinned&&buses[pinned])map.easeTo({center:buses[pinned].cur,zoom:Math.max(map.getZoom(),15),duration:700,padding:{top:80,left:0,right:0,bottom:padB}});};
+map.on('dragstart',()=>{if(pinned){pinned=null;Object.values(buses).forEach(x=>x.el.classList.remove('pinned'));post({type:'unpin'});}});
+window.setUser=function(lat,lon){const to=[lon,lat];if(!userM){const el=document.createElement('div');el.className='user-dot';el.style.zIndex=900;userM=new maplibregl.Marker({element:el}).setLngLat(to).addTo(map);}else userM.setLngLat(to);};
+window.getCenter=function(){const c=map.getCenter();return JSON.stringify({lat:c.lat,lon:c.lng});};
+window.focusStop=function(lat,lon,zoom,padBottom){map.flyTo({center:[lon,lat],zoom:zoom||16,duration:500,padding:{top:80,left:0,right:0,bottom:padBottom||0}});};
+</script></body></html>
