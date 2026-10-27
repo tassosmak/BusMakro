@@ -14,7 +14,7 @@ A native macOS app for tracking Athens (OASA) buses live. It is built with Pytho
 - **Follow a bus.** Pin a bus (⌖) and the map follows it.
 - **Auto-refresh.** Data updates every 15 seconds; you can also refresh by hand.
 - **Keyboard shortcuts.** ⌘Q quit, ⌘H hide, ⌘W close, ⌘M minimize, ⌘R refresh, ⌘L locate me, ⌘[ back, and ⌘C/⌘V/⌘A in the search field.
-- **Window drag bar.** Hover over the top edge of the window and a bar fades in: drag it to move the window, or double-click it to zoom.
+- **Window drag bar.** Hover over the top edge of the window and a bar fades in, together with the red/yellow/green window buttons (hidden otherwise): drag it to move the window, or double-click it to zoom.
 - **Debug mode.** Writes a detailed log to the terminal and to an in-app overlay (🐞).
 
 ## Requirements

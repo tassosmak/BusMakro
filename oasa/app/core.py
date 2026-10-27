@@ -171,6 +171,7 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
 
         self.do_layout()
         install_menu('Makro OASA', self)
+        self.drag_bar.fade(0.0, animate=False)  # traffic lights start hidden, like the bar
         self.window.makeKeyAndOrderFront_(None)
         NSApplication.sharedApplication().activateIgnoringOtherApps_(True)
         threading.Thread(target=self.fetch_lines, daemon=True).start()

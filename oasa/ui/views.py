@@ -84,6 +84,8 @@ class MapHandler(NSObject):
 class WindowDragBar(NSView):
     """Thin strip along the top of the window: hidden until hovered, drag it to move the window.
 
+    The window's traffic-light buttons fade in and out with it.
+
     The map fills the whole window (title bar included) and would otherwise swallow those drags.
     Double-click zooms the window, like a normal title bar."""
     def initWithFrame_(self, frame):
@@ -107,10 +109,23 @@ class WindowDragBar(NSView):
         return self
 
     @objc.python_method
-    def fade(self, alpha):
+    def window_buttons(self):
+        """The red/yellow/green buttons (close, minimize, zoom)."""
+        w = self.window()
+        return [b for b in (w.standardWindowButton_(i) for i in range(3)) if b is not None] if w else []
+
+    @objc.python_method
+    def fade(self, alpha, animate=True):
+        """Show/hide the bar together with the window buttons (they stay clickable while faded)."""
+        views = [self] + self.window_buttons()
+        if not animate:
+            for v in views:
+                v.setAlphaValue_(alpha)
+            return
         NSAnimationContext.beginGrouping()
         NSAnimationContext.currentContext().setDuration_(0.18)
-        self.animator().setAlphaValue_(alpha)
+        for v in views:
+            v.animator().setAlphaValue_(alpha)
         NSAnimationContext.endGrouping()
 
     def mouseEntered_(self, event):
