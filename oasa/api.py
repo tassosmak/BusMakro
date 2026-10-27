@@ -1,5 +1,6 @@
 """Network access: transit.haroldpoi.dev / static data and official OASA predictions."""
 import time
+from concurrent.futures import ThreadPoolExecutor
 import requests
 from oasa.config import NEAR_STOPS_LIMIT, OASA_API
 from oasa.debug import log
@@ -46,11 +47,14 @@ def official_eta_s(live, vehicle_id, stop_id, now):
     return None if m is None else max(0.0, m * 60 - (now - o['at']))
 
 
-def oasa_call(act, **params):
-    """POST to the OASA telematics API (it ignores GET). Raises on failure."""
+def oasa_call(act, *args, **named):
+    """POST to the OASA telematics API (it ignores GET). Raises on failure.
+
+    Positional args are sent as p1, p2, …; keyword args keep their names (e.g. line_code)."""
     t0 = time.perf_counter()
     q = {'act': act}
-    q.update({f'p{i}': v for i, v in enumerate(params.values(), 1)})
+    q.update({f'p{i}': v for i, v in enumerate(args, 1)})
+    q.update(named)
     try:
         r = requests.post(OASA_API, params=q, headers={'User-Agent': 'Mozilla/5.0'}, timeout=15)
         r.raise_for_status()
@@ -65,7 +69,7 @@ def oasa_call(act, **params):
 def get_closest_stops(lat, lon, limit=NEAR_STOPS_LIMIT):
     """Nearest stops of any line: [{id, name, lat, lon}], nearest first."""
     stops = []
-    for s in oasa_call('getClosestStops', lat=lat, lon=lon)[:limit]:
+    for s in oasa_call('getClosestStops', lat, lon)[:limit]:
         try:
             stops.append({'id': str(s['StopCode']), 'name': s.get('StopDescr') or s.get('StopDescrEng') or 'Unnamed stop',
                           'street': s.get('StopStreet') or '', 'lat': float(s['StopLat']), 'lon': float(s['StopLng'])})
@@ -77,10 +81,12 @@ def get_closest_stops(lat, lon, limit=NEAR_STOPS_LIMIT):
 def get_stop_lines(stop_id):
     """Every line serving a stop, with the next official arrivals (minutes), soonest first.
 
-    [{line, name, route_codes, etas}]: one entry per line, its route variants merged."""
-    routes = oasa_call('webRoutesForStop', stop=stop_id)
+    [{line, name, line_code, route_codes, routes, etas, sched}]: one entry per line, its route
+    variants merged. Lines with no bus on the road get `sched`, a timetable-based estimate
+    (see oasa.schedule), or None when nothing more runs today."""
+    routes = oasa_call('webRoutesForStop', stop_id)
     try:
-        arrivals = oasa_call('getStopArrivals', stop=stop_id)
+        arrivals = oasa_call('getStopArrivals', stop_id)
     except Exception:
         arrivals = []  # lines are still worth showing without times
     by_route = {}
@@ -94,13 +100,34 @@ def get_stop_lines(stop_id):
         if str(r.get('hidden', '0')) == '1' or not r.get('LineID'):
             continue
         ln = lines.setdefault(r['LineID'], {'line': r['LineID'], 'name': r.get('RouteDescr') or r.get('LineDescr') or '',
-                                            'route_codes': [], 'etas': []})
+                                            'line_code': str(r.get('LineCode') or ''), 'route_codes': [],
+                                            'routes': [], 'etas': []})
         code = str(r.get('RouteCode'))
         if code not in ln['route_codes']:  # OASA repeats routes
             ln['route_codes'].append(code)
+            ln['routes'].append((code, str(r.get('RouteType') or '1')))
             ln['etas'].extend(by_route.get(code, []))
     out = list(lines.values())
     for ln in out:
         ln['etas'] = sorted(set(ln['etas']))
-    out.sort(key=lambda ln: (ln['etas'][0] if ln['etas'] else 10 ** 6, ln['line']))
+        ln['sched'] = None
+    idle = [ln for ln in out if not ln['etas'] and ln['line_code']]
+    if idle:
+        from oasa.schedule import scheduled_arrival  # imported here: schedule.py imports this module
+
+        def estimate(ln):
+            try:
+                ln['sched'] = scheduled_arrival(ln['line_code'], ln['routes'], str(stop_id))
+            except Exception as e:
+                log(f'schedule for line {ln["line"]} failed: {e}', 'WARN')
+        with ThreadPoolExecutor(max_workers=6) as pool:
+            list(pool.map(estimate, idle))
+
+    def sort_key(ln):
+        if ln['etas']:
+            return (0, ln['etas'][0], ln['line'])
+        if ln['sched']:
+            return (0, ln['sched']['eta_min'], ln['line'])
+        return (1, 0, ln['line'])
+    out.sort(key=sort_key)
     return out

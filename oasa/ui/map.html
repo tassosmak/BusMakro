@@ -27,6 +27,22 @@ map.on('load',()=>post({type:'map',msg:'style loaded'}));
 map.on('idle',()=>post({type:'map',msg:'idle (all tiles rendered)'}));
 darkMode.addEventListener('change',()=>map.setStyle(darkMode.matches?STYLES.dark:STYLES.light));
 let stops={},buses={},pinned=null,padB=0,rafOn=false,userM=null;
+let routeCoords=null;
+// Route line: a road-following shape drawn under the street labels, with an outline (casing).
+function drawRoute(){try{
+  ['route-line','route-casing'].forEach(id=>{if(map.getLayer(id))map.removeLayer(id)});
+  if(map.getSource('route'))map.removeSource('route');
+  if(!routeCoords||routeCoords.length<2)return;
+  map.addSource('route',{type:'geojson',data:{type:'Feature',geometry:{type:'LineString',coordinates:routeCoords}}});
+  const below=(map.getStyle().layers.find(l=>l.type==='symbol')||{}).id;
+  const dark=darkMode.matches;
+  map.addLayer({id:'route-casing',type:'line',source:'route',layout:{'line-join':'round','line-cap':'round'},
+    paint:{'line-color':dark?'#0b1220':'#ffffff','line-width':['interpolate',['linear'],['zoom'],10,4,15,9,18,14],'line-opacity':0.95}},below);
+  map.addLayer({id:'route-line',type:'line',source:'route',layout:{'line-join':'round','line-cap':'round'},
+    paint:{'line-color':dark?'#4c9dff':'#1677ff','line-width':['interpolate',['linear'],['zoom'],10,2,15,5,18,8]}},below);
+}catch(e){/* style still loading: the 'style.load' handler draws it */}}
+map.on('style.load',drawRoute);  // also re-adds the route after a light/dark style switch
+window.setRoute=function(latlon){routeCoords=latlon&&latlon.length?latlon.map(p=>[p[1],p[0]]):null;drawRoute();};
 const BUS_MS=1800;
 function mk(cls,text,lon,lat,title,z){const el=document.createElement('div');el.className=cls;if(text)el.textContent=text;el.title=title||'';el.style.zIndex=z||0;const m=new maplibregl.Marker({element:el}).setLngLat([lon,lat]).addTo(map);return {m,el};}
 function clear(o){Object.values(o).forEach(x=>x.m.remove());return {}}

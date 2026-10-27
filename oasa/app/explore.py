@@ -71,6 +71,7 @@ class ExploreMixin:
         self.pinned_id = None
         self.bus_markers = []
         self.push_buses([])
+        self.push_route(None)
         self.evaluate_js('window.setPinned(null,0);')
         if self.line_menu.numberOfItems():
             self.line_menu.selectItemAtIndex_(0)
@@ -141,11 +142,21 @@ class ExploreMixin:
             else:
                 rows = []
                 for ln in self.stop_lines:
-                    etas = ln['etas']
-                    rows.append({'kind': 'stopline', 'line': ln['line'], 'name': ln['name'],
-                                 'eta_txt': f'{etas[0]} min' if etas else '—',
-                                 'next_txt': ('Then ' + ', '.join(f'{m} min' for m in etas[1:3]) if len(etas) > 1
-                                              else 'No more buses soon' if etas else 'No buses due soon')})
+                    etas, sched = ln['etas'], ln.get('sched')
+                    row = {'kind': 'stopline', 'line': ln['line'], 'name': ln['name'], 'scheduled': False}
+                    if etas:  # a bus is on the road: official live prediction
+                        row['eta_txt'] = f'{etas[0]} min'
+                        row['next_txt'] = ('Then ' + ', '.join(f'{m} min' for m in etas[1:3]) if len(etas) > 1
+                                           else 'Live')
+                    elif sched:  # not on the road yet: timetable + rough travel time
+                        row['eta_txt'] = f'~{sched["eta_min"]} min'
+                        row['next_txt'] = (f'Scheduled · leaves the terminus {sched["depart"]:%H:%M}, '
+                                           f'here ~{sched["arrive"]:%H:%M}')
+                        row['scheduled'] = True
+                    else:
+                        row['eta_txt'] = '—'
+                        row['next_txt'] = 'No more buses today'
+                    rows.append(row)
         self.explore_source.rows = rows
         self.explore_table.reloadData()
 

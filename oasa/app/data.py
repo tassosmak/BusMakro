@@ -15,6 +15,15 @@ class DataMixin:
                          + json.dumps(self.selected_stop_id) + ',' + json.dumps(bool(fit)) + ','
                          + str(int(self.sheet_h)) + ');')
 
+    def push_route(self, vid):
+        """Draw variant `vid`'s road shape on the map (None clears it). Only sent when it changes."""
+        if vid == self.drawn_variant:
+            return
+        self.drawn_variant = vid
+        shape = ((self.line_data or {}).get('variants', {}).get(vid) or {}).get('shape') if vid else None
+        log(f'route line -> {vid} ({len(shape or [])} points)')
+        self.evaluate_js('window.setRoute(' + json.dumps(shape or []) + ');')
+
     def push_buses(self, buses):
         self.evaluate_js('window.setBuses(' + json.dumps(buses) + ');')
 

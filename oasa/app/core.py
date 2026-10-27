@@ -64,6 +64,7 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
         self.explore_stop = None
         self.stop_lines = None
         self.pending_stop = None    # stop to select once a line opened from a stop has loaded
+        self.drawn_variant = None   # route variant whose shape is on the map
         log(f'DEBUG on · python {sys.version.split()[0]} · pid {os.getpid()} · CoreLocation {"yes" if HAS_CL else "no"}')
 
         style = (NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable
@@ -284,6 +285,8 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
         if self.line_data:
             self.push_stops(fit=True)
             self.push_buses(self.bus_markers)
+            vid, self.drawn_variant = self.drawn_variant, None
+            self.push_route(vid)
         if self.user_loc:
             self.evaluate_js(f'window.setUser({self.user_loc[0]},{self.user_loc[1]});')
         if self.mode == 'home' and self.user_loc is None and not self.loc_tried:

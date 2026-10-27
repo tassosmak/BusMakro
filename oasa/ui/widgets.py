@@ -131,7 +131,9 @@ def make_row_view(row, width, app):
         badge.addSubview_(num)
         name = label(row['name'], 13, True); name.setFrame_(NSMakeRect(82, 30, cw - 82 - 86, 18))
         nxt = label(row['next_txt'], 11, color=NSColor.secondaryLabelColor()); nxt.setFrame_(NSMakeRect(82, 11, cw - 82 - 86, 16))
-        eta = label(row['eta_txt'], 18, True, NSColor.systemGreenColor() if row['eta_txt'] != '—' else NSColor.secondaryLabelColor())
+        eta_col = (NSColor.secondaryLabelColor() if row['eta_txt'] == '—'
+                   else NSColor.systemOrangeColor() if row.get('scheduled') else NSColor.systemGreenColor())
+        eta = label(row['eta_txt'], 18, True, eta_col)
         eta.setFrame_(NSMakeRect(cw - 84, (h - 6) / 2 - 12, 72, 24)); eta.setAlignment_(NSTextAlignmentRight)
         name.setAutoresizingMask_(W_SIZABLE); nxt.setAutoresizingMask_(W_SIZABLE); eta.setAutoresizingMask_(MIN_X_MARGIN)
         for v in (badge, name, nxt, eta):

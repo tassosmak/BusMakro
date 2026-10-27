@@ -50,3 +50,7 @@ LOC_TIMEOUT = 8.0           # s to wait for a fix once permission is granted
 LOC_PROMPT_TIMEOUT = 30.0   # s to wait the first time, while the permission prompt is open
 AUTH_NOT_DETERMINED = 0     # CLAuthorizationStatus values
 AUTH_GRANTED = (3, 4)       # authorizedAlways / authorizedWhenInUse
+
+# Timetable estimate for lines with no bus on the road yet (oasa/schedule.py)
+SCHED_PACE_M_S = 3.2            # real average bus pace incl. stops/lights (measured on line 810)
+SCHED_DEPARTED_SLACK_MIN = 3    # still count a departure this many minutes late as "about to leave"

@@ -62,11 +62,13 @@ class TabsMixin:
         ld = self.line_data
         if not ld or not ld.get('variants'):
             self.variant_keys = []
+            self.push_route(None)
             self.route_source.rows = [{'message': 'No route data for this line.'}]
             self.route_table.reloadData()
             return
         variants, stops = ld['variants'], ld.get('stops', {})
         vid = self.pick_route_variant()
+        self.push_route(vid)
         self.variant_keys = list(variants.keys())
         self.variant_menu.removeAllItems()
         for i, k in enumerate(self.variant_keys):

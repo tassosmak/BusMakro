@@ -5,9 +5,9 @@ A native macOS app for tracking Athens (OASA) buses live. It is built with Pytho
 ## Features
 
 - **Stops near you on launch.** When the app opens, it finds your location and lists the closest stops of *any* line, also shown on the map.
-- **Every line at a stop.** Tap a stop (in the list or on the map) to see all the lines that stop there, soonest first, with the next arrival times from OASA.
+- **Every line at a stop.** Tap a stop (in the list or on the map) to see all the lines that stop there, soonest first. Lines with a bus on the road show the live OASA prediction in green. Lines with no bus out yet show a timetable estimate in orange (`~N min`, with the departure time from the terminus).
 - **Line view.** Tap a line to open it with that stop already selected. **‹ Back** steps back to the stop, then to the stops near you. You can also pick any line from the dropdown.
-  - **Live map:** the line's stops and its buses moving in real time, with a heading arrow on each bus. The map follows the system light/dark theme.
+  - **Live map:** the route drawn along the roads (a blue line with an outline, for the selected variant), the line's stops, and its buses moving in real time, with a heading arrow on each bus. The map follows the system light/dark theme.
   - **Arrivals tab:** buses approaching the stop, with a live countdown, distance along the route and delay against the schedule ("On time", "+10 min").
   - **Route tab:** every stop on the line in order, with buses shown between the stops they're travelling between. If a line has several route variants, you can choose one.
   - **Nearby tab:** the line's stops closest to you, with walking times.
@@ -65,7 +65,7 @@ You can also turn debug on by setting `MAKRO_DEBUG=1`, or by setting `DEBUG_DEFA
 |---|---|
 | `angelospk.github.io/athens-transit-rt/static/v1` | Static data: the list of lines, and each line's stops and route variants |
 | `transit.haroldpoi.dev/v1/lines/<line>` | Live buses: position, speed, delay, trip label, next stop |
-| `telematics.oasa.gr/api/` | OASA: closest stops (`getClosestStops`), lines at a stop (`webRoutesForStop`), official arrival predictions (`getStopArrivals`) |
+| `telematics.oasa.gr/api/` | OASA: closest stops (`getClosestStops`), lines at a stop (`webRoutesForStop`), official arrival predictions (`getStopArrivals`), today's timetable (`getDailySchedule`), each route's stops (`webGetStops`) |
 | CARTO basemaps + MapLibre GL | Map tiles and rendering |
 
 The OASA API only answers **POST** requests; a GET returns an empty response. The CARTO key can be overridden with the `CARTO_KEY` environment variable.
@@ -82,6 +82,14 @@ The OASA API only answers **POST** requests; a GET returns an empty response. Th
 
 Only buses that haven't yet passed the stop on their route variant are listed.
 
+### Lines with no bus on the road yet
+
+On the stop screen, a line with no live prediction gets a **timetable estimate**, shown in orange as `~N min`:
+
+`next departure from the route's first stop (today's OASA timetable) + distance along the route to this stop ÷ 3.2 m/s`
+
+3.2 m/s (about 11.5 km/h) is the real average pace measured on line 810, including stops and lights. It's only a rough guide: the timetable says when a bus *should* leave, not when it does, and traffic varies. A departure up to 3 minutes overdue still counts, because a bus often appears in tracking a little after leaving. If nothing more runs today, the line shows "No more buses today". You can tune both values in `oasa/config.py` (`SCHED_PACE_M_S`, `SCHED_DEPARTED_SLACK_MIN`).
+
 ## Project structure
 
 ```
@@ -92,10 +100,11 @@ oasa/
   debug.py           Debug flag and thread-safe logger
   api.py             HTTP helpers and the OASA calls (closest stops, lines at a stop, predictions)
   eta.py             Distances, the fallback ETA estimate, ETA/distance formatting
+  schedule.py        Timetable-based ETA for lines with no bus on the road yet
   ui/
     widgets.py       Small AppKit helpers (labels, buttons, glass panels) and the list cards
     views.py         Table data source, bottom-sheet drag handle, map → Python message bridge
-    map.html         The MapLibre map page (stops, animated buses, your location)
+    map.html         The MapLibre map page (route line, stops, animated buses, your location)
     map.py           Loads map.html
   app/
     core.py          OasaNativeApp: window setup, layout, and every method macOS calls
