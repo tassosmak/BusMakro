@@ -4,6 +4,8 @@ from AppKit import (
     NSMakeRect, NSColor, NSFont, NSFontWeightSemibold, NSButton, NSTextField, NSView,
     NSVisualEffectView, NSVisualEffectMaterialPopover, NSVisualEffectBlendingModeWithinWindow,
     NSVisualEffectStateActive, NSTextAlignmentRight, NSTextAlignmentCenter,
+    NSFontDescriptorSystemDesignRounded, NSFontFeatureSettingsAttribute,
+    NSFontFeatureTypeIdentifierKey, NSFontFeatureSelectorIdentifierKey,
 )
 try:  # trackpad haptics (optional)
     from AppKit import NSHapticFeedbackManager
@@ -21,9 +23,20 @@ def haptic():
     except Exception:
         pass
 
-def label(text, size=13, bold=False, color=None):
+def sys_font(size, bold=False, rounded=False, tabular=False):
+    """SF Pro, optionally SF Pro Rounded and/or with fixed-width digits (like Apple's Clock/Maps)."""
+    font = NSFont.systemFontOfSize_weight_(size, NSFontWeightSemibold if bold else 0.0)
+    desc = font.fontDescriptor()
+    if rounded:
+        desc = desc.fontDescriptorWithDesign_(NSFontDescriptorSystemDesignRounded) or desc
+    if tabular:  # kNumberSpacingType / kMonospacedNumbersSelector: countdowns don't jitter
+        desc = desc.fontDescriptorByAddingAttributes_({NSFontFeatureSettingsAttribute: [
+            {NSFontFeatureTypeIdentifierKey: 6, NSFontFeatureSelectorIdentifierKey: 0}]})
+    return NSFont.fontWithDescriptor_size_(desc, size) or font
+
+def label(text, size=13, bold=False, color=None, rounded=False, tabular=False):
     v = NSTextField.labelWithString_(text)
-    v.setFont_(NSFont.systemFontOfSize_weight_(size, NSFontWeightSemibold) if bold else NSFont.systemFontOfSize_(size))
+    v.setFont_(sys_font(size, bold, rounded, tabular))
     v.setLineBreakMode_(4)  # truncate tail
     if color is not None:
         v.setTextColor_(color)
@@ -126,14 +139,14 @@ def make_row_view(row, width, app):
     if kind == 'stopline':
         root, card, cw = card_base(width, h)
         badge = solid(NSMakeRect(12, (h - 6) / 2 - 14, 58, 28), NSColor.systemBlueColor(), 8)
-        num = label(row['line'], 15, True, NSColor.whiteColor()); num.setFrame_(NSMakeRect(0, 4, 58, 20))
+        num = label(row['line'], 15, True, NSColor.whiteColor(), rounded=True); num.setFrame_(NSMakeRect(0, 4, 58, 20))
         num.setAlignment_(NSTextAlignmentCenter)
         badge.addSubview_(num)
         name = label(row['name'], 13, True); name.setFrame_(NSMakeRect(82, 30, cw - 82 - 86, 18))
         nxt = label(row['next_txt'], 11, color=NSColor.secondaryLabelColor()); nxt.setFrame_(NSMakeRect(82, 11, cw - 82 - 86, 16))
         eta_col = (NSColor.secondaryLabelColor() if row['eta_txt'] == '—'
                    else NSColor.systemOrangeColor() if row.get('scheduled') else NSColor.systemGreenColor())
-        eta = label(row['eta_txt'], 18, True, eta_col)
+        eta = label(row['eta_txt'], 18, True, eta_col, rounded=True, tabular=True)
         eta.setFrame_(NSMakeRect(cw - 84, (h - 6) / 2 - 12, 72, 24)); eta.setAlignment_(NSTextAlignmentRight)
         name.setAutoresizingMask_(W_SIZABLE); nxt.setAutoresizingMask_(W_SIZABLE); eta.setAutoresizingMask_(MIN_X_MARGIN)
         for v in (badge, name, nxt, eta):
@@ -142,11 +155,11 @@ def make_row_view(row, width, app):
 
     if kind == 'near':
         root, card, cw = card_base(width, h)
-        dist = label(row['dist_txt'], 20, True); dist.setFrame_(NSMakeRect(14, 30, 108, 26))
+        dist = label(row['dist_txt'], 20, True, rounded=True, tabular=True); dist.setFrame_(NSMakeRect(14, 30, 108, 26))
         walk = label(row['walk'], 11, color=NSColor.secondaryLabelColor()); walk.setFrame_(NSMakeRect(14, 10, 108, 16))
         name_w = cw - 134 - (86 if row.get('closest') else 12)
         name = label(row['name'], 13, True); name.setFrame_(NSMakeRect(134, 36, name_w, 18)); name.setAutoresizingMask_(W_SIZABLE)
-        nxt = label(row['next_txt'], 12, color=NSColor.secondaryLabelColor()); nxt.setFrame_(NSMakeRect(134, 14, cw - 146, 18))
+        nxt = label(row['next_txt'], 12, color=NSColor.secondaryLabelColor(), tabular=True); nxt.setFrame_(NSMakeRect(134, 14, cw - 146, 18))
         nxt.setAutoresizingMask_(W_SIZABLE)
         row['next_label'] = nxt
         for v in (dist, walk, name, nxt):
@@ -161,7 +174,7 @@ def make_row_view(row, width, app):
     root, card, cw = card_base(width, h)
     if row.get('pinned'):
         card.layer().setBorderWidth_(1.5); card.layer().setBorderColor_(NSColor.systemOrangeColor().CGColor())
-    eta = label(fmt_eta(row['eta_s'] - (time.time() - row['t0'])), 20, True); eta.setFrame_(NSMakeRect(14, 32, 112, 28))
+    eta = label(fmt_eta(row['eta_s'] - (time.time() - row['t0'])), 20, True, rounded=True, tabular=True); eta.setFrame_(NSMakeRect(14, 32, 112, 28))
     row['eta_label'] = eta
     sub = label(row['sub'], 11, color=NSColor.secondaryLabelColor()); sub.setFrame_(NSMakeRect(14, 10, 112, 16))
     title = label(row['title'], 13, True); title.setFrame_(NSMakeRect(134, 38, cw - 134 - 92, 18))

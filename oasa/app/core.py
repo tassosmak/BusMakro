@@ -91,7 +91,7 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
 
         # --- Floating top bar ---
         self.pill = glass(NSMakeRect(0, 0, 420, PILL_H), 18)
-        self.title = label('Makro OASA', 15, True)
+        self.title = label('Makro OASA', 16, True, rounded=True)
         self.status = label('Finding stops near you…', 11, color=NSColor.secondaryLabelColor())
         self.refresh_button = button('↻', self, 'refresh:', 7)  # circular
         for v in (self.title, self.status, self.refresh_button):

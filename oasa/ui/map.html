@@ -19,13 +19,21 @@ window.addEventListener('error',e=>post({type:'console',level:'error',msg:String
 const KEY='__CARTO_KEY__';
 const STYLES={light:'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json?key='+KEY,dark:'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json?key='+KEY};
 const darkMode=matchMedia('(prefers-color-scheme: dark)');
-const map=new maplibregl.Map({container:'map',style:darkMode.matches?STYLES.dark:STYLES.light,center:[23.7275,37.9838],zoom:11,attributionControl:false});
+// CARTO labels use Montserrat; swap in Open Sans, the closest to Apple's SF that CARTO serves glyphs for.
+const FONT_SWAP={'Montserrat Medium':'Open Sans Regular','Montserrat SemiBold':'Open Sans Bold',
+  'Montserrat Regular Italic':'Open Sans Italic','Montserrat SemiBold Italic':'Open Sans Italic'};
+function loadStyle(url){fetch(url).then(r=>r.json()).then(st=>{
+  st.layers.forEach(l=>{const tf=l.layout&&l.layout['text-font'];if(Array.isArray(tf))l.layout['text-font']=tf.map(f=>FONT_SWAP[f]||f);});
+  map.setStyle(st,{diff:false});
+}).catch(e=>{post({type:'error',msg:'style: '+e});map.setStyle(url);});}
+const map=new maplibregl.Map({container:'map',style:{version:8,sources:{},layers:[{id:'bg',type:'background',paint:{'background-color':darkMode.matches?'#202124':'#f2f2ef'}}]},center:[23.7275,37.9838],zoom:11,attributionControl:false});
+loadStyle(darkMode.matches?STYLES.dark:STYLES.light);
 map.addControl(new maplibregl.NavigationControl({showCompass:false}),'top-right');
 map.addControl(new maplibregl.AttributionControl({compact:true}),'top-left');
 map.on('error',e=>post({type:'error',msg:String((e&&e.error&&e.error.message)||e)}));
 map.on('load',()=>post({type:'map',msg:'style loaded'}));
 map.on('idle',()=>post({type:'map',msg:'idle (all tiles rendered)'}));
-darkMode.addEventListener('change',()=>map.setStyle(darkMode.matches?STYLES.dark:STYLES.light));
+darkMode.addEventListener('change',()=>loadStyle(darkMode.matches?STYLES.dark:STYLES.light));
 let stops={},buses={},pinned=null,padB=0,rafOn=false,userM=null;
 let routeCoords=null;
 // Route line: a road-following shape drawn under the street labels, with an outline (casing).
