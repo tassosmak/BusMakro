@@ -13,6 +13,8 @@ A native macOS app for tracking Athens (OASA) buses live. It is built with Pytho
   - **Nearby tab:** the line's stops closest to you, with walking times.
 - **Follow a bus.** Pin a bus (⌖) and the map follows it.
 - **Auto-refresh.** Data updates every 15 seconds; you can also refresh by hand.
+- **Keyboard shortcuts.** ⌘Q quit, ⌘H hide, ⌘W close, ⌘M minimize, ⌘R refresh, ⌘L locate me, ⌘[ back, and ⌘C/⌘V/⌘A in the search field.
+- **Window drag bar.** Hover over the top edge of the window and a bar fades in: drag it to move the window, or double-click it to zoom.
 - **Debug mode.** Writes a detailed log to the terminal and to an in-app overlay (🐞).
 
 ## Requirements
@@ -102,8 +104,9 @@ oasa/
   eta.py             Distances, the fallback ETA estimate, ETA/distance formatting
   schedule.py        Timetable-based ETA for lines with no bus on the road yet
   ui/
-    widgets.py       Small AppKit helpers (labels, buttons, glass panels) and the list cards
-    views.py         Table data source, bottom-sheet drag handle, map → Python message bridge
+    widgets.py       Small AppKit helpers (labels, buttons, glass panels, fonts) and the list cards
+    menu.py          The menu bar (keyboard shortcuts only work through menu items on macOS)
+    views.py         Table data source, bottom-sheet drag handle, window drag bar, map → Python message bridge
     map.html         The MapLibre map page (route line, stops, animated buses, your location)
     map.py           Loads map.html
   app/

@@ -1,9 +1,12 @@
-"""AppKit helper classes: table data source, sheet drag handle, map message bridge."""
+"""AppKit helper classes: table data source, sheet drag handle, window drag bar, map message bridge."""
 import objc
-from AppKit import NSView
+from AppKit import NSAnimationContext, NSColor, NSMakeRect, NSTrackingArea, NSView
 from Foundation import NSObject
 from oasa.debug import log
 from oasa.ui.widgets import make_row_view, row_height
+
+# NSTrackingMouseEnteredAndExited | NSTrackingActiveAlways | NSTrackingInVisibleRect
+TRACK_OPTIONS = 0x01 | 0x80 | 0x200
 
 
 class RowDataSource(NSObject):
@@ -77,3 +80,50 @@ class MapHandler(NSObject):
             log(f'JS {level}: {body.get("msg")}', 'ERROR' if level == 'error' else 'JS')
         elif kind == 'map':
             log('map: ' + str(body.get('msg')))
+
+class WindowDragBar(NSView):
+    """Thin strip along the top of the window: hidden until hovered, drag it to move the window.
+
+    The map fills the whole window (title bar included) and would otherwise swallow those drags.
+    Double-click zooms the window, like a normal title bar."""
+    def initWithFrame_(self, frame):
+        self = objc.super(WindowDragBar, self).initWithFrame_(frame)
+        if self is None:
+            return None
+        self.setWantsLayer_(True)
+        self.layer().setBackgroundColor_(NSColor.windowBackgroundColor().colorWithAlphaComponent_(0.55).CGColor())
+        self.setAlphaValue_(0.0)
+        w, h = frame.size.width, frame.size.height
+        grip = NSView.alloc().initWithFrame_(NSMakeRect(w / 2 - 18, h / 2 - 2, 36, 4))
+        grip.setAutoresizingMask_(1 | 4 | 8 | 32)  # flexible margins on all sides: stays centred
+        grip.setWantsLayer_(True)
+        grip.layer().setBackgroundColor_(NSColor.tertiaryLabelColor().CGColor())
+        grip.layer().setCornerRadius_(2)
+        self.grip = grip
+        self.addSubview_(grip)
+        area = NSTrackingArea.alloc().initWithRect_options_owner_userInfo_(
+            NSMakeRect(0, 0, 0, 0), TRACK_OPTIONS, self, None)
+        self.addTrackingArea_(area)
+        return self
+
+    @objc.python_method
+    def fade(self, alpha):
+        NSAnimationContext.beginGrouping()
+        NSAnimationContext.currentContext().setDuration_(0.18)
+        self.animator().setAlphaValue_(alpha)
+        NSAnimationContext.endGrouping()
+
+    def mouseEntered_(self, event):
+        self.fade(1.0)
+
+    def mouseExited_(self, event):
+        self.fade(0.0)
+
+    def acceptsFirstMouse_(self, event):
+        return True
+
+    def mouseDown_(self, event):
+        if event.clickCount() == 2:
+            self.window().performZoom_(None)
+        else:
+            self.window().performWindowDragWithEvent_(event)

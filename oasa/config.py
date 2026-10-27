@@ -30,6 +30,8 @@ NEAR_STOPS_LIMIT = 12   # stops listed on the home screen
 
 TOP_INSET = 34      # room for the traffic-light buttons
 
+DRAG_BAR_H = 28     # hover strip at the top for moving the window
+
 PILL_H = 52
 
 WALK_M_PER_MIN = 80.0

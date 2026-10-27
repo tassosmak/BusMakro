@@ -24,11 +24,12 @@ from oasa.app.explore import NO_LINE, ExploreMixin
 from oasa.app.location import LocationMixin
 from oasa.app.sheet import SheetMixin
 from oasa.app.tabs import TabsMixin
-from oasa.config import AUTH_GRANTED, AUTH_NOT_DETERMINED, CARTO_KEY, PILL_H, TABS, TOP_INSET, W_SIZABLE
+from oasa.config import AUTH_GRANTED, AUTH_NOT_DETERMINED, CARTO_KEY, DRAG_BAR_H, PILL_H, TABS, TOP_INSET, W_SIZABLE
 from oasa.debug import DEBUG, DEBUG_LINES, _debug_lock, _debug_seq, log
 from oasa.eta import fmt_eta
 from oasa.ui.map import HTML_MAP
-from oasa.ui.views import DragHandle, MapHandler, RowDataSource
+from oasa.ui.menu import install_menu
+from oasa.ui.views import DragHandle, MapHandler, RowDataSource, WindowDragBar
 from oasa.ui.widgets import button, glass, haptic, label, line_id_of, solid
 
 
@@ -90,6 +91,10 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
         content.addSubview_(self.map)
         self.map.loadHTMLString_baseURL_(HTML_MAP.replace('__CARTO_KEY__', CARTO_KEY),
                                          NSURL.URLWithString_('https://localhost/'))
+
+        # --- Window drag strip along the very top (fades in on hover) ---
+        self.drag_bar = WindowDragBar.alloc().initWithFrame_(NSMakeRect(0, 852, 440, DRAG_BAR_H))
+        content.addSubview_(self.drag_bar)
 
         # --- Floating top bar ---
         self.pill = glass(NSMakeRect(0, 0, 420, PILL_H), 18)
@@ -165,6 +170,7 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
             content.addSubview_(self.debug_panel)
 
         self.do_layout()
+        install_menu('Makro OASA', self)
         self.window.makeKeyAndOrderFront_(None)
         NSApplication.sharedApplication().activateIgnoringOtherApps_(True)
         threading.Thread(target=self.fetch_lines, daemon=True).start()
@@ -199,6 +205,7 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
         b = self.content.bounds()
         W, H = b.size.width, b.size.height
         self.map.setFrame_(NSMakeRect(0, 0, W, H))
+        self.drag_bar.setFrame_(NSMakeRect(0, H - DRAG_BAR_H, W, DRAG_BAR_H))
         pw = min(W - 20, 480); px = (W - pw) / 2
 
         pill_y = H - TOP_INSET - PILL_H
