@@ -4,10 +4,13 @@ A native macOS app for tracking Athens (OASA) buses live. It is built with Pytho
 
 ## Features
 
-- **Live map.** Shows the line's stops and its buses moving in real time, with a heading arrow on each bus. The map follows the system light/dark theme.
-- **Arrivals tab.** Pick a stop to see the buses approaching it, with a live countdown, distance along the route and delay against the schedule ("On time", "+10 min").
-- **Route tab.** Lists every stop on the line in order, with the buses shown between the stops they're travelling between. If a line has several route variants, you can choose one.
-- **Nearby tab.** Lists the line's stops closest to you, with walking times. It uses your location when available and the map centre otherwise.
+- **Stops near you on launch.** When the app opens, it finds your location and lists the closest stops of *any* line, also shown on the map.
+- **Every line at a stop.** Tap a stop (in the list or on the map) to see all the lines that stop there, soonest first, with the next arrival times from OASA.
+- **Line view.** Tap a line to open it with that stop already selected. **‹ Back** steps back to the stop, then to the stops near you. You can also pick any line from the dropdown.
+  - **Live map:** the line's stops and its buses moving in real time, with a heading arrow on each bus. The map follows the system light/dark theme.
+  - **Arrivals tab:** buses approaching the stop, with a live countdown, distance along the route and delay against the schedule ("On time", "+10 min").
+  - **Route tab:** every stop on the line in order, with buses shown between the stops they're travelling between. If a line has several route variants, you can choose one.
+  - **Nearby tab:** the line's stops closest to you, with walking times.
 - **Follow a bus.** Pin a bus (⌖) and the map follows it.
 - **Auto-refresh.** Data updates every 15 seconds; you can also refresh by hand.
 - **Debug mode.** Writes a detailed log to the terminal and to an in-app overlay (🐞).
@@ -62,7 +65,7 @@ You can also turn debug on by setting `MAKRO_DEBUG=1`, or by setting `DEBUG_DEFA
 |---|---|
 | `angelospk.github.io/athens-transit-rt/static/v1` | Static data: the list of lines, and each line's stops and route variants |
 | `transit.haroldpoi.dev/v1/lines/<line>` | Live buses: position, speed, delay, trip label, next stop |
-| `telematics.oasa.gr/api/?act=getStopArrivals` | Official OASA arrival predictions for the selected stop |
+| `telematics.oasa.gr/api/` | OASA: closest stops (`getClosestStops`), lines at a stop (`webRoutesForStop`), official arrival predictions (`getStopArrivals`) |
 | CARTO basemaps + MapLibre GL | Map tiles and rendering |
 
 The OASA API only answers **POST** requests; a GET returns an empty response. The CARTO key can be overridden with the `CARTO_KEY` environment variable.
@@ -87,7 +90,7 @@ setup.py             py2app build script for "Makro OASA.app" (Info.plist with t
 oasa/
   config.py          URLs, refresh rate, ETA settings, layout sizes
   debug.py           Debug flag and thread-safe logger
-  api.py             HTTP helpers and the official OASA predictions
+  api.py             HTTP helpers and the OASA calls (closest stops, lines at a stop, predictions)
   eta.py             Distances, the fallback ETA estimate, ETA/distance formatting
   ui/
     widgets.py       Small AppKit helpers (labels, buttons, glass panels) and the list cards
@@ -96,7 +99,8 @@ oasa/
     map.py           Loads map.html
   app/
     core.py          OasaNativeApp: window setup, layout, and every method macOS calls
-    data.py          Fetching data in the background and building arrival rows
+    explore.py       Home (stops near you) and stop (lines at a stop) screens, and navigating between them
+    data.py          Fetching line data in the background and building arrival rows
     tabs.py          Route and Nearby tabs
     sheet.py         Bottom-sheet sizing, dragging and animation
     location.py      Your location (CoreLocation, falling back to the map centre)
@@ -104,7 +108,7 @@ oasa/
 
 ### How the pieces fit together
 
-- `OasaNativeApp` (in `app/core.py`) is the app delegate. It combines the `DataMixin`, `TabsMixin`, `SheetMixin` and `LocationMixin` classes from the other `app/` files.
+- `OasaNativeApp` (in `app/core.py`) is the app delegate. It combines the `ExploreMixin`, `DataMixin`, `TabsMixin`, `SheetMixin` and `LocationMixin` classes from the other `app/` files.
 - **Network requests run on background threads.** Their results go into a queue, and a timer on the main thread (`checkResults_`) reads the queue and updates the UI. AppKit must only be touched from the main thread.
 - **The map is a web page in a `WKWebView`.** Python calls JavaScript functions on the page (`window.setStops`, `window.setBuses`, `window.setPinned`, …). The page sends clicks back through `MapHandler`.
 
@@ -113,7 +117,7 @@ oasa/
 PyObjC only registers methods called from Objective-C (button and menu actions, delegate callbacks, `NSTimer` targets) if they are defined **directly on `OasaNativeApp` in `core.py`**. Methods inherited from the mixin classes are not registered. In practice:
 
 - A method whose name ends in `_` (for example `refresh_`, `tick_`, or a delegate method like `webView_didFinishNavigation_`) → put it in `app/core.py`.
-- Any other helper method → put it in the mixin file for its area (`data.py`, `tabs.py`, `sheet.py`, `location.py`).
+- Any other helper method → put it in the mixin file for its area (`explore.py`, `data.py`, `tabs.py`, `sheet.py`, `location.py`).
 
 ## Credits
 

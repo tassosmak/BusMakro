@@ -9,7 +9,7 @@ try:  # trackpad haptics (optional)
     from AppKit import NSHapticFeedbackManager
 except Exception:  # pragma: no cover
     NSHapticFeedbackManager = None
-from oasa.config import BUS_ROW_H, MIN_X_MARGIN, NEAR_ROW_H, ROW_H, STOP_ROW_H, W_SIZABLE
+from oasa.config import BUS_ROW_H, LINE_ROW_H, MIN_X_MARGIN, NEAR_ROW_H, ROW_H, STOP_ROW_H, W_SIZABLE
 from oasa.eta import fmt_eta
 
 
@@ -63,7 +63,7 @@ def line_id_of(title):
 def row_height(row):
     if 'message' in row:
         return 60.0
-    return float({'stop': STOP_ROW_H, 'bus': BUS_ROW_H, 'near': NEAR_ROW_H}.get(row.get('kind'), ROW_H))
+    return float({'stop': STOP_ROW_H, 'bus': BUS_ROW_H, 'near': NEAR_ROW_H, 'stopline': LINE_ROW_H}.get(row.get('kind'), ROW_H))
 
 def card_base(width, h):
     root = NSView.alloc().initWithFrame_(NSMakeRect(0, 0, width, h))
@@ -121,6 +121,21 @@ def make_row_view(row, width, app):
             txt = label(row['text'], 12, True, NSColor.systemGreenColor()); txt.setFrame_(NSMakeRect(52, 9, width - 64, 16))
             txt.setAutoresizingMask_(W_SIZABLE)
             root.addSubview_(txt)
+        return root
+
+    if kind == 'stopline':
+        root, card, cw = card_base(width, h)
+        badge = solid(NSMakeRect(12, (h - 6) / 2 - 14, 58, 28), NSColor.systemBlueColor(), 8)
+        num = label(row['line'], 15, True, NSColor.whiteColor()); num.setFrame_(NSMakeRect(0, 4, 58, 20))
+        num.setAlignment_(NSTextAlignmentCenter)
+        badge.addSubview_(num)
+        name = label(row['name'], 13, True); name.setFrame_(NSMakeRect(82, 30, cw - 82 - 86, 18))
+        nxt = label(row['next_txt'], 11, color=NSColor.secondaryLabelColor()); nxt.setFrame_(NSMakeRect(82, 11, cw - 82 - 86, 16))
+        eta = label(row['eta_txt'], 18, True, NSColor.systemGreenColor() if row['eta_txt'] != '—' else NSColor.secondaryLabelColor())
+        eta.setFrame_(NSMakeRect(cw - 84, (h - 6) / 2 - 12, 72, 24)); eta.setAlignment_(NSTextAlignmentRight)
+        name.setAutoresizingMask_(W_SIZABLE); nxt.setAutoresizingMask_(W_SIZABLE); eta.setAutoresizingMask_(MIN_X_MARGIN)
+        for v in (badge, name, nxt, eta):
+            card.addSubview_(v)
         return root
 
     if kind == 'near':

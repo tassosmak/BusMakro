@@ -1,7 +1,7 @@
 """Network access: transit.haroldpoi.dev / static data and official OASA predictions."""
 import time
 import requests
-from oasa.config import OASA_API
+from oasa.config import NEAR_STOPS_LIMIT, OASA_API
 from oasa.debug import log
 
 
@@ -44,3 +44,63 @@ def official_eta_s(live, vehicle_id, stop_id, now):
         return None
     m = o.get('eta', {}).get(str(vehicle_id))
     return None if m is None else max(0.0, m * 60 - (now - o['at']))
+
+
+def oasa_call(act, **params):
+    """POST to the OASA telematics API (it ignores GET). Raises on failure."""
+    t0 = time.perf_counter()
+    q = {'act': act}
+    q.update({f'p{i}': v for i, v in enumerate(params.values(), 1)})
+    try:
+        r = requests.post(OASA_API, params=q, headers={'User-Agent': 'Mozilla/5.0'}, timeout=15)
+        r.raise_for_status()
+        data = r.json() or []
+        log(f'OASA {act} -> {r.status_code} {len(r.content)}B {int((time.perf_counter() - t0) * 1000)}ms')
+        return data
+    except Exception as e:
+        log(f'OASA {act} FAILED after {int((time.perf_counter() - t0) * 1000)}ms: {e}', 'ERROR')
+        raise
+
+
+def get_closest_stops(lat, lon, limit=NEAR_STOPS_LIMIT):
+    """Nearest stops of any line: [{id, name, lat, lon}], nearest first."""
+    stops = []
+    for s in oasa_call('getClosestStops', lat=lat, lon=lon)[:limit]:
+        try:
+            stops.append({'id': str(s['StopCode']), 'name': s.get('StopDescr') or s.get('StopDescrEng') or 'Unnamed stop',
+                          'street': s.get('StopStreet') or '', 'lat': float(s['StopLat']), 'lon': float(s['StopLng'])})
+        except (KeyError, TypeError, ValueError):
+            continue
+    return stops
+
+
+def get_stop_lines(stop_id):
+    """Every line serving a stop, with the next official arrivals (minutes), soonest first.
+
+    [{line, name, route_codes, etas}]: one entry per line, its route variants merged."""
+    routes = oasa_call('webRoutesForStop', stop=stop_id)
+    try:
+        arrivals = oasa_call('getStopArrivals', stop=stop_id)
+    except Exception:
+        arrivals = []  # lines are still worth showing without times
+    by_route = {}
+    for a in arrivals:
+        try:
+            by_route.setdefault(str(a['route_code']), []).append(int(a['btime2']))
+        except (KeyError, TypeError, ValueError):
+            continue
+    lines = {}
+    for r in routes:
+        if str(r.get('hidden', '0')) == '1' or not r.get('LineID'):
+            continue
+        ln = lines.setdefault(r['LineID'], {'line': r['LineID'], 'name': r.get('RouteDescr') or r.get('LineDescr') or '',
+                                            'route_codes': [], 'etas': []})
+        code = str(r.get('RouteCode'))
+        if code not in ln['route_codes']:  # OASA repeats routes
+            ln['route_codes'].append(code)
+            ln['etas'].extend(by_route.get(code, []))
+    out = list(lines.values())
+    for ln in out:
+        ln['etas'] = sorted(set(ln['etas']))
+    out.sort(key=lambda ln: (ln['etas'][0] if ln['etas'] else 10 ** 6, ln['line']))
+    return out

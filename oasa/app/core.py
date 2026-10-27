@@ -20,6 +20,7 @@ except Exception:  # pragma: no cover
     CoreLocation = None
     HAS_CL = False
 from oasa.app.data import DataMixin
+from oasa.app.explore import NO_LINE, ExploreMixin
 from oasa.app.location import LocationMixin
 from oasa.app.sheet import SheetMixin
 from oasa.app.tabs import TabsMixin
@@ -31,7 +32,7 @@ from oasa.ui.views import DragHandle, MapHandler, RowDataSource
 from oasa.ui.widgets import button, glass, haptic, label, line_id_of, solid
 
 
-class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin):
+class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, ExploreMixin):
     def applicationDidFinishLaunching_(self, notification):
         self.results = queue.Queue()
         self.lines = []
@@ -58,6 +59,11 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin):
         self.loc_mgr = None
         self.loc_pending = None
         self.loc_tried = False
+        self.mode = 'home'          # 'home' (stops near you) | 'stop' (lines at a stop) | 'line'
+        self.near_stops = {}
+        self.explore_stop = None
+        self.stop_lines = None
+        self.pending_stop = None    # stop to select once a line opened from a stop has loaded
         log(f'DEBUG on · python {sys.version.split()[0]} · pid {os.getpid()} · CoreLocation {"yes" if HAS_CL else "no"}')
 
         style = (NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable
@@ -85,7 +91,7 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin):
         # --- Floating top bar ---
         self.pill = glass(NSMakeRect(0, 0, 420, PILL_H), 18)
         self.title = label('Makro OASA', 15, True)
-        self.status = label('Loading transit data…', 11, color=NSColor.secondaryLabelColor())
+        self.status = label('Finding stops near you…', 11, color=NSColor.secondaryLabelColor())
         self.refresh_button = button('↻', self, 'refresh:', 7)  # circular
         for v in (self.title, self.status, self.refresh_button):
             self.pill.addSubview_(v)
@@ -101,6 +107,8 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin):
         self.handle_pill = solid(NSMakeRect(0, 0, 40, 5), NSColor.tertiaryLabelColor(), 2.5)
         self.handle.addSubview_(self.handle_pill)
 
+        self.back_button = button('‹ Back', self, 'backClicked:', 1)
+        self.explore_heading = label('STOPS NEAR YOU', 11, True, NSColor.secondaryLabelColor())
         self.line_menu = NSPopUpButton.alloc().initWithFrame_(NSMakeRect(0, 0, 100, 28))
         self.line_menu.setTarget_(self); self.line_menu.setAction_('lineChanged:')
         self.tabs = NSSegmentedControl.segmentedControlWithLabels_trackingMode_target_action_(TABS, 0, self, 'tabChanged:')
@@ -120,11 +128,14 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin):
         self.table_source = RowDataSource.alloc().init(); self.table_source.app = self
         self.route_source = RowDataSource.alloc().init(); self.route_source.app = self
         self.near_source = RowDataSource.alloc().init(); self.near_source.app = self
+        self.explore_source = RowDataSource.alloc().init(); self.explore_source.app = self
         self.arr_scroll, self.table, self.table_col = self.make_table(self.table_source, None)
         self.route_scroll, self.route_table, self.route_col = self.make_table(self.route_source, 'routeClicked:')
         self.near_scroll, self.near_table, self.near_col = self.make_table(self.near_source, 'nearbyClicked:')
+        self.explore_scroll, self.explore_table, self.explore_col = self.make_table(self.explore_source, 'exploreClicked:')
+        self.explore_source.rows = [{'message': 'Finding stops near you…'}]
 
-        for v in (self.handle, self.line_menu, self.tabs, self.search, self.stop_menu, self.variant_menu,
+        for v in (self.handle, self.back_button, self.explore_heading, self.explore_scroll, self.line_menu, self.tabs, self.search, self.stop_menu, self.variant_menu,
                   self.arrival_heading, self.locate_button, self.arr_scroll, self.route_scroll, self.near_scroll):
             self.sheet.addSubview_(v)
         content.addSubview_(self.sheet)
@@ -205,7 +216,18 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin):
         self.handle_pill.setFrame_(NSMakeRect(pw / 2 - 20, 14, 40, 5))
 
         y = sh - 34
-        self.line_menu.setFrame_(NSMakeRect(12, y - 28, pw - 24, 28)); y -= 36
+        back_w = 0 if self.mode == 'home' else 78
+        self.back_button.setFrame_(NSMakeRect(10, y - 28, back_w - 6, 28))
+        self.line_menu.setFrame_(NSMakeRect(12 + back_w, y - 28, pw - 24 - back_w, 28)); y -= 36
+        if self.mode != 'line':
+            self.explore_heading.setFrame_(NSMakeRect(16, y - 18, pw - 32 - (130 if self.mode == 'home' else 0), 16))
+            self.locate_button.setFrame_(NSMakeRect(pw - 134, y - 22, 122, 22))
+            y -= 26
+            self.explore_scroll.setFrame_(NSMakeRect(6, 6, pw - 12, max(40, y - 6)))
+            self.explore_col.setWidth_(self.explore_scroll.contentSize().width)
+            if reload:
+                self.explore_table.reloadData()
+            y = sh - 34 - 36  # line-mode controls are hidden; keep their frames sane
         self.tabs.setFrame_(NSMakeRect(12, y - 24, pw - 24, 24)); y -= 32
         if self.tab == 0:
             self.search.setFrame_(NSMakeRect(12, y - 26, pw - 24, 26)); y -= 32
@@ -214,7 +236,8 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin):
             self.variant_menu.setFrame_(NSMakeRect(12, y - 26, pw - 24, 26)); y -= 32
         else:
             self.arrival_heading.setFrame_(NSMakeRect(16, y - 18, pw - 32, 16))
-            self.locate_button.setFrame_(NSMakeRect(pw - 134, y - 22, 122, 22))
+            if self.mode == 'line':
+                self.locate_button.setFrame_(NSMakeRect(pw - 134, y - 22, 122, 22))
             y -= 26
         area = NSMakeRect(6, 6, pw - 12, max(40, y - 6))
         for scroll, col, table in ((self.arr_scroll, self.table_col, self.table),
@@ -263,6 +286,9 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin):
             self.push_buses(self.bus_markers)
         if self.user_loc:
             self.evaluate_js(f'window.setUser({self.user_loc[0]},{self.user_loc[1]});')
+        if self.mode == 'home' and self.user_loc is None and not self.loc_tried:
+            self.loc_tried = True
+            self.start_location()
 
     def webView_didFailNavigation_withError_(self, webview, navigation, error):
         log(f'webview: navigation failed: {error}', 'ERROR')
@@ -283,8 +309,16 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin):
 
     # ---- Actions --------------------------------------------------------------
     def lineChanged_(self, sender):
+        if sender.indexOfSelectedItem() <= 0:  # 'Browse a line…' placeholder
+            if self.mode == 'line':
+                self.go_home()
+            return
         line_id = line_id_of(sender.titleOfSelectedItem())
         if line_id:
+            if self.mode != 'line':
+                log('mode -> line')
+            self.mode = 'line'
+            self.do_layout()
             log(f'line selected: {line_id}')
             self.current_line = line_id
             self.selected_stop_id = None
@@ -324,6 +358,9 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin):
             self.scroll_route_to_selected()
 
     def select_stop(self, sid):
+        if self.mode != 'line':
+            self.open_stop(sid)
+            return
         if not self.line_data:
             return
         sid = str(sid)
@@ -348,11 +385,29 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin):
             self.scroll_route_to_selected()
 
     def refresh_(self, sender):
-        if self.line_menu.numberOfItems() == 0:
+        log(f'manual refresh ({self.mode})')
+        self.refresh_current()
+
+    def refresh_current(self):
+        if self.mode == 'line' and self.current_line:
+            threading.Thread(target=self.fetch_live, args=(self.current_line,), daemon=True).start()
+        elif self.mode == 'stop' and self.explore_stop:
+            self.fetch_stop_lines_async(self.explore_stop['id'])
+
+    def backClicked_(self, sender):
+        haptic()
+        self.go_back()
+
+    def exploreClicked_(self, sender):
+        r = int(sender.clickedRow())
+        rows = self.explore_source.rows
+        if not 0 <= r < len(rows):
             return
-        line = line_id_of(self.line_menu.titleOfSelectedItem())
-        log(f'manual refresh: {line}')
-        threading.Thread(target=self.fetch_live, args=(line,), daemon=True).start()
+        row = rows[r]
+        if row.get('kind') == 'near':
+            haptic(); self.open_stop(row['sid'])
+        elif row.get('kind') == 'stopline':
+            haptic(); self.open_line_at_stop(row['line'])
 
     # ---- Pin / follow a bus ---------------------------------------------------
     def pinBus_(self, sender):
@@ -453,26 +508,25 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin):
                 break
             kind = item[0]
             if kind == 'refresh_request':
-                if self.line_menu.numberOfItems():
-                    line = line_id_of(self.line_menu.titleOfSelectedItem())
-                    log(f'auto refresh: {line}')
-                    threading.Thread(target=self.fetch_live, args=(line,), daemon=True).start()
+                self.refresh_current()
+            elif kind == 'near_stops':
+                self.on_near_stops(item[1], item[2])
+            elif kind == 'stop_lines':
+                self.on_stop_lines(item[1], item[2])
             elif kind == 'error':
                 self.status.setStringValue_('Error: ' + item[1][:120])
             elif kind == 'lines':
                 self.lines = item[1].get('lines', [])
                 log(f'lines loaded: {len(self.lines)}')
                 self.line_menu.removeAllItems()
+                self.line_menu.addItemWithTitle_(NO_LINE)
                 for line in self.lines:
                     self.line_menu.addItemWithTitle_(f'{line["id"]} — {line.get("name", "")}')
-                idx = next((i for i in range(self.line_menu.numberOfItems())
-                            if self.line_menu.itemTitleAtIndex_(i).startswith('810 —')), 0)
-                if self.line_menu.numberOfItems():
-                    self.line_menu.selectItemAtIndex_(idx)
-                    self.lineChanged_(self.line_menu)
+                if self.mode != 'line':
+                    self.line_menu.selectItemAtIndex_(0)
             elif kind == 'line':
                 _, line_id, static, live = item
-                if line_id != self.current_line:
+                if line_id != self.current_line or self.mode != 'line':
                     log(f'dropped stale line response {line_id} (current {self.current_line})', 'WARN')
                     continue
                 self.line_data, self.live = static, live
@@ -483,9 +537,15 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin):
                 self.render_arrivals(self.live)
                 self.do_layout()
                 self.status.setStringValue_(f'Line {line_id} · {len(self.live.get("vehicles", []))} live buses')
+                if self.pending_stop:
+                    sid, self.pending_stop = self.pending_stop, None
+                    if sid in self.line_data.get('stops', {}):
+                        self.select_stop(sid)
+                    else:
+                        log(f'stop {sid} not on line {line_id}', 'WARN')
             elif kind == 'live':
                 _, line_id, live = item
-                if line_id != self.current_line:
+                if line_id != self.current_line or self.mode != 'line':
                     log(f'dropped stale live response {line_id} (current {self.current_line})', 'WARN')
                     continue
                 self.render_arrivals(live)

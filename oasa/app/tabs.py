@@ -7,6 +7,17 @@ from oasa.eta import distance_km, fmt_dist, fmt_eta
 
 class TabsMixin:
     def update_tab_ui(self):
+        line = self.mode == 'line'
+        self.back_button.setHidden_(self.mode == 'home')
+        self.explore_heading.setHidden_(line); self.explore_scroll.setHidden_(line)
+        self.explore_heading.setStringValue_(self.explore_heading_text())
+        self.tabs.setHidden_(not line)
+        if not line:
+            for v in (self.search, self.stop_menu, self.arr_scroll, self.route_scroll, self.near_scroll,
+                      self.variant_menu, self.arrival_heading):
+                v.setHidden_(True)
+            self.locate_button.setHidden_(self.mode != 'home')
+            return
         t = self.tab
         multi = t == 1 and len(self.variant_keys) > 1
         self.search.setHidden_(t != 0); self.stop_menu.setHidden_(t != 0)

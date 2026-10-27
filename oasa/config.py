@@ -24,6 +24,10 @@ BUS_ROW_H = 34      # route: bus between stops
 
 NEAR_ROW_H = 70     # nearby card
 
+LINE_ROW_H = 64     # a line serving the selected stop
+
+NEAR_STOPS_LIMIT = 12   # stops listed on the home screen
+
 TOP_INSET = 34      # room for the traffic-light buttons
 
 PILL_H = 52

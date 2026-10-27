@@ -57,6 +57,8 @@ class LocationMixin:
         self.user_loc = (lat, lon, src)
         self.evaluate_js(f'window.setUser({lat},{lon});')
         self.rebuild_nearby()
+        if self.mode != 'line':
+            self.fetch_near_stops_async(lat, lon)
         if src == 'gps':
             self.status.setStringValue_('Located you · showing nearest stops')
             self.evaluate_js(f'window.focusStop({lat},{lon},15,{int(self.sheet_h)});')
