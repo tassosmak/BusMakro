@@ -19,22 +19,40 @@ A native macOS app for tracking Athens (OASA) buses live. It is built with Pytho
 - These packages:
 
 ```bash
-python -m pip install pyobjc-framework-Cocoa pyobjc-framework-WebKit pyobjc-framework-CoreLocation requests
+python -m pip install pyobjc-framework-Cocoa pyobjc-framework-WebKit pyobjc-framework-CoreLocation requests py2app
 ```
 
-`pyobjc-framework-CoreLocation` is optional. Without it, the Nearby tab uses the map centre instead of your location.
+`pyobjc-framework-CoreLocation` and `py2app` are only needed for your real location in the Nearby tab. Without them, the app uses the map centre instead.
 
 ## Running
 
+### As an app (recommended: needed for your location)
+
+macOS only shows the location permission prompt for a real `.app` bundle. Build one once:
+
+```bash
+/opt/anaconda3/envs/oasa-gui/bin/python setup.py py2app -A
+open "dist/Makro OASA.app"
+```
+
+This is a development build: it runs the source files in place, so code changes take effect the next time you open the app. You only need to rebuild if `setup.py` changes. For a standalone app that doesn't depend on this folder, build without `-A`.
+
+The first time you use locate, macOS asks for permission. You can change it later in System Settings → Privacy & Security → Location Services.
+
+To see the debug log while running the app:
+
+```bash
+open --env MAKRO_DEBUG=1 --stdout /dev/tty --stderr /dev/tty "dist/Makro OASA.app"
+```
+
+### Directly with Python
+
 ```bash
 /opt/anaconda3/envs/oasa-gui/bin/python main.py
-```
-
-With debug output:
-
-```bash
 /opt/anaconda3/envs/oasa-gui/bin/python main.py --debug
 ```
+
+This works for everything except your location: macOS silently refuses location access to a bare `python` process, so Nearby falls back to the map centre.
 
 You can also turn debug on by setting `MAKRO_DEBUG=1`, or by setting `DEBUG_DEFAULT = True` in `oasa/debug.py`.
 
@@ -65,6 +83,7 @@ Only buses that haven't yet passed the stop on their route variant are listed.
 
 ```
 main.py              Entry point: starts the macOS app
+setup.py             py2app build script for "Makro OASA.app" (Info.plist with the location reason)
 oasa/
   config.py          URLs, refresh rate, ETA settings, layout sizes
   debug.py           Debug flag and thread-safe logger

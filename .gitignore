@@ -7,3 +7,8 @@ __pycache__/
 
 # Private dev notes
 DEV_README.md
+
+# py2app build output
+build/
+dist/
+.eggs/

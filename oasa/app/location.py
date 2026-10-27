@@ -7,6 +7,7 @@ try:  # location (optional): pip install pyobjc-framework-CoreLocation
 except Exception:  # pragma: no cover
     CoreLocation = None
     HAS_CL = False
+from oasa.config import AUTH_NOT_DETERMINED, LOC_PROMPT_TIMEOUT, LOC_TIMEOUT
 from oasa.debug import log
 
 
@@ -21,12 +22,15 @@ class LocationMixin:
                 self.loc_mgr = CoreLocation.CLLocationManager.alloc().init()
                 self.loc_mgr.setDelegate_(self)
                 self.loc_mgr.setDesiredAccuracy_(CoreLocation.kCLLocationAccuracyHundredMeters)
+            asking = self.loc_mgr.authorizationStatus() == AUTH_NOT_DETERMINED
             if hasattr(self.loc_mgr, 'requestWhenInUseAuthorization'):
                 self.loc_mgr.requestWhenInUseAuthorization()
             self.loc_mgr.requestLocation()
             self.loc_pending = time.time()
+            # Give the user time to answer the permission prompt the first time.
+            wait = LOC_PROMPT_TIMEOUT if asking else LOC_TIMEOUT
             NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(
-                8.0, self, 'locTimeout:', None, False)
+                wait, self, 'locTimeout:', wait - 0.5, False)
             log('location requested')
         except Exception as e:
             log(f'location error: {e}', 'ERROR')

@@ -23,7 +23,7 @@ from oasa.app.data import DataMixin
 from oasa.app.location import LocationMixin
 from oasa.app.sheet import SheetMixin
 from oasa.app.tabs import TabsMixin
-from oasa.config import CARTO_KEY, PILL_H, TABS, TOP_INSET, W_SIZABLE
+from oasa.config import AUTH_GRANTED, AUTH_NOT_DETERMINED, CARTO_KEY, PILL_H, TABS, TOP_INSET, W_SIZABLE
 from oasa.debug import DEBUG, DEBUG_LINES, _debug_lock, _debug_seq, log
 from oasa.eta import fmt_eta
 from oasa.ui.map import HTML_MAP
@@ -399,11 +399,23 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin):
 
     def locationManager_didFailWithError_(self, manager, error):
         log(f'location failed: {error}', 'WARN')
+        if manager.authorizationStatus() == AUTH_NOT_DETERMINED:
+            return  # permission prompt still open: retried from the authorization callback
         if self.loc_pending:
             self.use_map_center(str(error))
 
+    def locationManagerDidChangeAuthorization_(self, manager):
+        status = manager.authorizationStatus()
+        log(f'location authorization: {status}')
+        if not self.loc_pending:
+            return
+        if status in AUTH_GRANTED:
+            manager.requestLocation()
+        elif status != AUTH_NOT_DETERMINED:
+            self.use_map_center('location permission denied')
+
     def locTimeout_(self, timer):
-        if self.loc_pending and time.time() - self.loc_pending >= 7.5:
+        if self.loc_pending and time.time() - self.loc_pending >= timer.userInfo():
             self.use_map_center('timed out')
 
     def tick_(self, timer):
