@@ -7,7 +7,7 @@ The app has three modes:
 """
 import json, threading
 from oasa.api import get_closest_stops, get_stop_lines
-from oasa.config import WALK_M_PER_MIN
+from oasa.config import NEAR_MIN_ZOOM, NEAR_REFETCH_KM, WALK_M_PER_MIN
 from oasa.debug import log
 from oasa.eta import distance_km, fmt_dist
 
@@ -77,10 +77,13 @@ class ExploreMixin:
             self.line_menu.selectItemAtIndex_(0)
 
     # ---- Data -------------------------------------------------------------------
-    def fetch_near_stops_async(self, lat, lon):
+    def fetch_near_stops_async(self, lat, lon, from_map=False):
+        """Stops around (lat, lon): your location, or the map centre after you pan (`from_map`)."""
+        self.near_origin = (lat, lon)
+
         def work():
             try:
-                self.results.put(('near_stops', (lat, lon), get_closest_stops(lat, lon)))
+                self.results.put(('near_stops', (lat, lon), from_map, get_closest_stops(lat, lon)))
             except Exception as e:
                 self.results.put(('error', f'Nearby stops: {e}'))
         threading.Thread(target=work, daemon=True).start()
@@ -93,18 +96,34 @@ class ExploreMixin:
                 self.results.put(('error', f'Lines at stop: {e}'))
         threading.Thread(target=work, daemon=True).start()
 
-    def on_near_stops(self, origin, stops):
+    def on_map_moved(self, lat, lon, zoom):
+        """Home screen: list the stops where the map is looking, once it has settled."""
+        if self.mode != 'home' or zoom < NEAR_MIN_ZOOM:
+            return
+        o = self.near_origin
+        if o and distance_km(o[0], o[1], lat, lon) < NEAR_REFETCH_KM:
+            return  # barely moved (or our own fit around the stops)
+        log(f'map moved (zoom {zoom:.1f}) -> stops in this area')
+        self.fetch_near_stops_async(lat, lon, from_map=True)
+
+    def on_near_stops(self, origin, from_map, stops):
+        if origin != self.near_origin:
+            return  # a newer request is on its way
         lat, lon = origin
+        me = self.user_loc if self.user_loc and self.user_loc[2] == 'gps' else None
         self.near_stops = {}
         for s in stops:
-            s['dist'] = distance_km(lat, lon, s['lat'], s['lon'])
+            s['rank'] = distance_km(lat, lon, s['lat'], s['lon'])  # list order: closest to the map centre / you
+            s['dist'] = distance_km(me[0], me[1], s['lat'], s['lon']) if me else s['rank']  # shown: from you
             self.near_stops[s['id']] = s
-        log(f'nearby stops: {len(stops)}')
+        self.near_from_map = from_map
+        log(f'nearby stops: {len(stops)}{" (map area)" if from_map else ""}')
         if self.mode == 'home':
-            self.show_near_stops(fit=True)
+            self.show_near_stops(fit=not from_map)  # never move the map the user just moved
             self.rebuild_explore()
-            src = self.user_loc[2] if self.user_loc else 'map'
-            self.status.setStringValue_('Stops near you' if src == 'gps' else 'Stops near the map centre')
+            self.status.setStringValue_(self.explore_heading_text().capitalize() if from_map
+                                        else 'Stops near you' if me else 'Stops near the map centre')
+            self.do_layout()
 
     def on_stop_lines(self, sid, lines):
         if self.mode != 'stop' or not self.explore_stop or self.explore_stop['id'] != sid:
@@ -123,9 +142,9 @@ class ExploreMixin:
 
     def rebuild_explore(self):
         if self.mode == 'home':
-            stops = sorted(self.near_stops.values(), key=lambda s: s['dist'])
+            stops = sorted(self.near_stops.values(), key=lambda s: s['rank'])
             if stops:
-                rows = [{'kind': 'near', 'sid': s['id'], 'name': s['name'], 'closest': i == 0,
+                rows = [{'kind': 'near', 'sid': s['id'], 'name': s['name'], 'closest': i == 0 and not self.near_from_map,
                          'dist_txt': fmt_dist(s['dist']),
                          'walk': f'~{max(1, round(s["dist"] * 1000 / WALK_M_PER_MIN))} min walk',
                          'bus_id': None, 'eta_s': None, 't0': 0,
@@ -162,6 +181,6 @@ class ExploreMixin:
 
     def explore_heading_text(self):
         if self.mode == 'home':
-            return 'STOPS NEAR YOU'
+            return 'STOPS IN THIS AREA' if self.near_from_map else 'STOPS NEAR YOU'
         s = self.explore_stop or {}
         return f'{s.get("name", "")} · STOP {s.get("id", "")}'.upper()

@@ -50,6 +50,9 @@ function drawRoute(){try{
     paint:{'line-color':dark?'#4c9dff':'#1677ff','line-width':['interpolate',['linear'],['zoom'],10,2,15,5,18,8]}},below);
 }catch(e){/* style still loading: the 'style.load' handler draws it */}}
 map.on('style.load',drawRoute);  // also re-adds the route after a light/dark style switch
+// Tell Python where the map is looking once it settles (debounced), so it can list stops there.
+let moveT=null;
+map.on('moveend',()=>{clearTimeout(moveT);moveT=setTimeout(()=>{const c=map.getCenter();post({type:'moved',lat:c.lat,lon:c.lng,zoom:map.getZoom()});},350);});
 window.setRoute=function(latlon){routeCoords=latlon&&latlon.length?latlon.map(p=>[p[1],p[0]]):null;drawRoute();};
 const BUS_MS=1800;
 function mk(cls,text,lon,lat,title,z){const el=document.createElement('div');el.className=cls;if(text)el.textContent=text;el.title=title||'';el.style.zIndex=z||0;const m=new maplibregl.Marker({element:el}).setLngLat([lon,lat]).addTo(map);return {m,el};}

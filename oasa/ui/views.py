@@ -64,6 +64,8 @@ class MapHandler(NSObject):
             self.app.select_stop(str(body.get('id')))
         elif kind == 'bus':
             self.app.toggle_pin(str(body.get('id')))
+        elif kind == 'moved':
+            self.app.on_map_moved(float(body.get('lat')), float(body.get('lon')), float(body.get('zoom')))
         elif kind == 'unpin':
             self.app.on_unpin()
         elif kind == 'error':

@@ -54,3 +54,7 @@ AUTH_GRANTED = (3, 4)       # authorizedAlways / authorizedWhenInUse
 # Timetable estimate for lines with no bus on the road yet (oasa/schedule.py)
 SCHED_PACE_M_S = 3.2            # real average bus pace incl. stops/lights (measured on line 810)
 SCHED_DEPARTED_SLACK_MIN = 3    # still count a departure this many minutes late as "about to leave"
+
+# Home screen: stops follow the map
+NEAR_MIN_ZOOM = 13.0     # below this the map shows too much area to list "nearby" stops
+NEAR_REFETCH_KM = 0.4    # refetch only after the map centre moved at least this far

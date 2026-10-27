@@ -61,6 +61,8 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
         self.loc_tried = False
         self.mode = 'home'          # 'home' (stops near you) | 'stop' (lines at a stop) | 'line'
         self.near_stops = {}
+        self.near_origin = None     # where the current nearby-stops list was searched from
+        self.near_from_map = False  # True: searched around the map centre after a pan
         self.explore_stop = None
         self.stop_lines = None
         self.pending_stop = None    # stop to select once a line opened from a stop has loaded
@@ -513,7 +515,7 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
             if kind == 'refresh_request':
                 self.refresh_current()
             elif kind == 'near_stops':
-                self.on_near_stops(item[1], item[2])
+                self.on_near_stops(item[1], item[2], item[3])
             elif kind == 'stop_lines':
                 self.on_stop_lines(item[1], item[2])
             elif kind == 'error':
