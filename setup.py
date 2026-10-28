@@ -6,27 +6,37 @@ silently denied.
 
 Development build (fast, runs the source in place; rebuild only when this file changes):
     python setup.py py2app -A
-Standalone build (copies Python and all packages into the app):
-    python setup.py py2app
+Standalone release build (also bundles conda's shared libraries, signs and zips):
+    python tools/build_app.py
 
 The app ends up in dist/Makro OASA.app.
 """
 from setuptools import setup
 
 APP_NAME = 'Makro OASA'
+VERSION = '1.0.0'
 
 setup(
     name=APP_NAME,
     app=['main.py'],
     data_files=[],
+    version=VERSION,
     options={'py2app': {
-        'packages': ['oasa'],
+        'iconfile': 'resources/icon.icns',
+        'packages': ['oasa', 'requests', 'certifi'],
         'includes': ['CoreLocation', 'WebKit'],
+        'excludes': ['tkinter', 'setuptools', 'pip', 'pytest'],
         'plist': {
             'CFBundleName': APP_NAME,
             'CFBundleDisplayName': APP_NAME,
             'CFBundleIdentifier': 'com.tassosmak.makro-oasa',
-            'CFBundleShortVersionString': '1.0.0',
+            'CFBundleShortVersionString': VERSION,
+            'CFBundleVersion': VERSION,
+            'CFBundleDevelopmentRegion': 'en',
+            'CFBundleLocalizations': ['en', 'el'],
+            'LSMinimumSystemVersion': '11.0',
+            'LSApplicationCategoryType': 'public.app-category.travel',
+            'NSHumanReadableCopyright': 'Unofficial app. Data: OASA, athens-transit-rt. Map: CARTO, OpenStreetMap contributors.',
             'NSLocationWhenInUseUsageDescription': 'Makro OASA uses your location to show the bus stops nearest to you.',
             'NSLocationUsageDescription': 'Makro OASA uses your location to show the bus stops nearest to you.',
             'NSHighResolutionCapable': True,

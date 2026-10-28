@@ -7,6 +7,7 @@ from oasa.api import attach_oasa, get_json, official_eta_s
 from oasa.config import API_BASE, REFRESH_SECONDS, STATIC_BASE
 from oasa.debug import log
 from oasa.eta import eta_seconds, route_distance_m
+from oasa.i18n import name, t
 
 
 class DataMixin:
@@ -53,7 +54,7 @@ class DataMixin:
     def stop_payload(self):
         if not self.line_data:
             return []
-        return [{'id': str(sid), 'name': s.get('name', 'Unnamed stop'), 'lat': s.get('lat'), 'lon': s.get('lon')}
+        return [{'id': str(sid), 'name': name(s.get('name')) or t('unnamed_stop'), 'lat': s.get('lat'), 'lon': s.get('lon')}
                 for sid, s in self.line_data.get('stops', {}).items()]
 
     # ---- Data -> rows -----------------------------------------------------------
@@ -85,16 +86,16 @@ class DataMixin:
                 eta_s, _ = eta_seconds(v, dist_m, now)
             delay = v.get('delay_s')
             if delay is None:
-                delay_txt, delay_col = 'No delay data', NSColor.secondaryLabelColor()
+                delay_txt, delay_col = t('no_delay_data'), NSColor.secondaryLabelColor()
             elif abs(delay) < 60:
-                delay_txt, delay_col = 'On time', NSColor.systemGreenColor()
+                delay_txt, delay_col = t('on_time'), NSColor.systemGreenColor()
             else:
-                delay_txt = f'{delay / 60:+.0f} min'
+                delay_txt = t('min', n=f'{delay / 60:+.0f}')
                 delay_col = NSColor.systemOrangeColor() if delay > 0 else NSColor.systemBlueColor()
             rows.append({'kind': 'arrival', 'id': bid, 'distance': dist, 'eta_s': eta_s, 't0': now,
                          'delay': delay_txt, 'delay_color': delay_col,
-                         'sub': f'{dist:.2f} km' + (' · est.' if est else ''),
-                         'title': f'Bus {bid}', 'trip': v.get('trip_label') or 'Trip unavailable',
+                         'sub': f'{dist:.2f} km' + (f' · {t("est")}' if est else ''),
+                         'title': t('bus_n', id=bid), 'trip': name(v.get('trip_label')) or t('trip_unavailable'),
                          'pinned': bid == self.pinned_id})
         rows.sort(key=lambda x: x['distance'])
         return rows
@@ -115,9 +116,9 @@ class DataMixin:
             buses.append({'id': v.get('id'), 'lat': v['lat'], 'lon': v['lon'],
                           'heading': h if isinstance(h, (int, float)) else None})
         log(f'arrivals: {len(vehicles)} vehicles on line, {len(rows)} approaching stop {self.selected_stop_id}')
-        self.table_source.rows = rows or [{'message': 'Choose a stop to see approaching buses.'
+        self.table_source.rows = rows or [{'message': t('choose_stop')
                                            if not self.selected_stop_id
-                                           else 'No confirmed approaching vehicles found for this stop.'}]
+                                           else t('no_approaching')}]
         self.table.reloadData()
         self.bus_markers = buses
         self.push_buses(buses)

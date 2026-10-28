@@ -3,6 +3,7 @@ import time
 from oasa.config import TABS, WALK_M_PER_MIN
 from oasa.debug import log
 from oasa.eta import distance_km, fmt_dist, fmt_eta
+from oasa import i18n
 
 
 class TabsMixin:
@@ -26,7 +27,8 @@ class TabsMixin:
         self.variant_menu.setHidden_(not multi)
         self.arrival_heading.setHidden_(multi)
         self.arrival_heading.setStringValue_(
-            ['APPROACHING BUSES', f'STOPS ALONG LINE {self.current_line or ""}', 'NEAREST STOPS ON THIS LINE'][t])
+            [i18n.t('h_approaching'), i18n.t('h_along_line', line=i18n.line_label(self.current_line or '')),
+             i18n.t('h_nearest_on_line')][t])
 
     def set_tab(self, i):
         self.tab = i
@@ -63,7 +65,7 @@ class TabsMixin:
         if not ld or not ld.get('variants'):
             self.variant_keys = []
             self.push_route(None)
-            self.route_source.rows = [{'message': 'No route data for this line.'}]
+            self.route_source.rows = [{'message': i18n.t('no_route_data')}]
             self.route_table.reloadData()
             return
         variants, stops = ld['variants'], ld.get('stops', {})
@@ -73,7 +75,7 @@ class TabsMixin:
         self.variant_menu.removeAllItems()
         for i, k in enumerate(self.variant_keys):
             st = [str(x) for x in variants[k].get('stops', [])]
-            last = stops.get(st[-1], {}).get('name', '?') if st else '?'
+            last = i18n.name(stops.get(st[-1], {}).get('name', '?')) if st else '?'
             self.variant_menu.addItemWithTitle_(f'{i + 1}. {k} → {last}')
         self.variant_menu.selectItemAtIndex_(self.variant_keys.index(vid))
 
@@ -92,10 +94,10 @@ class TabsMixin:
         for i, sid in enumerate(route):
             for d, v in sorted(by_next.get(sid, []), key=lambda t: -t[0]):
                 rows.append({'kind': 'bus', 'id': str(v.get('id', '?')),
-                             'text': f'Bus {v.get("id", "?")} · {fmt_dist(d)} to next stop'})
-            rows.append({'kind': 'stop', 'sid': sid, 'name': stops.get(sid, {}).get('name', 'Unnamed stop'),
+                             'text': i18n.t('bus_to_next', id=v.get('id', '?'), dist=fmt_dist(d))})
+            rows.append({'kind': 'stop', 'sid': sid, 'name': i18n.name(stops.get(sid, {}).get('name')) or i18n.t('unnamed_stop'),
                          'selected': sid == self.selected_stop_id, 'first': i == 0, 'last': i == len(route) - 1})
-        self.route_source.rows = rows or [{'message': 'No stops for this route.'}]
+        self.route_source.rows = rows or [{'message': i18n.t('no_stops_route')}]
         self.route_table.reloadData()
         if self.tab == 1:
             self.update_tab_ui()
@@ -110,9 +112,9 @@ class TabsMixin:
     # ---- Nearby tab: nearest stops via CoreLocation (fallback: map centre) --------
     def rebuild_nearby(self):
         if not self.line_data:
-            self.near_source.rows = [{'message': 'Loading line…'}]
+            self.near_source.rows = [{'message': i18n.t('loading_line_short')}]
         elif self.user_loc is None:
-            self.near_source.rows = [{'message': 'Tap “Locate me” to find the nearest stops.'}]
+            self.near_source.rows = [{'message': i18n.t('tap_locate')}]
         else:
             lat, lon, src = self.user_loc
             cand = []
@@ -126,12 +128,12 @@ class TabsMixin:
             for i, (d, sid, s) in enumerate(cand[:6]):
                 ap = self.approaching_for(sid)
                 soon = min(ap, key=lambda r: r['eta_s']) if ap else None
-                rows.append({'kind': 'near', 'sid': sid, 'name': s.get('name', 'Unnamed stop'),
+                rows.append({'kind': 'near', 'sid': sid, 'name': i18n.name(s.get('name')) or i18n.t('unnamed_stop'),
                              'dist_txt': fmt_dist(d), 'closest': i == 0,
-                             'walk': f'~{max(1, round(d * 1000 / WALK_M_PER_MIN))} min walk',
+                             'walk': i18n.t('walk', n=max(1, round(d * 1000 / WALK_M_PER_MIN))),
                              'bus_id': soon['id'] if soon else None,
                              'eta_s': soon['eta_s'] if soon else None, 't0': now,
-                             'next_txt': (f'Bus {soon["id"]} · {fmt_eta(soon["eta_s"])}' if soon
-                                          else 'No approaching bus')})
-            self.near_source.rows = rows or [{'message': 'No stops with coordinates on this line.'}]
+                             'next_txt': (i18n.t('bus_eta', id=soon['id'], eta=fmt_eta(soon['eta_s'])) if soon
+                                          else i18n.t('no_approaching_bus'))})
+            self.near_source.rows = rows or [{'message': i18n.t('no_stop_coords')}]
         self.near_table.reloadData()

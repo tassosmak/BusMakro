@@ -20,7 +20,7 @@ except Exception:  # pragma: no cover
     CoreLocation = None
     HAS_CL = False
 from oasa.app.data import DataMixin
-from oasa.app.explore import NO_LINE, ExploreMixin
+from oasa.app.explore import ExploreMixin
 from oasa.app.location import LocationMixin
 from oasa.app.sheet import SheetMixin
 from oasa.app.tabs import TabsMixin
@@ -30,7 +30,9 @@ from oasa.eta import fmt_eta
 from oasa.ui.map import HTML_MAP
 from oasa.ui.menu import install_menu
 from oasa.ui.views import DragHandle, MapHandler, RowDataSource, WindowDragBar
-from oasa.ui.widgets import button, glass, haptic, label, line_id_of, solid
+from oasa import i18n
+from oasa.i18n import line_label, t
+from oasa.ui.widgets import button, glass, haptic, label, solid
 
 
 class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, ExploreMixin):
@@ -99,7 +101,7 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
         # --- Floating top bar ---
         self.pill = glass(NSMakeRect(0, 0, 420, PILL_H), 18)
         self.title = label('Makro OASA', 16, True, rounded=True)
-        self.status = label('Finding stops near you…', 11, color=NSColor.secondaryLabelColor())
+        self.status = label(t('finding_stops'), 11, color=NSColor.secondaryLabelColor())
         self.refresh_button = button('↻', self, 'refresh:', 7)  # circular
         for v in (self.title, self.status, self.refresh_button):
             self.pill.addSubview_(v)
@@ -115,22 +117,22 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
         self.handle_pill = solid(NSMakeRect(0, 0, 40, 5), NSColor.tertiaryLabelColor(), 2.5)
         self.handle.addSubview_(self.handle_pill)
 
-        self.back_button = button('‹ Back', self, 'backClicked:', 1)
-        self.explore_heading = label('STOPS NEAR YOU', 11, True, NSColor.secondaryLabelColor())
+        self.back_button = button(t('back'), self, 'backClicked:', 1)
+        self.explore_heading = label(t('h_stops_near_you'), 11, True, NSColor.secondaryLabelColor())
         self.line_menu = NSPopUpButton.alloc().initWithFrame_(NSMakeRect(0, 0, 100, 28))
         self.line_menu.setTarget_(self); self.line_menu.setAction_('lineChanged:')
-        self.tabs = NSSegmentedControl.segmentedControlWithLabels_trackingMode_target_action_(TABS, 0, self, 'tabChanged:')
+        self.tabs = NSSegmentedControl.segmentedControlWithLabels_trackingMode_target_action_([t(k) for k in TABS], 0, self, 'tabChanged:')
         self.tabs.setSelectedSegment_(0)
         self.search = NSSearchField.alloc().initWithFrame_(NSMakeRect(0, 0, 100, 26))
-        self.search.setPlaceholderString_('Search stop name…')
+        self.search.setPlaceholderString_(t('search_stop'))
         self.search.setSendsSearchStringImmediately_(True)
         self.search.setTarget_(self); self.search.setAction_('searchChanged:')
         self.stop_menu = NSPopUpButton.alloc().initWithFrame_(NSMakeRect(0, 0, 100, 28))
         self.stop_menu.setTarget_(self); self.stop_menu.setAction_('stopChanged:')
         self.variant_menu = NSPopUpButton.alloc().initWithFrame_(NSMakeRect(0, 0, 100, 26))
         self.variant_menu.setTarget_(self); self.variant_menu.setAction_('variantChanged:')
-        self.arrival_heading = label('APPROACHING BUSES', 11, True, NSColor.secondaryLabelColor())
-        self.locate_button = button('📍 Locate me', self, 'locateMe:', 1)
+        self.arrival_heading = label(t('h_approaching'), 11, True, NSColor.secondaryLabelColor())
+        self.locate_button = button(t('locate_me'), self, 'locateMe:', 1)
         self.locate_button.setControlSize_(1); self.locate_button.setFont_(NSFont.systemFontOfSize_(11))
 
         self.table_source = RowDataSource.alloc().init(); self.table_source.app = self
@@ -141,7 +143,7 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
         self.route_scroll, self.route_table, self.route_col = self.make_table(self.route_source, 'routeClicked:')
         self.near_scroll, self.near_table, self.near_col = self.make_table(self.near_source, 'nearbyClicked:')
         self.explore_scroll, self.explore_table, self.explore_col = self.make_table(self.explore_source, 'exploreClicked:')
-        self.explore_source.rows = [{'message': 'Finding stops near you…'}]
+        self.explore_source.rows = [{'message': t('finding_stops')}]
 
         for v in (self.handle, self.back_button, self.explore_heading, self.explore_scroll, self.line_menu, self.tabs, self.search, self.stop_menu, self.variant_menu,
                   self.arrival_heading, self.locate_button, self.arr_scroll, self.route_scroll, self.near_scroll):
@@ -326,7 +328,8 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
             if self.mode == 'line':
                 self.go_home()
             return
-        line_id = line_id_of(sender.titleOfSelectedItem())
+        idx = int(sender.indexOfSelectedItem()) - 1  # item 0 is the placeholder
+        line_id = self.lines[idx]['id'] if 0 <= idx < len(self.lines) else None
         if line_id:
             if self.mode != 'line':
                 log('mode -> line')
@@ -337,7 +340,7 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
             self.selected_stop_id = None
             self.route_variant = None; self.route_variant_user = False
             self.pinned_id = None
-            self.status.setStringValue_(f'Loading line {line_id}…')
+            self.status.setStringValue_(t('loading_line', line=line_label(line_id)))
             threading.Thread(target=self.fetch_line, args=(line_id,), daemon=True).start()
 
     def stopChanged_(self, sender):
@@ -352,7 +355,7 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
         self.stop_menu.removeAllItems(); self.stop_options = {}
         stops = self.line_data.get('stops', {})
         for sid, s in sorted(stops.items(), key=lambda x: str(x[1].get('name', '')).casefold()):
-            title = f'{s.get("name", "Unnamed stop")} [{sid}]'
+            title = self.stop_title(sid, s)
             if term and term not in title.casefold():
                 continue
             self.stop_menu.addItemWithTitle_(title)
@@ -390,7 +393,7 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
         self.render_arrivals(self.live)
         if self.current_line:  # get official predictions for the new stop
             threading.Thread(target=self.fetch_live, args=(self.current_line,), daemon=True).start()
-        title = f'{stop.get("name", "Unnamed stop")} [{sid}]'
+        title = self.stop_title(sid, stop)
         if title in self.stop_options:
             self.stop_menu.selectItemWithTitle_(title)
         if self.tab == 1:
@@ -406,6 +409,13 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
             threading.Thread(target=self.fetch_live, args=(self.current_line,), daemon=True).start()
         elif self.mode == 'stop' and self.explore_stop:
             self.fetch_stop_lines_async(self.explore_stop['id'])
+
+    def setLanguage_(self, sender):
+        code = str(sender.representedObject())
+        if code != i18n.lang():
+            log(f'language -> {code}')
+            i18n.set_lang(code)
+            self.apply_language()
 
     def backClicked_(self, sender):
         haptic()
@@ -496,7 +506,7 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
         for r in self.near_source.rows:
             lab = r.get('next_label')
             if lab is not None and r.get('eta_s') is not None:
-                lab.setStringValue_(f'Bus {r["bus_id"]} · {fmt_eta(r["eta_s"] - (now - r["t0"]))}')
+                lab.setStringValue_(t('bus_eta', id=r['bus_id'], eta=fmt_eta(r['eta_s'] - (now - r['t0']))))
 
     def update_debug_panel(self):
         veh = len((self.live or {}).get('vehicles', []))
@@ -527,16 +537,11 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
             elif kind == 'stop_lines':
                 self.on_stop_lines(item[1], item[2])
             elif kind == 'error':
-                self.status.setStringValue_('Error: ' + item[1][:120])
+                self.status.setStringValue_(t('error', msg=item[1][:120]))
             elif kind == 'lines':
                 self.lines = item[1].get('lines', [])
                 log(f'lines loaded: {len(self.lines)}')
-                self.line_menu.removeAllItems()
-                self.line_menu.addItemWithTitle_(NO_LINE)
-                for line in self.lines:
-                    self.line_menu.addItemWithTitle_(f'{line["id"]} — {line.get("name", "")}')
-                if self.mode != 'line':
-                    self.line_menu.selectItemAtIndex_(0)
+                self.fill_line_menu()
             elif kind == 'line':
                 _, line_id, static, live = item
                 if line_id != self.current_line or self.mode != 'line':
@@ -549,7 +554,7 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
                 self.push_stops(fit=True)
                 self.render_arrivals(self.live)
                 self.do_layout()
-                self.status.setStringValue_(f'Line {line_id} · {len(self.live.get("vehicles", []))} live buses')
+                self.status.setStringValue_(t('line_live', line=line_label(line_id), n=len(self.live.get('vehicles', []))))
                 if self.pending_stop:
                     sid, self.pending_stop = self.pending_stop, None
                     if sid in self.line_data.get('stops', {}):
@@ -562,6 +567,6 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
                     log(f'dropped stale live response {line_id} (current {self.current_line})', 'WARN')
                     continue
                 self.render_arrivals(live)
-                self.status.setStringValue_(f'Line {line_id} · Updated {datetime.now().astimezone():%H:%M:%S}')
+                self.status.setStringValue_(t('line_updated', line=line_label(line_id), time=f'{datetime.now().astimezone():%H:%M:%S}'))
         if DEBUG:
             self.update_debug_panel()

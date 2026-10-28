@@ -7,11 +7,12 @@ The app has three modes:
 """
 import json, threading
 from oasa.api import get_closest_stops, get_stop_lines
-from oasa.config import NEAR_MIN_ZOOM, NEAR_REFETCH_KM, WALK_M_PER_MIN
+from oasa.config import NEAR_MIN_ZOOM, NEAR_REFETCH_KM, TABS, WALK_M_PER_MIN
 from oasa.debug import log
 from oasa.eta import distance_km, fmt_dist
+from oasa.i18n import line_label, name, t
+from oasa.ui.menu import install_menu
 
-NO_LINE = 'Browse a line…'
 
 
 class ExploreMixin:
@@ -46,14 +47,13 @@ class ExploreMixin:
 
     def open_line_at_stop(self, line_id):
         """Switch to the single-line view of `line_id`, with the current stop selected."""
-        title = next((self.line_menu.itemTitleAtIndex_(i) for i in range(self.line_menu.numberOfItems())
-                      if self.line_menu.itemTitleAtIndex_(i).startswith(f'{line_id} —')), None)
-        if title is None:
-            self.status.setStringValue_(f'No route data for line {line_id}')
+        idx = next((i for i, ln in enumerate(self.lines) if ln['id'] == line_id), None)
+        if idx is None:
+            self.status.setStringValue_(t('no_route_for_line', line=line_label(line_id)))
             log(f'line {line_id} not in lines.json', 'WARN')
             return
         self.pending_stop = self.explore_stop['id'] if self.explore_stop else None
-        self.line_menu.selectItemWithTitle_(title)
+        self.line_menu.selectItemAtIndex_(idx + 1)  # item 0 is the 'browse a line' placeholder
         self.lineChanged_(self.line_menu)
 
     def go_back(self):
@@ -76,6 +76,44 @@ class ExploreMixin:
         if self.line_menu.numberOfItems():
             self.line_menu.selectItemAtIndex_(0)
 
+    # ---- Language -----------------------------------------------------------------
+    def stop_title(self, sid, stop):
+        """Stop-menu title; the same function builds and looks up titles."""
+        return f'{name(stop.get("name")) or t("unnamed_stop")} [{sid}]'
+
+    def fill_line_menu(self):
+        """(Re)build the line dropdown in the current language, keeping the selection."""
+        keep = self.line_menu.indexOfSelectedItem() if self.line_menu.numberOfItems() else 0
+        self.line_menu.removeAllItems()
+        self.line_menu.addItemWithTitle_(t('browse_line'))
+        for line in self.lines:
+            self.line_menu.addItemWithTitle_(f'{line_label(line["id"])} — {name(line.get("name"), line.get("name_en"))}')
+        self.line_menu.selectItemAtIndex_(keep if self.mode == 'line' and 0 <= keep < self.line_menu.numberOfItems() else 0)
+
+    def apply_language(self):
+        """Relabel everything after a language switch."""
+        install_menu('Makro OASA', self)
+        self.back_button.setTitle_(t('back'))
+        self.locate_button.setTitle_(t('locate_me'))
+        self.search.setPlaceholderString_(t('search_stop'))
+        for i, key in enumerate(TABS):
+            self.tabs.setLabel_forSegment_(t(key), i)
+        self.fill_line_menu()
+        if self.mode == 'line' and self.line_data:
+            self.searchChanged_(self.search)
+            if self.selected_stop_id:
+                title = self.stop_title(self.selected_stop_id, self.line_data.get('stops', {}).get(self.selected_stop_id, {}))
+                if title in self.stop_options:
+                    self.stop_menu.selectItemWithTitle_(title)
+            self.push_stops()
+            self.render_arrivals(self.live)
+        else:
+            self.show_near_stops(selected=self.explore_stop['id'] if self.mode == 'stop' and self.explore_stop else None)
+            self.rebuild_explore()
+        if self.mode == 'home':
+            self.status.setStringValue_(t('stops_in_area') if self.near_from_map else t('stops_near_you'))
+        self.do_layout()
+
     # ---- Data -------------------------------------------------------------------
     def fetch_near_stops_async(self, lat, lon, from_map=False):
         """Stops around (lat, lon): your location, or the map centre after you pan (`from_map`)."""
@@ -85,7 +123,7 @@ class ExploreMixin:
             try:
                 self.results.put(('near_stops', (lat, lon), from_map, get_closest_stops(lat, lon)))
             except Exception as e:
-                self.results.put(('error', f'Nearby stops: {e}'))
+                self.results.put(('error', t('err_nearby', msg=e)))
         threading.Thread(target=work, daemon=True).start()
 
     def fetch_stop_lines_async(self, sid):
@@ -93,7 +131,7 @@ class ExploreMixin:
             try:
                 self.results.put(('stop_lines', sid, get_stop_lines(sid)))
             except Exception as e:
-                self.results.put(('error', f'Lines at stop: {e}'))
+                self.results.put(('error', t('err_lines_at_stop', msg=e)))
         threading.Thread(target=work, daemon=True).start()
 
     def on_map_moved(self, lat, lon, zoom):
@@ -121,8 +159,8 @@ class ExploreMixin:
         if self.mode == 'home':
             self.show_near_stops(fit=not from_map)  # never move the map the user just moved
             self.rebuild_explore()
-            self.status.setStringValue_(self.explore_heading_text().capitalize() if from_map
-                                        else 'Stops near you' if me else 'Stops near the map centre')
+            self.status.setStringValue_(t('stops_in_area') if from_map
+                                        else t('stops_near_you') if me else t('stops_near_centre'))
             self.do_layout()
 
     def on_stop_lines(self, sid, lines):
@@ -134,9 +172,10 @@ class ExploreMixin:
 
     # ---- Views ------------------------------------------------------------------
     def show_near_stops(self, selected=None, fit=False):
-        items = [{'id': s['id'], 'name': s['name'], 'lat': s['lat'], 'lon': s['lon']} for s in self.near_stops.values()]
+        shown = list(self.near_stops.values())
         if self.explore_stop and self.explore_stop['id'] not in self.near_stops:
-            items.append({k: self.explore_stop[k] for k in ('id', 'name', 'lat', 'lon')})
+            shown.append(self.explore_stop)
+        items = [{'id': s['id'], 'name': name(s['name'], s.get('name_en')), 'lat': s['lat'], 'lon': s['lon']} for s in shown]
         self.evaluate_js('window.setStops(' + json.dumps(items) + ',' + json.dumps(selected) + ','
                          + json.dumps(bool(fit)) + ',' + str(int(self.sheet_h)) + ');')
 
@@ -144,43 +183,44 @@ class ExploreMixin:
         if self.mode == 'home':
             stops = sorted(self.near_stops.values(), key=lambda s: s['rank'])
             if stops:
-                rows = [{'kind': 'near', 'sid': s['id'], 'name': s['name'], 'closest': i == 0 and not self.near_from_map,
+                rows = [{'kind': 'near', 'sid': s['id'], 'name': name(s['name'], s.get('name_en')) or t('unnamed_stop'),
+                         'closest': i == 0 and not self.near_from_map,
                          'dist_txt': fmt_dist(s['dist']),
-                         'walk': f'~{max(1, round(s["dist"] * 1000 / WALK_M_PER_MIN))} min walk',
+                         'walk': t('walk', n=max(1, round(s['dist'] * 1000 / WALK_M_PER_MIN))),
                          'bus_id': None, 'eta_s': None, 't0': 0,
-                         'next_txt': (s['street'] + ' · ' if s['street'] else '') + f'Stop {s["id"]}'}
+                         'next_txt': (name(s['street'], s.get('street_en')) + ' · ' if s['street'] else '')
+                                     + t('stop_n', id=s['id'])}
                         for i, s in enumerate(stops)]
             else:
-                rows = [{'message': 'Finding stops near you…' if self.user_loc is None or self.loc_pending
-                         else 'No stops found nearby.'}]
+                rows = [{'message': t('finding_stops') if self.user_loc is None or self.loc_pending
+                         else t('no_stops_nearby')}]
         else:
             if self.stop_lines is None:
-                rows = [{'message': 'Loading lines at this stop…'}]
+                rows = [{'message': t('loading_lines_at_stop')}]
             elif not self.stop_lines:
-                rows = [{'message': 'No lines found for this stop.'}]
+                rows = [{'message': t('no_lines_at_stop')}]
             else:
                 rows = []
                 for ln in self.stop_lines:
                     etas, sched = ln['etas'], ln.get('sched')
-                    row = {'kind': 'stopline', 'line': ln['line'], 'name': ln['name'], 'scheduled': False}
+                    row = {'kind': 'stopline', 'line': ln['line'], 'name': name(ln['name'], ln.get('name_en')), 'scheduled': False}
                     if etas:  # a bus is on the road: official live prediction
-                        row['eta_txt'] = f'{etas[0]} min'
-                        row['next_txt'] = ('Then ' + ', '.join(f'{m} min' for m in etas[1:3]) if len(etas) > 1
-                                           else 'Live')
+                        row['eta_txt'] = t('min', n=etas[0])
+                        row['next_txt'] = (t('then', list=', '.join(t('min', n=m) for m in etas[1:3])) if len(etas) > 1
+                                           else t('live'))
                     elif sched:  # not on the road yet: timetable + rough travel time
-                        row['eta_txt'] = f'~{sched["eta_min"]} min'
-                        row['next_txt'] = (f'Scheduled · leaves the terminus {sched["depart"]:%H:%M}, '
-                                           f'here ~{sched["arrive"]:%H:%M}')
+                        row['eta_txt'] = t('approx_min', n=sched['eta_min'])
+                        row['next_txt'] = t('scheduled', depart=f'{sched["depart"]:%H:%M}', arrive=f'{sched["arrive"]:%H:%M}')
                         row['scheduled'] = True
                     else:
                         row['eta_txt'] = '—'
-                        row['next_txt'] = 'No more buses today'
+                        row['next_txt'] = t('no_more_today')
                     rows.append(row)
         self.explore_source.rows = rows
         self.explore_table.reloadData()
 
     def explore_heading_text(self):
         if self.mode == 'home':
-            return 'STOPS IN THIS AREA' if self.near_from_map else 'STOPS NEAR YOU'
+            return t('h_stops_in_area') if self.near_from_map else t('h_stops_near_you')
         s = self.explore_stop or {}
-        return f'{s.get("name", "")} · STOP {s.get("id", "")}'.upper()
+        return t('h_stop', name=name(s.get('name', ''), s.get('name_en')), id=s.get('id', '')).upper()

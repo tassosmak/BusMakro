@@ -9,11 +9,12 @@ except Exception:  # pragma: no cover
     HAS_CL = False
 from oasa.config import AUTH_NOT_DETERMINED, LOC_PROMPT_TIMEOUT, LOC_TIMEOUT
 from oasa.debug import log
+from oasa.i18n import t
 
 
 class LocationMixin:
     def start_location(self):
-        self.status.setStringValue_('Locating…')
+        self.status.setStringValue_(t('locating'))
         if not HAS_CL:
             self.use_map_center('pyobjc-framework-CoreLocation is not installed')
             return
@@ -41,7 +42,7 @@ class LocationMixin:
         log(f'location fallback -> map centre ({why})', 'WARN')
         self.loc_pending = None
         if not self.map_ready:
-            self.status.setStringValue_('Location unavailable')
+            self.status.setStringValue_(t('loc_unavailable'))
             return
 
         def done(result, error):
@@ -60,7 +61,7 @@ class LocationMixin:
         if self.mode != 'line':
             self.fetch_near_stops_async(lat, lon)
         if src == 'gps':
-            self.status.setStringValue_('Located you · showing nearest stops')
+            self.status.setStringValue_(t('located'))
             self.evaluate_js(f'window.focusStop({lat},{lon},15,{int(self.sheet_h)});')
         else:
-            self.status.setStringValue_('Location unavailable · using the map centre')
+            self.status.setStringValue_(t('loc_map_centre'))

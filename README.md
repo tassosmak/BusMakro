@@ -1,6 +1,23 @@
+<p align="center"><img src="resources/icon.png" width="128" alt="Makro OASA icon"></p>
+
 # Makro OASA
 
-A native macOS app for tracking Athens (OASA) buses live. It is built with Python and AppKit (via PyObjC) and has a phone-style layout: a full-window map with a floating top bar and a bottom sheet you can drag up and down.
+A native macOS app for tracking Athens (OASA) buses live, in Greek or English. Open it and it shows the stops around you; tap one to see every line that stops there and when the next bus comes.
+
+It is built with Python and AppKit (via PyObjC) and has a phone-style layout: a full-window map with a floating top bar and a bottom sheet you can drag up and down.
+
+## Download & install
+
+1. Download **`Makro-OASA-<version>-macOS.zip`** from the [latest release](https://github.com/tassosmak/Makro_Oasa/releases/latest).
+2. Unzip it and drag **Makro OASA** into your **Applications** folder.
+3. **The first time you open it, macOS will block it**, because the app isn't signed with a paid Apple developer certificate:
+   - **macOS 15 (Sequoia) and later:** open the app once, then go to **System Settings → Privacy & Security**, scroll down and click **Open Anyway**.
+   - **macOS 14 and earlier:** right-click (or Control-click) the app → **Open** → **Open**.
+
+   You only need to do this once.
+4. When it asks to use your location, click **Allow**, so it can show the stops near you. You can change this later in System Settings → Privacy & Security → Location Services.
+
+**Requirements:** macOS 11 (Big Sur) or later, on an Apple Silicon Mac. The current build is arm64 only.
 
 ## Features
 
@@ -15,34 +32,40 @@ A native macOS app for tracking Athens (OASA) buses live. It is built with Pytho
 - **Auto-refresh.** Data updates every 15 seconds; you can also refresh by hand.
 - **Keyboard shortcuts.** ⌘Q quit, ⌘H hide, ⌘W close, ⌘M minimize, ⌘R refresh, ⌘L locate me, ⌘[ back, and ⌘C/⌘V/⌘A in the search field.
 - **Window drag bar.** Hover over the top edge of the window and a bar fades in, together with the red/yellow/green window buttons (hidden otherwise): drag it to move the window, or double-click it to zoom.
+- **Greek or English.** The whole app, including the menus, works in both. It starts in your Mac's language; switch it under **View → Language**. In English, stop and line names use OASA's official English names, or a standard (ELOT 743) transliteration where OASA has none.
 - **Debug mode.** Writes a detailed log to the terminal and to an in-app overlay (🐞).
 
-## Requirements
+## Building from source
 
-- macOS
-- Python 3 in a conda environment (the project uses `oasa-gui`)
+### Requirements
+
+- macOS, with Python 3 in a conda environment (the project uses `oasa-gui`)
 - These packages:
 
 ```bash
 python -m pip install pyobjc-framework-Cocoa pyobjc-framework-WebKit pyobjc-framework-CoreLocation requests py2app
 ```
 
-`pyobjc-framework-CoreLocation` and `py2app` are only needed for your real location in the Nearby tab. Without them, the app uses the map centre instead.
+### Release build
 
-## Running
+```bash
+/opt/anaconda3/envs/oasa-gui/bin/python tools/build_app.py
+```
 
-### As an app (recommended: needed for your location)
+This creates `dist/Makro OASA.app` and `dist/Makro-OASA-<version>-macOS.zip`. The app is fully standalone: it includes Python, every package and the shared libraries conda's Python needs (libffi, OpenSSL, zlib…). The script copies those libraries in, ad-hoc signs every library and the app, then zips it. The version number lives in `setup.py` (`VERSION`).
 
-macOS only shows the location permission prompt for a real `.app` bundle. Build one once:
+The icon is drawn by `tools/make_icon.py` (it writes `resources/icon.icns` and `resources/icon.png`).
+
+### Development build
+
+macOS only shows the location permission prompt for a real `.app` bundle, so for development, build an alias app once:
 
 ```bash
 /opt/anaconda3/envs/oasa-gui/bin/python setup.py py2app -A
 open "dist/Makro OASA.app"
 ```
 
-This is a development build: it runs the source files in place, so code changes take effect the next time you open the app. You only need to rebuild if `setup.py` changes. For a standalone app that doesn't depend on this folder, build without `-A`.
-
-The first time you use locate, macOS asks for permission. You can change it later in System Settings → Privacy & Security → Location Services.
+It runs the source files in place, so code changes take effect the next time you open it. You only need to rebuild if `setup.py` changes.
 
 To see the debug log while running the app:
 
@@ -57,7 +80,7 @@ open --env MAKRO_DEBUG=1 --stdout /dev/tty --stderr /dev/tty "dist/Makro OASA.ap
 /opt/anaconda3/envs/oasa-gui/bin/python main.py --debug
 ```
 
-This works for everything except your location: macOS silently refuses location access to a bare `python` process, so Nearby falls back to the map centre.
+This works for everything except your location: macOS silently refuses location access to a bare `python` process, so the app falls back to the map centre.
 
 You can also turn debug on by setting `MAKRO_DEBUG=1`, or by setting `DEBUG_DEFAULT = True` in `oasa/debug.py`.
 
@@ -96,13 +119,18 @@ On the stop screen, a line with no live prediction gets a **timetable estimate**
 
 ```
 main.py              Entry point: starts the macOS app
-setup.py             py2app build script for "Makro OASA.app" (Info.plist with the location reason)
+setup.py             py2app settings for "Makro OASA.app" (version, icon, Info.plist with the location reason)
+tools/
+  build_app.py       Release build: py2app + bundled libraries + signing + zip
+  make_icon.py       Draws the app icon
+resources/           icon.icns (app icon), icon.png (README)
 oasa/
   config.py          URLs, refresh rate, ETA settings, layout sizes
   debug.py           Debug flag and thread-safe logger
   api.py             HTTP helpers and the OASA calls (closest stops, lines at a stop, predictions)
   eta.py             Distances, the fallback ETA estimate, ETA/distance formatting
   schedule.py        Timetable-based ETA for lines with no bus on the road yet
+  i18n.py            Greek/English text, place names and ELOT 743 transliteration
   ui/
     widgets.py       Small AppKit helpers (labels, buttons, glass panels, fonts) and the list cards
     menu.py          The menu bar (keyboard shortcuts only work through menu items on macOS)
@@ -141,5 +169,6 @@ This app is built on other people's work. Thank you to:
 - **[CARTO](https://carto.com/attributions)** basemaps, with map data © **[OpenStreetMap](https://www.openstreetmap.org/copyright)** contributors (ODbL). The map shows this attribution in its corner.
 - **[PyObjC](https://pyobjc.readthedocs.io/)**: Python bindings for the macOS frameworks (AppKit, WebKit, CoreLocation).
 - **[Requests](https://requests.readthedocs.io/)**: HTTP requests.
+- **[py2app](https://py2app.readthedocs.io/)**: packaging the app.
 
 This is an unofficial project. It is not affiliated with or endorsed by OASA.

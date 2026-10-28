@@ -1,5 +1,6 @@
 """The menu bar. On macOS keyboard shortcuts (⌘Q, ⌘W, ⌘C…) only work through menu items."""
 from AppKit import NSApplication, NSMenu, NSMenuItem
+from oasa.i18n import LANG_NAMES, LANGS, lang, t
 
 CMD, SHIFT, OPT = 1 << 20, 1 << 17, 1 << 19   # NSEventModifierFlag Command / Shift / Option
 
@@ -27,32 +28,41 @@ def install_menu(app_name, delegate):
     bar = NSMenu.alloc().init()
 
     m = _submenu(bar, app_name)
-    _item(m, f'About {app_name}', 'orderFrontStandardAboutPanel:')
+    _item(m, t('m_about', app=app_name), 'orderFrontStandardAboutPanel:')
     m.addItem_(NSMenuItem.separatorItem())
-    _item(m, f'Hide {app_name}', 'hide:', 'h')
-    _item(m, 'Hide Others', 'hideOtherApplications:', 'h', mods=CMD | OPT)
-    _item(m, 'Show All', 'unhideAllApplications:')
+    _item(m, t('m_hide', app=app_name), 'hide:', 'h')
+    _item(m, t('m_hide_others'), 'hideOtherApplications:', 'h', mods=CMD | OPT)
+    _item(m, t('m_show_all'), 'unhideAllApplications:')
     m.addItem_(NSMenuItem.separatorItem())
-    _item(m, f'Quit {app_name}', 'terminate:', 'q')
+    _item(m, t('m_quit', app=app_name), 'terminate:', 'q')
 
-    m = _submenu(bar, 'Edit')  # makes ⌘C/⌘V/⌘A work in the stop search field
-    _item(m, 'Undo', 'undo:', 'z')
-    _item(m, 'Redo', 'redo:', 'z', mods=CMD | SHIFT)
+    m = _submenu(bar, t('m_edit'))  # makes ⌘C/⌘V/⌘A work in the stop search field
+    _item(m, t('m_undo'), 'undo:', 'z')
+    _item(m, t('m_redo'), 'redo:', 'z', mods=CMD | SHIFT)
     m.addItem_(NSMenuItem.separatorItem())
-    _item(m, 'Cut', 'cut:', 'x')
-    _item(m, 'Copy', 'copy:', 'c')
-    _item(m, 'Paste', 'paste:', 'v')
-    _item(m, 'Select All', 'selectAll:', 'a')
+    _item(m, t('m_cut'), 'cut:', 'x')
+    _item(m, t('m_copy'), 'copy:', 'c')
+    _item(m, t('m_paste'), 'paste:', 'v')
+    _item(m, t('m_select_all'), 'selectAll:', 'a')
 
-    m = _submenu(bar, 'View')
-    _item(m, 'Refresh', 'refresh:', 'r', target=delegate)
-    _item(m, 'Locate Me', 'locateMe:', 'l', target=delegate)
-    _item(m, 'Back', 'backClicked:', '[', target=delegate)
+    m = _submenu(bar, t('m_view'))
+    _item(m, t('m_refresh'), 'refresh:', 'r', target=delegate)
+    _item(m, t('m_locate'), 'locateMe:', 'l', target=delegate)
+    _item(m, t('m_back'), 'backClicked:', '[', target=delegate)
+    m.addItem_(NSMenuItem.separatorItem())
+    langs = NSMenu.alloc().initWithTitle_(t('m_language'))
+    for code in LANGS:
+        it = _item(langs, LANG_NAMES[code], 'setLanguage:', target=delegate)
+        it.setRepresentedObject_(code)
+        it.setState_(1 if code == lang() else 0)  # checkmark on the current language
+    top = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(t('m_language'), None, '')
+    top.setSubmenu_(langs)
+    m.addItem_(top)
 
-    m = _submenu(bar, 'Window')
-    _item(m, 'Minimize', 'performMiniaturize:', 'm')
-    _item(m, 'Zoom', 'performZoom:')
-    _item(m, 'Close', 'performClose:', 'w')
+    m = _submenu(bar, t('m_window'))
+    _item(m, t('m_minimize'), 'performMiniaturize:', 'm')
+    _item(m, t('m_zoom'), 'performZoom:')
+    _item(m, t('m_close'), 'performClose:', 'w')
     app.setWindowsMenu_(m)
 
     app.setMainMenu_(bar)

@@ -36,7 +36,7 @@ PILL_H = 52
 
 WALK_M_PER_MIN = 80.0
 
-TABS = ['Arrivals', 'Route', 'Nearby']
+TABS = ['tab_arrivals', 'tab_route', 'tab_nearby']   # i18n keys
 
 OASA_API = "https://telematics.oasa.gr/api/"
 

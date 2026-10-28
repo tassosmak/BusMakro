@@ -71,8 +71,9 @@ def get_closest_stops(lat, lon, limit=NEAR_STOPS_LIMIT):
     stops = []
     for s in oasa_call('getClosestStops', lat, lon)[:limit]:
         try:
-            stops.append({'id': str(s['StopCode']), 'name': s.get('StopDescr') or s.get('StopDescrEng') or 'Unnamed stop',
-                          'street': s.get('StopStreet') or '', 'lat': float(s['StopLat']), 'lon': float(s['StopLng'])})
+            stops.append({'id': str(s['StopCode']), 'name': s.get('StopDescr') or s.get('StopDescrEng') or '',
+                          'name_en': s.get('StopDescrEng') or '', 'street': s.get('StopStreet') or '',
+                          'street_en': s.get('StopStreetEng') or '', 'lat': float(s['StopLat']), 'lon': float(s['StopLng'])})
         except (KeyError, TypeError, ValueError):
             continue
     return stops
@@ -100,6 +101,7 @@ def get_stop_lines(stop_id):
         if str(r.get('hidden', '0')) == '1' or not r.get('LineID'):
             continue
         ln = lines.setdefault(r['LineID'], {'line': r['LineID'], 'name': r.get('RouteDescr') or r.get('LineDescr') or '',
+                                            'name_en': r.get('RouteDescrEng') or r.get('LineDescrEng') or '',
                                             'line_code': str(r.get('LineCode') or ''), 'route_codes': [],
                                             'routes': [], 'etas': []})
         code = str(r.get('RouteCode'))

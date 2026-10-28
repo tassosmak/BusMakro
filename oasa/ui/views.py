@@ -4,6 +4,7 @@ from AppKit import NSAnimationContext, NSColor, NSMakeRect, NSTrackingArea, NSVi
 from Foundation import NSObject
 from oasa.debug import log
 from oasa.ui.widgets import make_row_view, row_height
+from oasa.i18n import t
 
 # NSTrackingMouseEnteredAndExited | NSTrackingActiveAlways | NSTrackingInVisibleRect
 TRACK_OPTIONS = 0x01 | 0x80 | 0x200
@@ -74,7 +75,7 @@ class MapHandler(NSObject):
         elif kind == 'error':
             msg = str(body.get('msg'))
             log('map error: ' + msg, 'ERROR')
-            self.app.status.setStringValue_('Map: ' + msg[:90])
+            self.app.status.setStringValue_(t('map_error', msg=msg[:90]))
         elif kind == 'console':
             level = str(body.get('level'))
             log(f'JS {level}: {body.get("msg")}', 'ERROR' if level == 'error' else 'JS')

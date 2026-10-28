@@ -1,6 +1,7 @@
 """Distances, our own ETA estimate (fallback) and ETA/distance formatting."""
 import math
 from oasa.config import ETA_DEFAULT_SPEED, ETA_MAX_SPEED, ETA_MIN_SPEED
+from oasa.i18n import t
 
 
 def distance_km(lat1, lon1, lat2, lon2):
@@ -43,9 +44,9 @@ def eta_seconds(v, dist_m, now):
 def fmt_eta(seconds):
     s = max(0.0, seconds)
     if s < 20:
-        return 'Due'
+        return t('due')
     m, sec = divmod(int(s), 60)
-    return f'{m}:{sec:02d} min'
+    return t('eta_min_sec', m=m, s=sec)
 
 def fmt_dist(km):
     return f'{int(round(km * 100) * 10)} m' if km < 1 else f'{km:.1f} km'

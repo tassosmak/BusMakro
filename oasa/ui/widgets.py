@@ -13,6 +13,7 @@ except Exception:  # pragma: no cover
     NSHapticFeedbackManager = None
 from oasa.config import BUS_ROW_H, LINE_ROW_H, MIN_X_MARGIN, NEAR_ROW_H, ROW_H, STOP_ROW_H, W_SIZABLE
 from oasa.eta import fmt_eta
+from oasa.i18n import line_label, t
 
 
 def haptic():
@@ -69,9 +70,6 @@ def solid(frame, color, radius=0):
         v.layer().setCornerRadius_(radius)
     return v
 
-def line_id_of(title):
-    return str(title or '').split(' — ', 1)[0].strip()
-
 # ---- Row views ----------------------------------------------------------------
 def row_height(row):
     if 'message' in row:
@@ -94,10 +92,10 @@ def make_row_view(row, width, app):
 
     if 'message' in row:
         root = NSView.alloc().initWithFrame_(NSMakeRect(0, 0, width, h))
-        t = label(row['message'], 12, color=NSColor.secondaryLabelColor())
-        t.setFrame_(NSMakeRect(12, 18, width - 24, 18))
-        t.setAlignment_(NSTextAlignmentCenter); t.setAutoresizingMask_(W_SIZABLE)
-        root.addSubview_(t)
+        msg = label(row['message'], 12, color=NSColor.secondaryLabelColor())
+        msg.setFrame_(NSMakeRect(12, 18, width - 24, 18))
+        msg.setAlignment_(NSTextAlignmentCenter); msg.setAutoresizingMask_(W_SIZABLE)
+        root.addSubview_(msg)
         return root
 
     if kind in ('stop', 'bus'):
@@ -123,7 +121,7 @@ def make_row_view(row, width, app):
             dot.layer().setBorderWidth_(2); dot.layer().setBorderColor_(NSColor.whiteColor().CGColor())
             root.addSubview_(dot)
             name = label(row['name'], 13, bool(sel)); name.setFrame_(NSMakeRect(52, 22, width - 64, 18))
-            sub = label(f'Stop {row["sid"]}', 11, color=NSColor.secondaryLabelColor()); sub.setFrame_(NSMakeRect(52, 6, width - 64, 14))
+            sub = label(t('stop_n', id=row['sid']), 11, color=NSColor.secondaryLabelColor()); sub.setFrame_(NSMakeRect(52, 6, width - 64, 14))
             name.setAutoresizingMask_(W_SIZABLE); sub.setAutoresizingMask_(W_SIZABLE)
             root.addSubview_(name); root.addSubview_(sub)
         else:
@@ -139,7 +137,7 @@ def make_row_view(row, width, app):
     if kind == 'stopline':
         root, card, cw = card_base(width, h)
         badge = solid(NSMakeRect(12, (h - 6) / 2 - 14, 58, 28), NSColor.systemBlueColor(), 8)
-        num = label(row['line'], 15, True, NSColor.whiteColor(), rounded=True); num.setFrame_(NSMakeRect(0, 4, 58, 20))
+        num = label(line_label(row['line']), 15, True, NSColor.whiteColor(), rounded=True); num.setFrame_(NSMakeRect(0, 4, 58, 20))
         num.setAlignment_(NSTextAlignmentCenter)
         badge.addSubview_(num)
         name = label(row['name'], 13, True); name.setFrame_(NSMakeRect(82, 30, cw - 82 - 86, 18))
@@ -165,7 +163,7 @@ def make_row_view(row, width, app):
         for v in (dist, walk, name, nxt):
             card.addSubview_(v)
         if row.get('closest'):
-            tag = label('CLOSEST', 9, True, NSColor.systemOrangeColor()); tag.setFrame_(NSMakeRect(cw - 78, 40, 66, 12))
+            tag = label(t('closest'), 9, True, NSColor.systemOrangeColor()); tag.setFrame_(NSMakeRect(cw - 78, 40, 66, 12))
             tag.setAlignment_(NSTextAlignmentRight); tag.setAutoresizingMask_(MIN_X_MARGIN)
             card.addSubview_(tag)
         return root
@@ -185,7 +183,7 @@ def make_row_view(row, width, app):
     pin = NSButton.alloc().initWithFrame_(NSMakeRect(cw - 38, 8, 30, 24))
     pin.setBordered_(False); pin.setFont_(NSFont.systemFontOfSize_(16))
     pin.setTitle_('📍' if row.get('pinned') else '⌖')
-    pin.setToolTip_('Follow this bus on the map')
+    pin.setToolTip_(t('follow_bus'))
     pin.setIdentifier_(row['id']); pin.setTarget_(app); pin.setAction_('pinBus:')
     pin.setAutoresizingMask_(MIN_X_MARGIN)
     for v in (eta, sub, title, trip, delay, pin):
