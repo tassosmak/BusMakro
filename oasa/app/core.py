@@ -38,9 +38,23 @@ from oasa.i18n import line_label, t
 from oasa.ui.widgets import button, float_button, glass, haptic, label, solid
 
 
+class MainQueue(queue.Queue):
+    """A queue whose put() also asks the main thread to drain it: no polling timer needed."""
+    def __init__(self, app):
+        super().__init__()
+        self.app = app
+
+    def put(self, item, block=True, timeout=None):
+        super().put(item, block, timeout)
+        self.app.performSelectorOnMainThread_withObject_waitUntilDone_('checkResults:', None, False)
+
+
 class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, ExploreMixin, GlanceMixin):
     def applicationDidFinishLaunching_(self, notification):
-        self.results = queue.Queue()
+        self.results = MainQueue(self)   # worker threads -> main thread (wakes it only when something arrives)
+        self.visible = True         # window on screen (not minimised, hidden, closed or covered)
+        self.tick_timer = None      # 1 s countdowns: only while visible on the line view
+        self.last_refresh = time.time()
         self.lines = []
         self.line_data = None
         self.live = {}
@@ -237,7 +251,9 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
         self.schedule_poll()
         self.setup_glance()
         from Foundation import NSTimer
-        NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(15, self, 'glanceTick:', None, True)
+        NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(15, self, 'glanceTick:', None, True).setTolerance_(5)
+        NSWorkspace.sharedWorkspace().notificationCenter().addObserver_selector_name_object_(
+            self, 'systemDidWake:', 'NSWorkspaceDidWakeNotification', None)
 
     def applicationShouldTerminateAfterLastWindowClosed_(self, app):
         return self.status_item is None  # with the menu bar item, closing the window keeps it running
@@ -311,6 +327,7 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
 
     def do_layout(self, reload=True):
         self.update_tab_ui()
+        self.update_timers()
         b = self.content.bounds()
         W, H = b.size.width, b.size.height
         self.map.setFrame_(NSMakeRect(0, 0, W, H))
@@ -761,6 +778,38 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
         if self.loc_pending and time.time() - self.loc_pending >= timer.userInfo():
             self.use_map_center('timed out')
 
+    def update_timers(self):
+        """Run the 1 s countdown tick only while its countdowns are on screen."""
+        want = self.visible and self.mode in ('line', 'search', 'home')
+        want = want and any(r.get('eta_s') is not None for r in self.table_source.rows + self.near_source.rows)
+        if want and self.tick_timer is None:
+            from Foundation import NSTimer
+            self.tick_timer = NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(1.0, self, 'tick:', None, True)
+            self.tick_timer.setTolerance_(0.1)
+        elif not want and self.tick_timer is not None:
+            self.tick_timer.invalidate()
+            self.tick_timer = None
+
+    def windowDidChangeOcclusionState_(self, notification):
+        """Minimised, hidden, closed or covered: pause everything; back on screen: catch up at once."""
+        vis = bool(self.window.occlusionState() & 2)  # NSWindowOcclusionStateVisible
+        if vis == self.visible:
+            return
+        self.visible = vis
+        log(f'window {"visible" if vis else "hidden"}: {"resuming" if vis else "pausing"}')
+        self.evaluate_js(f'window.setPaused({json.dumps(not vis)});')
+        self.update_timers()
+        if vis and time.time() - self.last_refresh > 10:
+            self.last_refresh = time.time()
+            self.refresh_current()
+
+    def systemDidWake_(self, notification):
+        log('mac woke up: refreshing')
+        self.last_refresh = time.time()
+        if self.visible:
+            self.refresh_current()
+        self.poll_glance()
+
     def tick_(self, timer):
         """Once a second: live ETA countdowns between data refreshes."""
         now = time.time()
@@ -805,6 +854,9 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
             if what:
                 self.succeeded(what)
             if kind == 'refresh_request':
+                if not self.visible:
+                    continue  # hidden: nothing to show (the menu bar polls favourites itself)
+                self.last_refresh = time.time()
                 self.refresh_current()
                 if self.lines and time.time() - self.alerts_at > ALERTS_EVERY_S:
                     self.fetch_alerts_async()

@@ -2,7 +2,6 @@
 import json, threading, time
 from urllib.parse import quote
 from AppKit import NSColor
-from Foundation import NSTimer
 from oasa.api import attach_oasa, error_kind, get_json, official_eta_s
 from oasa.config import API_BASE, REFRESH_SECONDS, STATIC_BASE
 from oasa.debug import log
@@ -130,10 +129,7 @@ class DataMixin:
 
     # ---- Polling --------------------------------------------------------------
     def schedule_poll(self):
-        NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(
-            0.2, self, 'checkResults:', None, True)
-        NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(
-            1.0, self, 'tick:', None, True)
+        # results arrive through MainQueue (no polling); the 1 s tick runs only when needed (update_timers)
         threading.Thread(target=self.auto_refresh_loop, daemon=True).start()
 
     def auto_refresh_loop(self):

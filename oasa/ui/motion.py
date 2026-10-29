@@ -76,7 +76,8 @@ def pulse_dot(x, y, size, color=None, fast=False):
     period = 1.1 if fast else 2.0
     g = CAAnimationGroup.animation()
     g.setAnimations_([_basic('transform.scale', 1.0, 2.6, period), _basic('opacity', 0.55, 0.0, period)])
-    g.setDuration_(period); g.setRepeatCount_(1e9); g.setTimingFunction_(_ease())
+    g.setDuration_(period); g.setTimingFunction_(_ease())
+    g.setRepeatCount_(1e9 if fast else 3)  # live: a few breaths per refresh, then still; due now: keeps going
     ring.addAnimation_forKey_(g, 'pulse')
     if fast:  # due now: the dot itself throbs too
         b = _basic('opacity', 1.0, 0.45, period / 2)

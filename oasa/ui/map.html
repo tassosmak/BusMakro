@@ -12,9 +12,8 @@
 .bus-wrap.pinned .bus-dot{border-color:#ff9500;box-shadow:0 0 0 3px #ff950066}
 .bus-wrap::after{content:'';position:absolute;left:0;top:0;width:27px;height:27px;border-radius:50%;border:2px solid #198754;opacity:0;pointer-events:none}
 .bus-wrap.ping::after{animation:ping 1.2s ease-out}
-@keyframes breathe{0%,100%{box-shadow:0 0 0 6px #0a84ff33}50%{box-shadow:0 0 0 13px #0a84ff14}}
 @keyframes ping{0%{transform:scale(1);opacity:.8}100%{transform:scale(2.4);opacity:0}}
-.user-dot{animation:breathe 2.4s ease-in-out infinite;width:14px;height:14px;border-radius:50%;background:#0a84ff;border:3px solid white;box-shadow:0 0 0 8px #0a84ff33}</style></head><body><div id="map"></div>
+.user-dot{width:14px;height:14px;border-radius:50%;background:#0a84ff;border:3px solid white;box-shadow:0 0 0 8px #0a84ff33,0 0 14px 6px #0a84ff22}</style></head><body><div id="map"></div>
 <script>
 function post(m){try{window.webkit.messageHandlers.oasa.postMessage(m)}catch(e){}}
 ['log','warn','error'].forEach(k=>{const o=console[k];console[k]=(...a)=>{o.apply(console,a);post({type:'console',level:k,msg:a.map(String).join(' ')})}});
@@ -151,9 +150,11 @@ function step(now){
     x.el.style.opacity=(nowS-x.fixAt>STALE_S||x.offRoute)?0.45:1;
   });
   if(pinned&&buses[pinned]&&now>followAfter&&now>userZoomUntil&&!map.isZooming())map.jumpTo({center:buses[pinned].cur,padding:{top:TOPPAD,left:0,right:0,bottom:padB}});
-  if(active)requestAnimationFrame(step);else rafOn=false;
+  if(active&&!paused)requestAnimationFrame(step);else rafOn=false;
 }
-function kick(){if(rafOn)return;rafOn=true;requestAnimationFrame(step);}
+let paused=false;  // window hidden: no drawing (Python resumes it)
+window.setPaused=function(p){paused=!!p;if(!paused)kick();};
+function kick(){if(rafOn||paused)return;rafOn=true;requestAnimationFrame(step);}
 function mkBus(id,to){const el=document.createElement('div');el.className='bus-wrap';el.title='Bus '+id;el.style.zIndex=2000;el.style.transition='opacity .4s';el.innerHTML='<div class="bus-rot"><div class="bus-arrow"></div></div><div class="bus-dot">🚌</div>';const m=new maplibregl.Marker({element:el}).setLngLat(to).addTo(map);el.addEventListener('click',ev=>{ev.stopPropagation();post({type:'bus',id:id})});return {m,el,rot:el.querySelector('.bus-rot'),cur:to,fix:to,fixAt:0,route:null,blendFrom:to,blendT0:0,angle:0,hdg:null};}
 window.setBuses=function(items){
   const seen=new Set(),nowS=Date.now()/1000,nowMs=performance.now();
