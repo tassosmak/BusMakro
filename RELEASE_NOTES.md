@@ -1,6 +1,6 @@
-# Makro OASA 1.0.0
+# BusMakro 1.0.0
 
-The first release of **Makro OASA**, a native macOS app for Athens buses, in Greek and English.
+The first release of **BusMakro**, a native macOS app for Athens buses, in Greek and English.
 
 ## What it does
 
@@ -14,7 +14,7 @@ The first release of **Makro OASA**, a native macOS app for Athens buses, in Gre
 
 ## Install
 
-1. Download **`Makro-OASA-1.0.0-macOS.zip`** below, unzip it, and move **Makro OASA** to **Applications**.
+1. Download **`BusMakro-1.0.0-macOS.zip`** below, unzip it, and move **BusMakro** to **Applications**.
 2. **First launch:** the app isn't notarized by Apple, so macOS blocks it the first time.
    - **macOS 15 (Sequoia) and later:** open it once, then go to **System Settings → Privacy & Security** and click **Open Anyway**.
    - **macOS 14 and earlier:** right-click the app → **Open** → **Open**.
@@ -22,7 +22,7 @@ The first release of **Makro OASA**, a native macOS app for Athens buses, in Gre
 
 **Requirements:** macOS 11 or later, **Apple Silicon** (M1 or newer). Intel Macs aren't supported in this build.
 
-**SHA-256** (`Makro-OASA-1.0.0-macOS.zip`): `8c9223e1b243ef9b33313f9d6256c539c19fa7958c239287ad7d90d4adae52e3`
+**SHA-256** (`BusMakro-1.0.0-macOS.zip`): `4952fdaa6b2f8c2ec254a0f32bcd0e44108de6006c3c488c7e1b680cc38c0381`
 
 ## Good to know
 

@@ -1,4 +1,4 @@
-"""Build the standalone release app: dist/Makro OASA.app and dist/Makro-OASA-<version>-macOS.zip
+"""Build the standalone release app: dist/BusMakro.app and dist/BusMakro-<version>-macOS.zip
 
 Run with the project's Python (the oasa-gui conda env):
     /opt/anaconda3/envs/oasa-gui/bin/python tools/build_app.py
@@ -13,7 +13,7 @@ Steps:
 import os, re, shutil, subprocess, sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-APP = os.path.join(ROOT, 'dist', 'Makro OASA.app')
+APP = os.path.join(ROOT, 'dist', 'BusMakro.app')
 PREFIX = sys.prefix  # the conda env the libraries come from
 LIB_SRC = os.path.join(PREFIX, 'lib')
 
@@ -86,7 +86,7 @@ def main():
     run(sys.executable, 'setup.py', 'py2app', stdout=subprocess.DEVNULL)
     bundle_rpath_libs()
     sign()
-    zip_path = os.path.join(ROOT, 'dist', f'Makro-OASA-{version()}-macOS.zip')
+    zip_path = os.path.join(ROOT, 'dist', f'BusMakro-{version()}-macOS.zip')
     run('ditto', '-c', '-k', '--sequesterRsrc', '--keepParent', APP, zip_path)
     print('built', APP)
     print('zipped', zip_path, f'({os.path.getsize(zip_path) / 1e6:.1f} MB)')

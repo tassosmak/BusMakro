@@ -76,7 +76,7 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
                  | NSWindowStyleMaskResizable | NSWindowStyleMaskFullSizeContentView)
         self.window = NSWindow.alloc().initWithContentRect_styleMask_backing_defer_(
             NSMakeRect(0, 0, 440, 880), style, NSBackingStoreBuffered, False)
-        self.window.setTitle_('Makro OASA'); self.window.setTitlebarAppearsTransparent_(True)
+        self.window.setTitle_('BusMakro'); self.window.setTitlebarAppearsTransparent_(True)
         self.window.setTitleVisibility_(1)
         self.window.setMinSize_((360, 640)); self.window.center(); self.window.setDelegate_(self)
         content = NSView.alloc().initWithFrame_(NSMakeRect(0, 0, 440, 880))
@@ -100,7 +100,7 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
 
         # --- Floating top bar ---
         self.pill = glass(NSMakeRect(0, 0, 420, PILL_H), 18)
-        self.title = label('Makro OASA', 16, True, rounded=True)
+        self.title = label('BusMakro', 16, True, rounded=True)
         self.status = label(t('finding_stops'), 11, color=NSColor.secondaryLabelColor())
         self.refresh_button = button('↻', self, 'refresh:', 7)  # circular
         for v in (self.title, self.status, self.refresh_button):
@@ -172,7 +172,7 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
             content.addSubview_(self.debug_panel)
 
         self.do_layout()
-        install_menu('Makro OASA', self)
+        install_menu('BusMakro', self)
         self.drag_bar.fade(0.0, animate=False)  # traffic lights start hidden, like the bar
         self.window.makeKeyAndOrderFront_(None)
         NSApplication.sharedApplication().activateIgnoringOtherApps_(True)

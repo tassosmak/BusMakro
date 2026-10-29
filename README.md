@@ -1,6 +1,6 @@
-<p align="center"><img src="resources/icon.png" width="128" alt="Makro OASA icon"></p>
+<p align="center"><img src="resources/icon.png" width="128" alt="BusMakro icon"></p>
 
-# Makro OASA
+# BusMakro
 
 A native macOS app for tracking Athens (OASA) buses live, in Greek or English. Open it and it shows the stops around you; tap one to see every line that stops there and when the next bus comes.
 
@@ -8,8 +8,8 @@ It is built with Python and AppKit (via PyObjC) and has a phone-style layout: a 
 
 ## Download & install
 
-1. Download **`Makro-OASA-<version>-macOS.zip`** from the [latest release](https://github.com/tassosmak/Makro_Oasa/releases/latest).
-2. Unzip it and drag **Makro OASA** into your **Applications** folder.
+1. Download **`BusMakro-<version>-macOS.zip`** from the [latest release](https://github.com/tassosmak/BusMakro/releases/latest).
+2. Unzip it and drag **BusMakro** into your **Applications** folder.
 3. **The first time you open it, macOS will block it**, because the app isn't signed with a paid Apple developer certificate:
    - **macOS 15 (Sequoia) and later:** open the app once, then go to **System Settings → Privacy & Security**, scroll down and click **Open Anyway**.
    - **macOS 14 and earlier:** right-click (or Control-click) the app → **Open** → **Open**.
@@ -52,7 +52,7 @@ python -m pip install pyobjc-framework-Cocoa pyobjc-framework-WebKit pyobjc-fram
 /opt/anaconda3/envs/oasa-gui/bin/python tools/build_app.py
 ```
 
-This creates `dist/Makro OASA.app` and `dist/Makro-OASA-<version>-macOS.zip`. The app is fully standalone: it includes Python, every package and the shared libraries conda's Python needs (libffi, OpenSSL, zlib…). The script copies those libraries in, ad-hoc signs every library and the app, then zips it. The version number lives in `setup.py` (`VERSION`).
+This creates `dist/BusMakro.app` and `dist/BusMakro-<version>-macOS.zip`. The app is fully standalone: it includes Python, every package and the shared libraries conda's Python needs (libffi, OpenSSL, zlib…). The script copies those libraries in, ad-hoc signs every library and the app, then zips it. The version number lives in `setup.py` (`VERSION`).
 
 The icon is drawn by `tools/make_icon.py` (it writes `resources/icon.icns` and `resources/icon.png`).
 
@@ -62,7 +62,7 @@ macOS only shows the location permission prompt for a real `.app` bundle, so for
 
 ```bash
 /opt/anaconda3/envs/oasa-gui/bin/python setup.py py2app -A
-open "dist/Makro OASA.app"
+open "dist/BusMakro.app"
 ```
 
 It runs the source files in place, so code changes take effect the next time you open it. You only need to rebuild if `setup.py` changes.
@@ -70,7 +70,7 @@ It runs the source files in place, so code changes take effect the next time you
 To see the debug log while running the app:
 
 ```bash
-open --env MAKRO_DEBUG=1 --stdout /dev/tty --stderr /dev/tty "dist/Makro OASA.app"
+open --env BUSMAKRO_DEBUG=1 --stdout /dev/tty --stderr /dev/tty "dist/BusMakro.app"
 ```
 
 ### Directly with Python
@@ -82,7 +82,7 @@ open --env MAKRO_DEBUG=1 --stdout /dev/tty --stderr /dev/tty "dist/Makro OASA.ap
 
 This works for everything except your location: macOS silently refuses location access to a bare `python` process, so the app falls back to the map centre.
 
-You can also turn debug on by setting `MAKRO_DEBUG=1`, or by setting `DEBUG_DEFAULT = True` in `oasa/debug.py`.
+You can also turn debug on by setting `BUSMAKRO_DEBUG=1`, or by setting `DEBUG_DEFAULT = True` in `oasa/debug.py`.
 
 ## Where the data comes from
 
@@ -119,7 +119,7 @@ On the stop screen, a line with no live prediction gets a **timetable estimate**
 
 ```
 main.py              Entry point: starts the macOS app
-setup.py             py2app settings for "Makro OASA.app" (version, icon, Info.plist with the location reason)
+setup.py             py2app settings for "BusMakro.app" (version, icon, Info.plist with the location reason)
 tools/
   build_app.py       Release build: py2app + bundled libraries + signing + zip
   make_icon.py       Draws the app icon

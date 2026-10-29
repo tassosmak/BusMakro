@@ -92,7 +92,7 @@ class ExploreMixin:
 
     def apply_language(self):
         """Relabel everything after a language switch."""
-        install_menu('Makro OASA', self)
+        install_menu('BusMakro', self)
         self.back_button.setTitle_(t('back'))
         self.locate_button.setTitle_(t('locate_me'))
         self.search.setPlaceholderString_(t('search_stop'))

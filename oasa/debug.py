@@ -5,14 +5,14 @@ from datetime import datetime
 
 
 # ---- Debug flag -------------------------------------------------------------
-# Set DEBUG_DEFAULT = True here, or run with `--debug`, or MAKRO_DEBUG=1.
+# Set DEBUG_DEFAULT = True here, or run with `--debug`, or BUSMAKRO_DEBUG=1.
 # When on: everything is logged to the terminal AND shown in an in-app overlay
 # (toggle it with the 🐞 button in the top bar).
 DEBUG_DEFAULT = False
 
 DEBUG = (DEBUG_DEFAULT
          or '--debug' in sys.argv
-         or os.environ.get('MAKRO_DEBUG', '').lower() in ('1', 'true', 'yes', 'on'))
+         or os.environ.get('BUSMAKRO_DEBUG', '').lower() in ('1', 'true', 'yes', 'on'))
 
 DEBUG_LINES = deque(maxlen=300)
 
