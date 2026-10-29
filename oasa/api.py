@@ -118,6 +118,13 @@ def get_stop_lines(stop_id, with_schedule=True):
             ln['etas'].extend(by_route.get(code, []))
             ln['vehicles'].extend(veh_by_route.get(code, []))  # the buses on their way here
     out = list(lines.values())
+    route_line = {code: ln['line'] for ln in out for code in ln['route_codes']}
+    try:  # learn from this reading (oasa/history.py)
+        from oasa import history
+        history.observe(stop_id, [(route_line[str(a['route_code'])], a.get('veh_code'), float(a['btime2']))
+                                  for a in arrivals if str(a.get('route_code')) in route_line and a.get('btime2') is not None])
+    except Exception as e:
+        log(f'history: {e}', 'WARN')
     for ln in out:
         ln['etas'] = sorted(set(ln['etas']))
         ln['sched'] = None

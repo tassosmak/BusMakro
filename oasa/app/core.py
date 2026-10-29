@@ -22,6 +22,7 @@ except Exception:  # pragma: no cover
     HAS_CL = False
 from oasa.app.data import DataMixin
 from oasa.app.explore import ExploreMixin
+from oasa.app.glance import GLANCE_EVERY_S, GlanceMixin
 from oasa.app.location import LocationMixin
 from oasa.app.sheet import SheetMixin
 from oasa.app.tabs import TabsMixin
@@ -36,7 +37,7 @@ from oasa.i18n import line_label, t
 from oasa.ui.widgets import button, float_button, glass, haptic, label, solid
 
 
-class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, ExploreMixin):
+class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, ExploreMixin, GlanceMixin):
     def applicationDidFinishLaunching_(self, notification):
         self.results = queue.Queue()
         self.lines = []
@@ -71,6 +72,8 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
         self.stop_lines = None
         self.pending_stop = None    # stop to select once a line opened from a stop has loaded
         self.drawn_variant = None   # route variant whose shape is on the map
+        self.fav_at = {}            # favourite stop id -> when its lines were fetched
+        self.status_item = None     # menu bar item (oasa/app/glance.py)
         self.fav_lines = {}         # favourite stop id -> its lines with live ETAs (None = not loaded yet)
         self.search_query = ''
         self.search_return = None   # mode to go back to when the search field is cleared
@@ -99,6 +102,7 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
         self.window.setTitle_('BusMakro'); self.window.setTitlebarAppearsTransparent_(True)
         self.window.setTitleVisibility_(1)
         self.window.setMinSize_((360, 640)); self.window.center(); self.window.setDelegate_(self)
+        self.window.setReleasedWhenClosed_(False)  # closing keeps BusMakro in the menu bar
         content = NSView.alloc().initWithFrame_(NSMakeRect(0, 0, 440, 880))
         self.window.setContentView_(content); self.content = content
 
@@ -229,9 +233,58 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
         threading.Thread(target=self.fetch_lines, daemon=True).start()
         threading.Thread(target=self.check_updates, args=(False,), daemon=True).start()
         self.schedule_poll()
+        self.setup_glance()
+        from Foundation import NSTimer
+        NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(15, self, 'glanceTick:', None, True)
 
     def applicationShouldTerminateAfterLastWindowClosed_(self, app):
+        return self.status_item is None  # with the menu bar item, closing the window keeps it running
+
+    def applicationShouldHandleReopen_hasVisibleWindows_(self, app, visible):
+        self.window.makeKeyAndOrderFront_(None)  # Dock icon click brings the window back
         return True
+
+    def applicationWillTerminate_(self, notification):
+        from oasa import history
+        history.flush()
+
+    def glanceTick_(self, timer):
+        """Menu bar: count down every 15 s, refetch every GLANCE_EVERY_S."""
+        if time.time() - getattr(self, 'glance_fetched', 0) >= GLANCE_EVERY_S:
+            self.glance_fetched = time.time()
+            self.poll_glance()
+        self.update_glance()
+
+    def menuBarStop_(self, sender):
+        self.open_from_glance(sender.representedObject())
+
+    def menuBarOpen_(self, sender):
+        self.open_from_glance()
+
+    def toggleMenuBar_(self, sender):
+        self.show_menu_bar(self.status_item is None)
+        sender.setState_(1 if self.status_item else 0)
+
+    def setMapStyle_(self, sender):
+        from Foundation import NSUserDefaults
+        style = sender.representedObject()
+        NSUserDefaults.standardUserDefaults().setObject_forKey_(style, 'mapStyle')
+        for it in sender.menu().itemArray():
+            it.setState_(1 if it.representedObject() == style else 0)
+        self.apply_map_prefs()
+
+    def toggle3D_(self, sender):
+        from Foundation import NSUserDefaults
+        d = NSUserDefaults.standardUserDefaults()
+        d.setBool_forKey_(not d.boolForKey_('map3d'), 'map3d')
+        sender.setState_(1 if d.boolForKey_('map3d') else 0)
+        self.apply_map_prefs()
+
+    def apply_map_prefs(self):
+        from Foundation import NSUserDefaults
+        d = NSUserDefaults.standardUserDefaults()
+        self.evaluate_js(f"window.setMapStyle({json.dumps(d.stringForKey_('mapStyle') or 'system')});"
+                         f"window.set3D({json.dumps(bool(d.boolForKey_('map3d')))});")
 
     def make_table(self, source, action):
         table = NSTableView.alloc().initWithFrame_(NSMakeRect(0, 0, 100, 100))
@@ -397,6 +450,7 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
     def webView_didFinishNavigation_(self, webview, navigation):
         self.map_ready = True
         log('webview: page loaded')
+        self.apply_map_prefs()
         if self.line_data:
             self.push_stops(fit=True)
             self.push_buses(self.bus_markers)

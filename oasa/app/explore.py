@@ -9,7 +9,7 @@ The app has four modes:
 """
 import json, threading, time
 from concurrent.futures import ThreadPoolExecutor
-from oasa import alerts, favorites, stop_index
+from oasa import alerts, favorites, history, stop_index
 from oasa.api import error_kind, get_closest_stops, get_stop_buses, get_stop_lines
 from oasa.config import NEAR_MIN_ZOOM, NEAR_REFETCH_KM, TABS, WALK_M_PER_MIN
 from oasa.debug import log
@@ -210,6 +210,8 @@ class ExploreMixin:
 
     def on_fav_lines(self, sid, lines):
         self.fav_lines[sid] = lines
+        self.fav_at[sid] = time.time()
+        self.update_glance()
         if self.mode == 'home' and self.home_tab == 1:
             self.rebuild_explore()
 
@@ -334,6 +336,12 @@ class ExploreMixin:
         elif self.mode == 'line':
             self.render_arrivals(self.live)
 
+    def network_rows(self):
+        """Strikes and whole-network notices, on top of the home and stop screens."""
+        return [{'kind': 'alert', 'title': a['title'], 'link': a['link'], 'strike': a['strike'],
+                 'meta': t('strike_meta' if a['strike'] else 'network_meta', date=f'{a["date"]:%d/%m}')}
+                for a in alerts.network(self.alerts)[:2]]
+
     def alert_rows(self, line_ids):
         rows = []
         for a in alerts.for_lines(self.alerts, list(line_ids)):
@@ -423,7 +431,7 @@ class ExploreMixin:
         if self.mode == 'search':
             rows = self.search_rows()
         elif self.mode == 'home' and self.home_tab == 1:
-            rows = self.fav_rows() or [{'message': t('no_favourites')}]
+            rows = self.network_rows() + (self.fav_rows() or [{'message': t('no_favourites')}])
         elif self.mode == 'home':
             stops = sorted(self.near_stops.values(), key=lambda s: s['rank'])
             if err == 'nearby' and not stops:
@@ -437,6 +445,7 @@ class ExploreMixin:
                          'next_txt': (name(s['street'], s.get('street_en')) + ' · ' if s['street'] else '')
                                      + t('stop_n', id=s['id'])}
                         for i, s in enumerate(stops)]
+                rows = self.network_rows() + rows
             else:
                 rows = [{'message': t('finding_stops') if self.user_loc is None or self.loc_pending
                          else t('no_stops_nearby')}]
@@ -448,15 +457,20 @@ class ExploreMixin:
             elif not self.stop_lines:
                 rows = [{'message': t('no_lines_at_stop')}]
             else:
-                rows = self.alert_rows(ln['line'] for ln in self.stop_lines)
+                rows = self.network_rows() + self.alert_rows(ln['line'] for ln in self.stop_lines)
                 hit = {l for a in alerts.for_lines(self.alerts, [ln['line'] for ln in self.stop_lines]) for l in a['lines']}
                 for ln in self.stop_lines:
                     etas, sched = ln['etas'], ln.get('sched')
                     row = {'kind': 'stopline', 'line': ln['line'], 'name': name(ln['name'], ln.get('name_en')), 'scheduled': False}
-                    if etas:  # a bus is on the road: official live prediction
-                        row['eta_txt'] = t('min', n=etas[0])
+                    if etas:  # a bus is on the road: official live prediction (corrected by what we learned)
+                        learned = history.learned_min(ln['line'], etas[0])
+                        row['eta_txt'] = t('min', n=etas[0] if learned is None else learned)
                         row['next_txt'] = (t('then', list=', '.join(t('min', n=m) for m in etas[1:3])) if len(etas) > 1
                                            else t('live'))
+                        hints = [self.bunch_hint(etas)]
+                        if learned is not None:
+                            hints.append(t('learned', n=etas[0]))
+                        row['next_txt'] = ' · '.join([h for h in hints if h] + [row['next_txt']])
                     elif sched:  # not on the road yet: timetable + rough travel time
                         row['eta_txt'] = t('approx_min', n=sched['eta_min'])
                         row['next_txt'] = t('scheduled', depart=f'{sched["depart"]:%H:%M}', arrive=f'{sched["arrive"]:%H:%M}')
@@ -464,11 +478,21 @@ class ExploreMixin:
                     else:
                         row['eta_txt'] = '—'
                         row['next_txt'] = t('no_more_today')
+                    ghost = history.ghost_rate(ln['line'])
+                    if ghost and ghost[0] >= 0.25:  # predicted buses of this line often never show up
+                        row['next_txt'] = t('ghost', p=round(ghost[0] * 100)) + ' · ' + row['next_txt']
                     if ln['line'] in hit:  # this line has a current OASA alert
                         row['next_txt'] = '⚠︎ ' + row['next_txt']
                     rows.append(row)
         self.explore_source.rows = rows
         self.explore_table.reloadData()
+
+    @staticmethod
+    def bunch_hint(etas):
+        """Two buses of a line arriving within 2 min of each other: say so, and how long the gap after is."""
+        if len(etas) < 2 or etas[1] - etas[0] > 2:
+            return ''
+        return t('bunch_gap', n=etas[2] - etas[1]) if len(etas) > 2 and etas[2] - etas[1] >= 10 else t('bunch_two')
 
     def explore_heading_text(self):
         if self.mode == 'search':

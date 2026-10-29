@@ -156,8 +156,9 @@ def make_row_view(row, width, app):
 
     if kind == 'alert':  # OASA service alert: ⚠︎, title (2 lines), date and lines
         root, card, cw = card_base(width, h)
-        card.layer().setBackgroundColor_(NSColor.systemOrangeColor().colorWithAlphaComponent_(0.14).CGColor())
-        icon = label('⚠︎', 18, True, NSColor.systemOrangeColor()); icon.setFrame_(NSMakeRect(12, h - 36, 24, 24))
+        tint = NSColor.systemRedColor() if row.get('strike') else NSColor.systemOrangeColor()  # strikes in red
+        card.layer().setBackgroundColor_(tint.colorWithAlphaComponent_(0.16 if row.get('strike') else 0.14).CGColor())
+        icon = label('⛔︎' if row.get('strike') else '⚠︎', 18, True, tint); icon.setFrame_(NSMakeRect(12, h - 36, 24, 24))
         title = label(row['title'], 12, True); title.setFrame_(NSMakeRect(42, 22, cw - 54, 34))
         title.setMaximumNumberOfLines_(2); title.cell().setWraps_(True); title.cell().setTruncatesLastVisibleLine_(True)
         meta = label(row['meta'], 11, color=NSColor.secondaryLabelColor()); meta.setFrame_(NSMakeRect(42, 6, cw - 54, 15))

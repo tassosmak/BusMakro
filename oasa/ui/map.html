@@ -20,6 +20,10 @@ window.addEventListener('error',e=>post({type:'console',level:'error',msg:String
 const KEY='__CARTO_KEY__';
 const STYLES={light:'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json?key='+KEY,dark:'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json?key='+KEY};
 const darkMode=matchMedia('(prefers-color-scheme: dark)');
+// Map style: 'system' follows macOS, or 'light' / 'dark' / 'night' (dark + glowing bus trails). Python sets it.
+let STYLE_PREF='system',THREE_D=false;
+function isDark(){return STYLE_PREF==='system'?darkMode.matches:STYLE_PREF!=='light';}
+function isNight(){return STYLE_PREF==='night';}
 // CARTO labels use Montserrat; swap in Open Sans, the closest to Apple's SF that CARTO serves glyphs for.
 const FONT_SWAP={'Montserrat Medium':'Open Sans Regular','Montserrat SemiBold':'Open Sans Bold',
   'Montserrat Regular Italic':'Open Sans Italic','Montserrat SemiBold Italic':'Open Sans Italic'};
@@ -27,14 +31,16 @@ function loadStyle(url){fetch(url).then(r=>r.json()).then(st=>{
   st.layers.forEach(l=>{const tf=l.layout&&l.layout['text-font'];if(Array.isArray(tf))l.layout['text-font']=tf.map(f=>FONT_SWAP[f]||f);});
   map.setStyle(st,{diff:false});
 }).catch(e=>{post({type:'error',msg:'style: '+e});map.setStyle(url);});}
-const map=new maplibregl.Map({container:'map',style:{version:8,sources:{},layers:[{id:'bg',type:'background',paint:{'background-color':darkMode.matches?'#202124':'#f2f2ef'}}]},center:[23.7275,37.9838],zoom:11,attributionControl:false});
-loadStyle(darkMode.matches?STYLES.dark:STYLES.light);
+const map=new maplibregl.Map({container:'map',style:{version:8,sources:{},layers:[{id:'bg',type:'background',paint:{'background-color':darkMode.matches?'#202124':'#f2f2ef'}}]},center:[23.7275,37.9838],zoom:11,maxPitch:65,attributionControl:false});
+let loadedStyle=null;
+function applyStyle(){const u=isDark()?STYLES.dark:STYLES.light;if(u!==loadedStyle){loadedStyle=u;loadStyle(u);}else drawExtras();}
+applyStyle();
 map.addControl(new maplibregl.NavigationControl({showCompass:false}),'top-right');
 map.addControl(new maplibregl.AttributionControl({compact:true}),'top-left');
 map.on('error',e=>post({type:'error',msg:String((e&&e.error&&e.error.message)||e)}));
 map.on('load',()=>post({type:'map',msg:'style loaded'}));
 map.on('idle',()=>post({type:'map',msg:'idle (all tiles rendered)'}));
-darkMode.addEventListener('change',()=>loadStyle(darkMode.matches?STYLES.dark:STYLES.light));
+darkMode.addEventListener('change',applyStyle);
 let stops={},buses={},pinned=null,padB=0,rafOn=false,userM=null;
 let routeCoords=null;
 // Space taken by the top bar (Python updates it: full screen / expanded map have no bar).
@@ -47,17 +53,42 @@ function drawRoute(){try{
   if(!routeCoords||routeCoords.length<2)return;
   map.addSource('route',{type:'geojson',data:{type:'Feature',geometry:{type:'LineString',coordinates:routeCoords}}});
   const below=(map.getStyle().layers.find(l=>l.type==='symbol')||{}).id;
-  const dark=darkMode.matches;
+  const dark=isDark();
   map.addLayer({id:'route-casing',type:'line',source:'route',layout:{'line-join':'round','line-cap':'round'},
     paint:{'line-color':dark?'#0b1220':'#ffffff','line-width':['interpolate',['linear'],['zoom'],10,4,15,9,18,14],'line-opacity':0.95}},below);
   map.addLayer({id:'route-line',type:'line',source:'route',layout:{'line-join':'round','line-cap':'round'},
     paint:{'line-color':dark?'#4c9dff':'#1677ff','line-width':['interpolate',['linear'],['zoom'],10,2,15,5,18,8]}},below);
 }catch(e){/* style still loading: the 'style.load' handler draws it */}}
-map.on('style.load',drawRoute);  // also re-adds the route after a light/dark style switch
+// 3D buildings (extruded from the tiles' heights) and the night look (glowing route + bus trails)
+function drawExtras(){try{
+  if(map.getLayer('bld-3d'))map.removeLayer('bld-3d');
+  if(THREE_D&&map.getSource('protomaps')){
+    const h=['coalesce',['get','height'],['*',3.2,['coalesce',['get','building:levels'],['get','levels'],3]]];
+    map.addLayer({id:'bld-3d',type:'fill-extrusion',source:'protomaps','source-layer':'buildings',minzoom:14,
+      paint:{'fill-extrusion-color':isNight()?'#1b2235':isDark()?'#2b2e36':'#dedbd4','fill-extrusion-height':h,
+             'fill-extrusion-base':['coalesce',['get','min_height'],0],'fill-extrusion-opacity':0.85}},
+      (map.getStyle().layers.find(l=>l.type==='symbol')||{}).id);
+  }
+  if(map.getLayer('bg-night'))map.removeLayer('bg-night');
+  if(map.getLayer('route-glow'))map.removeLayer('route-glow');
+  if(isNight()&&map.getSource('route'))map.addLayer({id:'route-glow',type:'line',source:'route',layout:{'line-cap':'round','line-join':'round'},
+      paint:{'line-color':'#4c9dff','line-width':18,'line-blur':12,'line-opacity':0.55}},'route-casing');
+  if(!map.getSource('trails'))map.addSource('trails',{type:'geojson',lineMetrics:true,data:{type:'FeatureCollection',features:[]}});
+  ['trail-glow','trail-line'].forEach(id=>{if(map.getLayer(id))map.removeLayer(id)});
+  const grad=(c,a)=>['interpolate',['linear'],['line-progress'],0,'rgba('+c+',0)',1,'rgba('+c+','+a+')'];
+  const night=isNight(),c=night?'80,255,170':'25,135,84';
+  if(night)map.addLayer({id:'trail-glow',type:'line',source:'trails',layout:{'line-cap':'round'},
+      paint:{'line-width':14,'line-blur':10,'line-gradient':grad(c,0.7)}});
+  map.addLayer({id:'trail-line',type:'line',source:'trails',layout:{'line-cap':'round'},
+      paint:{'line-width':night?3.5:3,'line-gradient':grad(c,night?1:0.45)}});
+}catch(e){}}
+window.setMapStyle=function(s){STYLE_PREF=s||'system';applyStyle();};
+window.set3D=function(on){THREE_D=!!on;drawExtras();map.easeTo({pitch:on?55:0,duration:600});};
+map.on('style.load',()=>{drawRoute();drawExtras();});  // re-adds route, 3D and trails after a style switch
 // Tell Python where the map is looking once it settles (debounced), so it can list stops there.
 let moveT=null;
 map.on('moveend',()=>{clearTimeout(moveT);moveT=setTimeout(()=>{const c=map.getCenter();post({type:'moved',lat:c.lat,lon:c.lng,zoom:map.getZoom()});},350);});
-window.setRoute=function(latlon){routeCoords=latlon&&latlon.length?latlon.map(p=>[p[1],p[0]]):null;drawRoute();};
+window.setRoute=function(latlon){routeCoords=latlon&&latlon.length?latlon.map(p=>[p[1],p[0]]):null;drawRoute();drawExtras();};
 function mk(cls,text,lon,lat,title,z){const el=document.createElement('div');el.className=cls;if(text)el.textContent=text;el.title=title||'';el.style.zIndex=z||0;const m=new maplibregl.Marker({element:el}).setLngLat([lon,lat]).addTo(map);return {m,el};}
 function clear(o){Object.values(o).forEach(x=>x.m.remove());return {}}
 window.setStops=function(items,selectedId,fit,padBottom){
@@ -73,6 +104,7 @@ function bearing(a,b){const r=Math.PI/180,y=Math.sin((b[0]-a[0])*r)*Math.cos(b[1
 // drawn; a huge gap fades and snaps instead of gliding through buildings; an older fix is ignored.
 const BLEND_MS=1500, SNAP_M=400, STALE_S=120;
 const MAX_DR_S=90;  // never extrapolate further than this past the GPS fix (about one update gap)
+const TRAIL_N=40;let trailT=0;  // each bus keeps its last 40 drawn positions (8 m apart) as a fading trail
 let followAfter=0;  // a pinned bus is followed every frame once the pin's zoom animation is done
 // jumpTo cancels a zoom in progress, so following pauses while the user zooms (and a moment after);
 // otherwise every frame cuts the zoom off and the map pulses in and out.
@@ -120,14 +152,18 @@ function step(now){
     if(t<1){const e=ease(t);p=[x.blendFrom[0]+(p[0]-x.blendFrom[0])*e,x.blendFrom[1]+(p[1]-x.blendFrom[1])*e];active=true;}
     if(x.route&&x.route.moving&&nowS-x.fixAt<MAX_DR_S)active=true;  // still driving along its road
     x.cur=p;x.m.setLngLat(p);turn(x,est.hdg);
+    const tr=x.trail;if(!tr.length||metres(tr[tr.length-1],p)>8){tr.push(p);if(tr.length>TRAIL_N)tr.shift();}
     // faded: no fresh GPS for a while, or not on its route (waiting at the depot/terminus to start)
     x.el.style.opacity=(nowS-x.fixAt>STALE_S||x.offRoute)?0.45:1;
   });
   if(pinned&&buses[pinned]&&now>followAfter&&now>userZoomUntil&&!map.isZooming())map.jumpTo({center:buses[pinned].cur,padding:{top:TOPPAD,left:0,right:0,bottom:padB}});
+  if(now-trailT>250){trailT=now;const src=map.getSource('trails');
+    if(src)src.setData({type:'FeatureCollection',features:Object.values(buses).filter(x=>x.trail.length>1)
+      .map(x=>({type:'Feature',properties:{},geometry:{type:'LineString',coordinates:x.trail}}))});}
   if(active)requestAnimationFrame(step);else rafOn=false;
 }
 function kick(){if(rafOn)return;rafOn=true;requestAnimationFrame(step);}
-function mkBus(id,to){const el=document.createElement('div');el.className='bus-wrap';el.title='Bus '+id;el.style.zIndex=2000;el.style.transition='opacity .4s';el.innerHTML='<div class="bus-rot"><div class="bus-arrow"></div></div><div class="bus-dot">🚌</div>';const m=new maplibregl.Marker({element:el}).setLngLat(to).addTo(map);el.addEventListener('click',ev=>{ev.stopPropagation();post({type:'bus',id:id})});return {m,el,rot:el.querySelector('.bus-rot'),cur:to,fix:to,fixAt:0,route:null,blendFrom:to,blendT0:0,angle:0,hdg:null};}
+function mkBus(id,to){const el=document.createElement('div');el.className='bus-wrap';el.title='Bus '+id;el.style.zIndex=2000;el.style.transition='opacity .4s';el.innerHTML='<div class="bus-rot"><div class="bus-arrow"></div></div><div class="bus-dot">🚌</div>';const m=new maplibregl.Marker({element:el}).setLngLat(to).addTo(map);el.addEventListener('click',ev=>{ev.stopPropagation();post({type:'bus',id:id})});return {m,el,rot:el.querySelector('.bus-rot'),cur:to,fix:to,fixAt:0,route:null,blendFrom:to,blendT0:0,angle:0,hdg:null,trail:[]};}
 window.setBuses=function(items){
   const seen=new Set(),nowS=Date.now()/1000,nowMs=performance.now();
   items.forEach(b=>{if(b.lat==null||b.lon==null)return;const id=String(b.id),fix=[b.lon,b.lat];seen.add(id);
@@ -139,7 +175,7 @@ window.setBuses=function(items){
     if(typeof b.heading==='number'&&!isNaN(b.heading))x.hdg=b.heading;
     const target=estimate(x,nowS).p;
     if(metres(x.cur,target)>SNAP_M){  // long GPS gap: fade and snap, never glide through blocks
-      x.el.style.opacity=0;x.cur=target;x.m.setLngLat(target);x.blendFrom=target;x.blendT0=0;
+      x.el.style.opacity=0;x.trail=[];x.cur=target;x.m.setLngLat(target);x.blendFrom=target;x.blendT0=0;
       setTimeout(()=>{x.el.style.opacity=1;},60);
     }else{x.blendFrom=x.cur;x.blendT0=nowMs;}
     x.el.classList.toggle('pinned',id===pinned);

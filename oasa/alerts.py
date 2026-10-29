@@ -17,6 +17,9 @@ MAX_AGE_DAYS = 14
 _AFTER = re.compile(r'(γραμμ\w*|lines?)\s+(.*)', re.I)
 _STOP = re.compile(r'\s(λόγω|στον|στην|στο|στη|στις|από|για|due|on|in|from|at|during)\s', re.I)
 _TOKEN = re.compile(r'[A-ZΑ-Ω]?\d{1,3}[A-ZΑ-Ω]?', re.I)
+# strike radar: work stoppages / strikes, announced days ahead (any category, no line needed)
+_STRIKE = re.compile(r'στάσ\w* εργασίας|απεργ\w*|strike|work stoppage', re.I)
+NETWORK_MAX_AGE_DAYS = 7   # notices about the whole network (no line named) are kept this long
 _LATIN = str.maketrans({'A': 'Α', 'B': 'Β', 'E': 'Ε', 'X': 'Χ', 'a': 'Α', 'b': 'Β', 'e': 'Ε', 'x': 'Χ'})
 
 
@@ -36,7 +39,8 @@ def lines_in(title, known):
 
 
 def fetch(known_lines):
-    """[{title, link, date, lines}] of recent alerts naming at least one known line, newest first."""
+    """[{title, link, date, lines, strike}] newest first: recent alerts naming at least one known line,
+    plus network-wide notices (no lines; `strike` True for strikes and work stoppages)."""
     known = set(known_lines)
     out, seen = [], set()
     cutoff = time.time() - MAX_AGE_DAYS * 86400
@@ -50,9 +54,10 @@ def fetch(known_lines):
             continue
         for it in root.iter('item'):
             cats = {(c.text or '').strip().lower() for c in it.findall('category')}
-            if 'alerts' not in cats:
-                continue
             title = html.unescape((it.findtext('title') or '').strip())
+            strike = bool(_STRIKE.search(title))
+            if 'alerts' not in cats and not strike:
+                continue
             link = (it.findtext('link') or '').strip()
             try:
                 when = parsedate_to_datetime(it.findtext('pubDate'))
@@ -61,9 +66,11 @@ def fetch(known_lines):
             if when.timestamp() < cutoff or link in seen:
                 continue
             lines = lines_in(title, known)
-            if lines:
+            network = not lines and (strike or not _AFTER.search(title) and when.timestamp() >= time.time() - NETWORK_MAX_AGE_DAYS * 86400)
+            if lines or network:
                 seen.add(link)
-                out.append({'title': re.sub(r'\s+', ' ', title), 'link': link, 'date': when, 'lines': lines})
+                out.append({'title': re.sub(r'\s+', ' ', title), 'link': link, 'date': when, 'lines': lines,
+                            'strike': strike})
     out.sort(key=lambda a: a['date'], reverse=True)
     log(f'alerts: {len(out)} recent alerts for {len({l for a in out for l in a["lines"]})} lines')
     return out
@@ -73,3 +80,8 @@ def for_lines(alerts, line_ids):
     """The alerts that mention any of `line_ids`."""
     ids = set(line_ids)
     return [a for a in alerts or [] if a['lines'] & ids]
+
+
+def network(alerts):
+    """Notices about the whole network (strikes first), not tied to a line."""
+    return sorted((a for a in alerts or [] if not a['lines']), key=lambda a: (not a['strike'], -a['date'].timestamp()))

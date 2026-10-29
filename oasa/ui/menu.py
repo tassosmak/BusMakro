@@ -51,6 +51,22 @@ def install_menu(app_name, delegate):
     _item(m, t('m_locate'), 'locateMe:', 'l', target=delegate)
     _item(m, t('m_back'), 'backClicked:', '[', target=delegate)
     m.addItem_(NSMenuItem.separatorItem())
+    from Foundation import NSUserDefaults
+    prefs = NSUserDefaults.standardUserDefaults()
+    styles = NSMenu.alloc().initWithTitle_(t('m_map_style'))
+    for code in ('system', 'light', 'dark', 'night'):
+        it = _item(styles, t('style_' + code), 'setMapStyle:', target=delegate)
+        it.setRepresentedObject_(code)
+        it.setState_(1 if code == (prefs.stringForKey_('mapStyle') or 'system') else 0)
+    top = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(t('m_map_style'), None, '')
+    top.setSubmenu_(styles)
+    m.addItem_(top)
+    _item(m, t('m_3d'), 'toggle3D:', '3', target=delegate).setState_(1 if prefs.boolForKey_('map3d') else 0)
+    m.addItem_(NSMenuItem.separatorItem())
+    it = _item(m, t('m_menubar'), 'toggleMenuBar:', target=delegate)
+    it.setState_(1 if getattr(delegate, 'status_item', None) is not None or prefs.objectForKey_('menuBar') is None
+                 or prefs.boolForKey_('menuBar') else 0)
+    m.addItem_(NSMenuItem.separatorItem())
     langs = NSMenu.alloc().initWithTitle_(t('m_language'))
     for code in LANGS:
         it = _item(langs, LANG_NAMES[code], 'setLanguage:', target=delegate)
