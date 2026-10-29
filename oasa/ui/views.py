@@ -1,8 +1,10 @@
 """AppKit helper classes: table data source, sheet drag handle, window drag bar, map message bridge."""
+import time
 import objc
 from AppKit import NSAnimationContext, NSColor, NSMakeRect, NSTrackingArea, NSView, NSVisualEffectView
 from Foundation import NSObject
 from oasa.debug import log
+from oasa.ui import motion
 from oasa.ui.widgets import make_row_view, row_height
 from oasa.i18n import t
 
@@ -18,16 +20,30 @@ class RowDataSource(NSObject):
             return None
         self.rows = []
         self.app = None
+        self.shown_sig = None
+        self.animate_until = 0
         return self
 
+    @staticmethod
+    def _sig(r):
+        return (r.get('kind'), r.get('line') or r.get('sid') or r.get('id') or r.get('title') or r.get('message'))
+
     def numberOfRowsInTableView_(self, table):
+        # a reload with different rows (not just fresher times) eases its rows in
+        sig = tuple(self._sig(r) for r in self.rows)
+        if sig != self.shown_sig:
+            self.shown_sig = sig
+            self.animate_until = time.time() + 0.4
         return len(self.rows)
 
     def tableView_heightOfRow_(self, table, row):
         return row_height(self.rows[row])
 
     def tableView_viewForTableColumn_row_(self, table, column, row):
-        return make_row_view(self.rows[row], column.width(), self.app)
+        view = make_row_view(self.rows[row], column.width(), self.app)
+        if time.time() < self.animate_until:
+            motion.appear(view, row)
+        return view
 
     def tableView_shouldSelectRow_(self, table, row):
         r = self.rows[row]

@@ -31,6 +31,7 @@ from oasa.debug import DEBUG, DEBUG_LINES, _debug_lock, _debug_seq, log
 from oasa.eta import fmt_eta
 from oasa.ui.map import HTML_MAP
 from oasa.ui.menu import install_menu
+from oasa.ui.motion import roll
 from oasa.ui.views import DragHandle, MapHandler, RowDataSource, SheetView, WindowDragBar
 from oasa import __version__, i18n, updates
 from oasa.i18n import line_label, t
@@ -72,6 +73,7 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
         self.stop_lines = None
         self.pending_stop = None    # stop to select once a line opened from a stop has loaded
         self.drawn_variant = None   # route variant whose shape is on the map
+        self.prev_eta = {}          # row -> last ETA text shown (a change rolls to the new value)
         self.fav_at = {}            # favourite stop id -> when its lines were fetched
         self.status_item = None     # menu bar item (oasa/app/glance.py)
         self.fav_lines = {}         # favourite stop id -> its lines with live ETAs (None = not loaded yet)
@@ -765,7 +767,12 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
         for r in self.table_source.rows:
             lab = r.get('eta_label')
             if lab is not None and r.get('eta_s') is not None:
-                lab.setStringValue_(fmt_eta(r['eta_s'] - (now - r['t0'])))
+                left = r['eta_s'] - (now - r['t0'])
+                m = int(max(0, left) // 60)
+                if r.get('shown_m', m) != m:
+                    roll(lab)  # the minute ticked over
+                r['shown_m'] = m
+                lab.setStringValue_(fmt_eta(left))
         for r in self.near_source.rows:
             lab = r.get('next_label')
             if lab is not None and r.get('eta_s') is not None:

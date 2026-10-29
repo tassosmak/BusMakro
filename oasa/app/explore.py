@@ -464,6 +464,7 @@ class ExploreMixin:
                     row = {'kind': 'stopline', 'line': ln['line'], 'name': name(ln['name'], ln.get('name_en')), 'scheduled': False}
                     if etas:  # a bus is on the road: official live prediction (corrected by what we learned)
                         learned = history.learned_min(ln['line'], etas[0])
+                        row['live'], row['due'] = True, (etas[0] if learned is None else learned) <= 1
                         row['eta_txt'] = t('min', n=etas[0] if learned is None else learned)
                         row['next_txt'] = (t('then', list=', '.join(t('min', n=m) for m in etas[1:3])) if len(etas) > 1
                                            else t('live'))

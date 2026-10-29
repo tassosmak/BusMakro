@@ -2,7 +2,7 @@
 import time
 from AppKit import (
     NSMakeRect, NSColor, NSFont, NSFontWeightSemibold, NSButton, NSTextField, NSView,
-    NSVisualEffectView, NSVisualEffectMaterialPopover, NSVisualEffectBlendingModeWithinWindow,
+    NSVisualEffectView, NSVisualEffectBlendingModeWithinWindow,
     NSVisualEffectStateActive, NSTextAlignmentRight, NSTextAlignmentCenter,
     NSFontDescriptorSystemDesignRounded, NSFontFeatureSettingsAttribute, NSImage, NSImageSymbolConfiguration,
     NSFontFeatureTypeIdentifierKey, NSFontFeatureSelectorIdentifierKey,
@@ -14,6 +14,9 @@ except Exception:  # pragma: no cover
 from oasa.config import ALERT_ROW_H, BUS_ROW_H, LINE_ROW_H, MIN_X_MARGIN, NEAR_ROW_H, ROW_H, STOP_ROW_H, W_SIZABLE
 from oasa.eta import fmt_eta
 from oasa.i18n import line_label, t
+from oasa.ui import motion
+
+GLASS_MATERIAL = 15   # NSVisualEffectMaterialFullScreenUI: thinner, more see-through than Popover
 
 
 def haptic():
@@ -52,7 +55,7 @@ def button(title, target, action, bezel=1):
 def glass(frame, radius, cls=NSVisualEffectView):
     """Translucent rounded 'iOS-style' card."""
     v = cls.alloc().initWithFrame_(frame)
-    v.setMaterial_(NSVisualEffectMaterialPopover)
+    v.setMaterial_(GLASS_MATERIAL)
     v.setBlendingMode_(NSVisualEffectBlendingModeWithinWindow)
     v.setState_(NSVisualEffectStateActive)
     v.setWantsLayer_(True)
@@ -102,7 +105,10 @@ def card_base(width, h):
     card = NSView.alloc().initWithFrame_(NSMakeRect(6, 3, cw, h - 6))
     card.setWantsLayer_(True); card.setAutoresizingMask_(W_SIZABLE)
     card.layer().setCornerRadius_(14)
-    card.layer().setBackgroundColor_(NSColor.labelColor().colorWithAlphaComponent_(0.07).CGColor())
+    # frosted pane on the glass: a faint fill and a hairline edge instead of a flat grey box
+    card.layer().setBackgroundColor_(NSColor.windowBackgroundColor().colorWithAlphaComponent_(0.32).CGColor())
+    card.layer().setBorderWidth_(0.5)
+    card.layer().setBorderColor_(NSColor.labelColor().colorWithAlphaComponent_(0.10).CGColor())
     root.addSubview_(card)
     return root, card, cw
 
@@ -199,6 +205,16 @@ def make_row_view(row, width, app):
         name.setAutoresizingMask_(W_SIZABLE); nxt.setAutoresizingMask_(W_SIZABLE); eta.setAutoresizingMask_(MIN_X_MARGIN)
         for v in (badge, name, nxt, eta):
             card.addSubview_(v)
+        if row.get('due'):  # arriving now: the card glows green
+            card.layer().setBackgroundColor_(NSColor.systemGreenColor().colorWithAlphaComponent_(0.16).CGColor())
+        if row.get('live'):  # official live time: a breathing dot on the badge's corner
+            card.addSubview_(motion.pulse_dot(70, (h - 6) / 2 + 14, 7, fast=bool(row.get('due'))))
+        key = ('stopline', row['line'], row['name'])
+        prev = app.prev_eta.get(key) if app is not None else None
+        if prev is not None and prev != row['eta_txt']:
+            motion.roll(eta)  # the time changed since the last refresh: roll to the new one
+        if app is not None:
+            app.prev_eta[key] = row['eta_txt']
         return root
 
     if kind == 'near':
@@ -222,6 +238,11 @@ def make_row_view(row, width, app):
     root, card, cw = card_base(width, h)
     if row.get('pinned'):
         card.layer().setBorderWidth_(1.5); card.layer().setBorderColor_(NSColor.systemOrangeColor().CGColor())
+    left = row['eta_s'] - (time.time() - row['t0'])
+    if left < 90:  # arriving now
+        card.layer().setBackgroundColor_(NSColor.systemGreenColor().colorWithAlphaComponent_(0.16).CGColor())
+    if not row.get('estimated'):
+        card.addSubview_(motion.pulse_dot(cw - 14, h - 20, 6, fast=left < 90))
     eta = label(fmt_eta(row['eta_s'] - (time.time() - row['t0'])), 20, True, rounded=True, tabular=True); eta.setFrame_(NSMakeRect(14, 32, 112, 28))
     row['eta_label'] = eta
     sub = label(row['sub'], 11, color=NSColor.secondaryLabelColor()); sub.setFrame_(NSMakeRect(14, 10, 112, 16))

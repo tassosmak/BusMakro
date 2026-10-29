@@ -92,7 +92,7 @@ class DataMixin:
             else:
                 delay_txt = t('min', n=f'{delay / 60:+.0f}')
                 delay_col = NSColor.systemOrangeColor() if delay > 0 else NSColor.systemBlueColor()
-            rows.append({'kind': 'arrival', 'id': bid, 'distance': dist, 'eta_s': eta_s, 't0': now,
+            rows.append({'kind': 'arrival', 'id': bid, 'distance': dist, 'eta_s': eta_s, 't0': now, 'estimated': est,
                          'delay': delay_txt, 'delay_color': delay_col,
                          'sub': f'{dist:.2f} km' + (f' · {t("est")}' if est else ''),
                          'title': t('bus_n', id=bid), 'trip': name(v.get('trip_label')) or t('trip_unavailable'),
