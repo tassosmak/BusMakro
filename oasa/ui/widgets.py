@@ -11,7 +11,7 @@ try:  # trackpad haptics (optional)
     from AppKit import NSHapticFeedbackManager
 except Exception:  # pragma: no cover
     NSHapticFeedbackManager = None
-from oasa.config import ALERT_ROW_H, BUS_ROW_H, LINE_ROW_H, MIN_X_MARGIN, NEAR_ROW_H, ROW_H, STOP_ROW_H, W_SIZABLE
+from oasa.config import TIMES_PER_ROW, ALERT_ROW_H, BUS_ROW_H, LINE_ROW_H, MIN_X_MARGIN, NEAR_ROW_H, ROW_H, STOP_ROW_H, W_SIZABLE
 from oasa.eta import fmt_eta
 from oasa.i18n import line_label, t
 from oasa.ui import motion
@@ -96,6 +96,8 @@ def row_height(row):
         return 60.0
     if row.get('kind') == 'header':
         return 28.0
+    if row.get('kind') == 'times':
+        return 30.0
     return float({'stop': STOP_ROW_H, 'bus': BUS_ROW_H, 'near': NEAR_ROW_H, 'fav': NEAR_ROW_H, 'alert': ALERT_ROW_H,
                   'stopline': LINE_ROW_H}.get(row.get('kind'), ROW_H))
 
@@ -171,6 +173,21 @@ def make_row_view(row, width, app):
         title.setAutoresizingMask_(W_SIZABLE); meta.setAutoresizingMask_(W_SIZABLE)
         for v in (icon, title, meta):
             card.addSubview_(v)
+        return root
+
+    if kind == 'times':  # a row of timetable departures: past dimmed, the next one in a green pill
+        root = NSView.alloc().initWithFrame_(NSMakeRect(0, 0, width, h))
+        cell_w = (width - 16) / TIMES_PER_ROW  # fixed columns, so the times line up row to row
+        for i, (txt, state) in enumerate(row['cells']):
+            x = 8 + i * cell_w
+            if state == 'next':
+                root.addSubview_(solid(NSMakeRect(x + 4, 3, cell_w - 8, h - 6),
+                                       NSColor.systemGreenColor().colorWithAlphaComponent_(0.22), (h - 6) / 2))
+            col = (NSColor.tertiaryLabelColor() if state == 'past' else
+                   NSColor.systemGreenColor() if state == 'next' else NSColor.labelColor())
+            lab = label(txt, 14, state == 'next', col, rounded=True, tabular=True)
+            lab.setFrame_(NSMakeRect(x, 6, cell_w, 18)); lab.setAlignment_(NSTextAlignmentCenter)
+            root.addSubview_(lab)
         return root
 
     if kind == 'header':  # section title inside a list

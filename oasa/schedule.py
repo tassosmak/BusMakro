@@ -95,3 +95,16 @@ def scheduled_arrival(line_code, routes, stop_code, now=None):
     if best:
         best['eta_min'] = max(0, round((best['arrive'] - now).total_seconds() / 60))
     return best
+
+
+def line_timetable(line_id, now=None):
+    """Today's whole timetable of a line: [{'name', 'name_en', 'go': [datetime], 'come': [datetime]}],
+    one per OASA variant of the line, the busiest first (variants with no trips today are left out)."""
+    from oasa.api import get_line_codes
+    now = now or datetime.now(ATHENS)
+    out = []
+    for code, name, name_en in get_line_codes().get(line_id, []):
+        d = departures(code, now.date())
+        if d['go'] or d['come']:
+            out.append({'name': name, 'name_en': name_en, 'go': d['go'], 'come': d['come']})
+    return sorted(out, key=lambda v: -(len(v['go']) + len(v['come'])))

@@ -87,6 +87,7 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
         self.stop_lines = None
         self.pending_stop = None    # stop to select once a line opened from a stop has loaded
         self.drawn_variant = None   # route variant whose shape is on the map
+        self.timetable = None       # (line id, today's timetable) for the Timetable tab
         self.prev_eta = {}          # row -> last ETA text shown (a change rolls to the new value)
         self.fav_at = {}            # favourite stop id -> when its lines were fetched
         self.status_item = None     # menu bar item (oasa/app/glance.py)
@@ -213,15 +214,17 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
         self.table_source = RowDataSource.alloc().init(); self.table_source.app = self
         self.route_source = RowDataSource.alloc().init(); self.route_source.app = self
         self.near_source = RowDataSource.alloc().init(); self.near_source.app = self
+        self.tt_source = RowDataSource.alloc().init(); self.tt_source.app = self
         self.explore_source = RowDataSource.alloc().init(); self.explore_source.app = self
         self.arr_scroll, self.table, self.table_col = self.make_table(self.table_source, 'arrivalsClicked:')
         self.route_scroll, self.route_table, self.route_col = self.make_table(self.route_source, 'routeClicked:')
         self.near_scroll, self.near_table, self.near_col = self.make_table(self.near_source, 'nearbyClicked:')
+        self.tt_scroll, self.tt_table, self.tt_col = self.make_table(self.tt_source, None)
         self.explore_scroll, self.explore_table, self.explore_col = self.make_table(self.explore_source, 'exploreClicked:')
         self.explore_source.rows = [{'message': t('finding_stops')}]
 
         for v in (self.handle, self.back_button, self.fav_button, self.home_tabs, self.explore_heading, self.explore_scroll, self.line_menu, self.tabs, self.search, self.stop_menu, self.variant_menu,
-                  self.arrival_heading, self.locate_button, self.arr_scroll, self.route_scroll, self.near_scroll):
+                  self.arrival_heading, self.locate_button, self.arr_scroll, self.route_scroll, self.near_scroll, self.tt_scroll):
             self.sheet.addSubview_(v)
         content.addSubview_(self.sheet)
 
@@ -426,7 +429,8 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
         area = NSMakeRect(6, 6, pw - 12, max(1, y - 6))
         for scroll, col, table in ((self.arr_scroll, self.table_col, self.table),
                                    (self.route_scroll, self.route_col, self.route_table),
-                                   (self.near_scroll, self.near_col, self.near_table)):
+                                   (self.near_scroll, self.near_col, self.near_table),
+                                   (self.tt_scroll, self.tt_col, self.tt_table)):
             scroll.setFrame_(area)
             col.setWidth_(scroll.contentSize().width)  # exact visible width, so cards stay centred
             if reload:
@@ -438,7 +442,7 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
                   self.variant_menu, self.arrival_heading, self.back_button, self.line_menu):
             if not v.isHidden() and v.frame().origin.y < 4:
                 v.setHidden_(True)
-        for v in (self.explore_scroll, self.arr_scroll, self.route_scroll, self.near_scroll):
+        for v in (self.explore_scroll, self.arr_scroll, self.route_scroll, self.near_scroll, self.tt_scroll):
             if not v.isHidden() and v.frame().size.height < 40:
                 v.setHidden_(True)
 
@@ -595,6 +599,8 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
             self.fetch_favs_async()
         elif self.mode == 'line' and self.current_line:
             threading.Thread(target=self.fetch_live, args=(self.current_line,), daemon=True).start()
+            if self.tab == 3:
+                self.rebuild_timetable()  # moves the "next" highlight along
         elif self.mode == 'stop' and self.explore_stop:
             self.fetch_stop_lines_async(self.explore_stop['id'])
 
@@ -869,6 +875,8 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
                     self.fetch_alerts_async()
             elif kind == 'alerts':
                 self.on_alerts(item[1])
+            elif kind == 'timetable':
+                self.on_timetable(item[1], item[2])
             elif kind == 'net_error':
                 self.on_net_error(item[1], item[2], item[3])
             elif kind == 'fav_lines':
@@ -914,6 +922,8 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
                 self.push_stops(fit=True)
                 self.render_arrivals(self.live)
                 self.last_live_ok = datetime.now()
+                if self.tab == 3:
+                    self.fetch_timetable_async()
                 self.do_layout()
                 self.status.setStringValue_(t('line_live', line=line_label(line_id), n=len(self.live.get('vehicles', []))))
                 if self.pending_pin:

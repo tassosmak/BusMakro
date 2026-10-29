@@ -1,7 +1,8 @@
-"""Tabs: Route (stops along the line) and Nearby (closest stops)."""
-import time
+"""Tabs: Route (stops along the line), Nearby (closest stops) and Timetable (today's departures)."""
+import threading, time
+from datetime import datetime
 from AppKit import NSAttributedString, NSColor, NSFont, NSFontAttributeName, NSForegroundColorAttributeName
-from oasa.config import TABS, WALK_M_PER_MIN
+from oasa.config import TABS, TIMES_PER_ROW, WALK_M_PER_MIN
 from oasa.debug import log
 from oasa.eta import distance_km, fmt_dist, fmt_eta
 from oasa import favorites, i18n
@@ -25,7 +26,7 @@ class TabsMixin:
         self.explore_heading.setStringValue_(self.explore_heading_text())
         self.tabs.setHidden_(not line)
         if not line:
-            for v in (self.search, self.stop_menu, self.arr_scroll, self.route_scroll, self.near_scroll,
+            for v in (self.search, self.stop_menu, self.arr_scroll, self.route_scroll, self.near_scroll, self.tt_scroll,
                       self.variant_menu, self.arrival_heading):
                 v.setHidden_(True)
             self.locate_button.setHidden_(True)  # replaced by the round button on the map
@@ -34,12 +35,13 @@ class TabsMixin:
         multi = t == 1 and len(self.variant_keys) > 1
         self.search.setHidden_(t != 0); self.stop_menu.setHidden_(t != 0)
         self.arr_scroll.setHidden_(t != 0); self.route_scroll.setHidden_(t != 1); self.near_scroll.setHidden_(t != 2)
+        self.tt_scroll.setHidden_(t != 3)
         self.locate_button.setHidden_(True)
         self.variant_menu.setHidden_(not multi)
         self.arrival_heading.setHidden_(multi)
         self.arrival_heading.setStringValue_(
             [i18n.t('h_approaching'), i18n.t('h_along_line', line=i18n.line_label(self.current_line or '')),
-             i18n.t('h_nearest_on_line')][t])
+             i18n.t('h_nearest_on_line'), i18n.t('h_timetable')][t])
 
     def set_tab(self, i):
         self.tab = i
@@ -52,6 +54,8 @@ class TabsMixin:
             if self.user_loc is None and not self.loc_tried:
                 self.loc_tried = True
                 self.start_location()
+        elif i == 3:
+            self.fetch_timetable_async()
         self.do_layout()
         if i == 1:
             self.scroll_route_to_selected()
@@ -148,3 +152,62 @@ class TabsMixin:
                                           else i18n.t('no_approaching_bus'))})
             self.near_source.rows = rows or [{'message': i18n.t('no_stop_coords')}]
         self.near_table.reloadData()
+
+    # ---- Timetable tab: today's departures from each end of the line --------------
+    def fetch_timetable_async(self):
+        line_id = self.current_line
+        if not line_id:
+            return
+        if self.timetable is None or self.timetable[0] != line_id:
+            self.timetable = None
+            self.tt_source.rows = [{'message': i18n.t('tt_loading')}]
+            self.tt_table.reloadData()
+
+        def work():
+            from oasa.schedule import line_timetable
+            try:
+                self.results.put(('timetable', line_id, line_timetable(line_id)))
+            except Exception as e:
+                self.results.put(('timetable', line_id, e))
+        threading.Thread(target=work, daemon=True).start()
+
+    def on_timetable(self, line_id, data):
+        if line_id != self.current_line:
+            return
+        if isinstance(data, Exception):
+            from oasa.api import error_kind
+            self.tt_source.rows = [{'message': i18n.t('tap_retry', msg=i18n.t('err_' + error_kind(data)))}]
+            self.tt_table.reloadData()
+            return
+        self.timetable = (line_id, data)
+        self.rebuild_timetable(scroll=True)
+
+    def rebuild_timetable(self, scroll=False):
+        """Each end's departures as rows of times: gone ones dimmed, the next one highlighted."""
+        if not self.timetable:
+            return
+        from oasa.schedule import ATHENS
+        now = datetime.now(ATHENS)
+        rows, first_next = [], None
+        for vi, var in enumerate(self.timetable[1]):
+            name = i18n.name(var['name'], var.get('name_en'))
+            ends = [e.strip() for e in name.split(' - ', 1)] if ' - ' in name else [name, name]
+            if vi:
+                rows.append({'kind': 'header', 'text': i18n.t('tt_variant', name=name)})
+            for times, place in ((var['go'], ends[0]), (var['come'], ends[-1])):
+                if not times:
+                    continue
+                left = sum(1 for d in times if d >= now)
+                rows.append({'kind': 'header', 'text': i18n.t('tt_from', place=place) + '  ·  ' + i18n.t('tt_left', n=left)})
+                nxt = next((d for d in times if d >= now), None)
+                for k in range(0, len(times), TIMES_PER_ROW):
+                    cells = [(f'{d:%H:%M}', 'next' if d == nxt else 'past' if d < now else 'future')
+                             for d in times[k:k + TIMES_PER_ROW]]
+                    if first_next is None and any(st == 'next' for _, st in cells):
+                        first_next = len(rows)
+                    rows.append({'kind': 'times', 'cells': cells})
+        self.tt_source.rows = rows or [{'message': i18n.t('tt_none')}]
+        self.tt_table.reloadData()
+        if scroll and first_next is not None:
+            self.tt_table.scrollRowToVisible_(min(len(rows) - 1, first_next + 3))
+            self.tt_table.scrollRowToVisible_(max(0, first_next - 2))

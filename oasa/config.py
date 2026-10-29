@@ -50,7 +50,9 @@ ANIM_S = 0.3         # sheet / top bar animation length
 
 WALK_M_PER_MIN = 80.0
 
-TABS = ['tab_arrivals', 'tab_route', 'tab_nearby']   # i18n keys
+TABS = ['tab_arrivals', 'tab_route', 'tab_nearby', 'tab_timetable']   # i18n keys
+
+TIMES_PER_ROW = 5   # Timetable tab: departure times per row
 
 OASA_API = "https://telematics.oasa.gr/api/"
 

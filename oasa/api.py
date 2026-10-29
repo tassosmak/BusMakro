@@ -171,3 +171,19 @@ def get_stop_buses(lines):
         return []
     with ThreadPoolExecutor(max_workers=6) as pool:
         return [b for found in pool.map(one, wanted) for b in found]
+
+
+_line_codes = None
+
+
+def get_line_codes():
+    """{line id: [(OASA line code, name, English name)]} for every line (a line can have several
+    variants, each with its own timetable). Fetched once."""
+    global _line_codes
+    if _line_codes is None:
+        out = {}
+        for l in oasa_call('webGetLines'):
+            if l.get('LineID') and l.get('LineCode'):
+                out.setdefault(l['LineID'], []).append((str(l['LineCode']), l.get('LineDescr') or '', l.get('LineDescrEng') or ''))
+        _line_codes = out
+    return _line_codes
