@@ -35,7 +35,7 @@ It is built with Python and AppKit (via PyObjC) and has a phone-style layout: a 
 - **Bunching warning.** When two buses of a line arrive within 2 minutes of each other, the line says so, and how long the gap after them is ("2 together, then a 25 min gap").
 - **Ghost buses.** BusMakro notices when buses OASA predicted vanish without ever arriving, and marks lines where that happens often ("👻 30% of buses vanish").
 - **Learned arrival times.** It compares OASA's predictions with when buses actually arrived (kept only on your Mac) and, once it has enough samples for a line, corrects the time shown ("learned · OASA says 6 min").
-- **3D buildings and map styles.** *View → 3D Buildings* (⌘3) tilts the map and raises the buildings; *View → Map Style* has Match System, Light, Dark and Night (with a glowing route).
+- **3D buildings and map styles.** *View → 3D Buildings* (⌘3) tilts the map and raises the buildings; *View → Map Style* has Match System, Light and Dark (a night look with a glowing route).
 - **Search.** The search field in the BusMakro bar finds lines (by number or name) and stops (by name, in Greek or Latin letters: "syntagma" finds ΣΥΝΤΑΓΜΑ), and shows which lines serve each stop. Clear it to go back to where you were.
 - **Favourite stops.** Tap the round ☆ on a stop to save it. The **Favourites** tab on the home screen lists your saved stops with their next live arrivals and shows them on the map.
 - **Works offline gracefully.** Without a connection the app says so ("No internet connection" or "Couldn't reach the bus service"). Click the message to retry, or just wait: it retries every 15 seconds and recovers on its own. In a line view, the last data stays on screen.

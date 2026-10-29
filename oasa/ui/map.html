@@ -23,10 +23,10 @@ window.addEventListener('error',e=>post({type:'console',level:'error',msg:String
 const KEY='__CARTO_KEY__';
 const STYLES={light:'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json?key='+KEY,dark:'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json?key='+KEY};
 const darkMode=matchMedia('(prefers-color-scheme: dark)');
-// Map style: 'system' follows macOS, or 'light' / 'dark' / 'night' (dark + glowing route). Python sets it.
+// Map style: 'system' follows macOS, or 'light' / 'dark'. Dark is the night look (glowing route). Python sets it.
 let STYLE_PREF='system',THREE_D=false;
 function isDark(){return STYLE_PREF==='system'?darkMode.matches:STYLE_PREF!=='light';}
-function isNight(){return STYLE_PREF==='night';}
+function isNight(){return isDark();}  // dark mode always gets the night look
 // CARTO labels use Montserrat; swap in Open Sans, the closest to Apple's SF that CARTO serves glyphs for.
 const FONT_SWAP={'Montserrat Medium':'Open Sans Regular','Montserrat SemiBold':'Open Sans Bold',
   'Montserrat Regular Italic':'Open Sans Italic','Montserrat SemiBold Italic':'Open Sans Italic'};

@@ -54,10 +54,11 @@ def install_menu(app_name, delegate):
     from Foundation import NSUserDefaults
     prefs = NSUserDefaults.standardUserDefaults()
     styles = NSMenu.alloc().initWithTitle_(t('m_map_style'))
-    for code in ('system', 'light', 'dark', 'night'):
+    current = {'night': 'dark'}.get(prefs.stringForKey_('mapStyle') or 'system', prefs.stringForKey_('mapStyle') or 'system')
+    for code in ('system', 'light', 'dark'):
         it = _item(styles, t('style_' + code), 'setMapStyle:', target=delegate)
         it.setRepresentedObject_(code)
-        it.setState_(1 if code == (prefs.stringForKey_('mapStyle') or 'system') else 0)
+        it.setState_(1 if code == current else 0)
     top = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(t('m_map_style'), None, '')
     top.setSubmenu_(styles)
     m.addItem_(top)
