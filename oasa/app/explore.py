@@ -109,6 +109,8 @@ class ExploreMixin:
         self.find.setPlaceholderString_(t('search_bar'))
         self.rebuild_chips()  # recent stops: names in the new language
         self.layout_onboarding()  # the welcome, if it is open
+        if getattr(self, 'settings_win', None) is not None and self.settings_win.isVisible():
+            self.settings_win.setTitle_(t('set_title')); self.draw_settings()
         self.update_focus_button()
         self.map_locate_btn.setToolTip_(t('m_locate'))
         self.fs_search_btn.setToolTip_(t('search_bar'))

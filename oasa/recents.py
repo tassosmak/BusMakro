@@ -23,3 +23,7 @@ def add(stop):
     entry['id'] = sid
     rest = [r for r in load() if r['id'] != sid]
     NSUserDefaults.standardUserDefaults().setObject_forKey_(([entry] + rest)[:MAX], _KEY)
+
+
+def clear():
+    NSUserDefaults.standardUserDefaults().removeObjectForKey_(_KEY)

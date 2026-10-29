@@ -25,6 +25,7 @@ from oasa.app.explore import ExploreMixin
 from oasa.app.glance import GLANCE_EVERY_S, GlanceMixin
 from oasa.app.palette import PaletteMixin
 from oasa.app.onboarding import OnboardingMixin
+from oasa.app.settings import SettingsMixin, show_recents
 from oasa.app.location import LocationMixin
 from oasa.app.sheet import SheetMixin
 from oasa.app.tabs import TabsMixin
@@ -51,7 +52,7 @@ class MainQueue(queue.Queue):
         self.app.performSelectorOnMainThread_withObject_waitUntilDone_('checkResults:', None, False)
 
 
-class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, ExploreMixin, GlanceMixin, PaletteMixin, OnboardingMixin):
+class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, ExploreMixin, GlanceMixin, PaletteMixin, OnboardingMixin, SettingsMixin):
     def applicationDidFinishLaunching_(self, notification):
         self.results = MainQueue(self)   # worker threads -> main thread (wakes it only when something arrives)
         self.visible = True         # window on screen (not minimised, hidden, closed or covered)
@@ -359,7 +360,7 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
         for b in self.chip_buttons:
             b.removeFromSuperview()
         self.chip_buttons = []
-        self.recent_stops = recents.load()
+        self.recent_stops = recents.load() if show_recents() else []  # Settings can turn the chips off
         for i, r in enumerate(self.recent_stops):
             text = i18n.name(r.get('name'), r.get('name_en')) or r['id']
             text = text if len(text) <= 22 else text[:21] + '…'
@@ -381,6 +382,15 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
 
     def onboardNext_(self, sender):
         self.onboard_next()
+
+    def showSettings_(self, sender):
+        self.show_settings()
+
+    def settingChanged_(self, sender):
+        self.setting_changed(sender)
+
+    def clearRecents_(self, sender):
+        self.clear_recents()
 
     def showWelcome_(self, sender):
         if self.ob is None:
