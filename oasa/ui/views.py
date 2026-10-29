@@ -1,6 +1,6 @@
 """AppKit helper classes: table data source, sheet drag handle, window drag bar, map message bridge."""
 import objc
-from AppKit import NSAnimationContext, NSColor, NSMakeRect, NSTrackingArea, NSView
+from AppKit import NSAnimationContext, NSColor, NSMakeRect, NSTrackingArea, NSView, NSVisualEffectView
 from Foundation import NSObject
 from oasa.debug import log
 from oasa.ui.widgets import make_row_view, row_height
@@ -30,7 +30,8 @@ class RowDataSource(NSObject):
         return make_row_view(self.rows[row], column.width(), self.app)
 
     def tableView_shouldSelectRow_(self, table, row):
-        return 'message' not in self.rows[row]
+        r = self.rows[row]
+        return ('message' not in r or 'retry' in r) and r.get('kind') != 'header'
 
 class DragHandle(NSView):
     """Top strip of the bottom sheet: drag (mouse or trackpad) to resize, click to toggle."""
@@ -50,6 +51,26 @@ class DragHandle(NSView):
 
     def mouseUp_(self, event):
         self.app.sheet_drag_end(self.moved)
+
+class SheetView(NSVisualEffectView):
+    """The bottom sheet: drag its body (anything that isn't a control or the list) to resize it,
+    like the handle. Clicks on labels and gaps bubble up here; a click without a drag does nothing."""
+    def acceptsFirstMouse_(self, event):
+        return True
+
+    def mouseDown_(self, event):
+        self.start_y = event.locationInWindow().y
+        self.moved = False
+        self.app.sheet_drag_begin()
+
+    def mouseDragged_(self, event):
+        dy = event.locationInWindow().y - self.start_y
+        if abs(dy) > 3:
+            self.moved = True
+        self.app.sheet_drag_move(dy)
+
+    def mouseUp_(self, event):
+        self.app.sheet_drag_end(self.moved, tap_toggles=False)
 
 class MapHandler(NSObject):
     def initWithApp_(self, app):

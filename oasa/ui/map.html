@@ -1,13 +1,14 @@
 <!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
 <style>html,body,#map{height:100%;width:100%;margin:0;background:#202124} .maplibregl-map{font:13px -apple-system,BlinkMacSystemFont,sans-serif}
-.maplibregl-ctrl-top-left,.maplibregl-ctrl-top-right{margin-top:96px}
+.maplibregl-ctrl-top-left,.maplibregl-ctrl-top-right{margin-top:132px}
 .stop-dot{width:12px;height:12px;border-radius:50%;background:#1677ff;border:2px solid white;box-shadow:0 1px 4px #0005;cursor:pointer}
 .selected-dot{width:15px;height:15px;border-radius:50%;background:#ff9500;border:3px solid white;box-shadow:0 1px 5px #0007;cursor:pointer}
 .bus-wrap{position:relative;width:31px;height:31px;cursor:pointer}
 .bus-rot{position:absolute;left:0;top:0;width:31px;height:31px;transition:transform .6s ease}
 .bus-arrow{position:absolute;left:50%;top:-9px;margin-left:-6px;width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:10px solid #198754;filter:drop-shadow(0 1px 2px #0006)}
 .bus-dot{position:absolute;left:0;top:0;display:flex;align-items:center;justify-content:center;width:27px;height:27px;border-radius:50%;background:#198754;border:2px solid white;color:white;font-size:14px;box-shadow:0 1px 5px #0005}
+.bus-dot.labelled{font:700 10px -apple-system,BlinkMacSystemFont,sans-serif;letter-spacing:-.2px}
 .bus-wrap.pinned .bus-dot{border-color:#ff9500;box-shadow:0 0 0 3px #ff950066}
 .user-dot{width:14px;height:14px;border-radius:50%;background:#0a84ff;border:3px solid white;box-shadow:0 0 0 8px #0a84ff33}</style></head><body><div id="map"></div>
 <script>
@@ -36,6 +37,9 @@ map.on('idle',()=>post({type:'map',msg:'idle (all tiles rendered)'}));
 darkMode.addEventListener('change',()=>loadStyle(darkMode.matches?STYLES.dark:STYLES.light));
 let stops={},buses={},pinned=null,padB=0,rafOn=false,userM=null;
 let routeCoords=null;
+// Space taken by the top bar (Python updates it: full screen / expanded map have no bar).
+let TOPPAD=116;
+window.setTopInset=function(px){TOPPAD=px;document.querySelectorAll('.maplibregl-ctrl-top-left,.maplibregl-ctrl-top-right').forEach(e=>e.style.marginTop=(px+16)+'px');};
 // Route line: a road-following shape drawn under the street labels, with an outline (casing).
 function drawRoute(){try{
   ['route-line','route-casing'].forEach(id=>{if(map.getLayer(id))map.removeLayer(id)});
@@ -54,36 +58,98 @@ map.on('style.load',drawRoute);  // also re-adds the route after a light/dark st
 let moveT=null;
 map.on('moveend',()=>{clearTimeout(moveT);moveT=setTimeout(()=>{const c=map.getCenter();post({type:'moved',lat:c.lat,lon:c.lng,zoom:map.getZoom()});},350);});
 window.setRoute=function(latlon){routeCoords=latlon&&latlon.length?latlon.map(p=>[p[1],p[0]]):null;drawRoute();};
-const BUS_MS=1800;
 function mk(cls,text,lon,lat,title,z){const el=document.createElement('div');el.className=cls;if(text)el.textContent=text;el.title=title||'';el.style.zIndex=z||0;const m=new maplibregl.Marker({element:el}).setLngLat([lon,lat]).addTo(map);return {m,el};}
 function clear(o){Object.values(o).forEach(x=>x.m.remove());return {}}
 window.setStops=function(items,selectedId,fit,padBottom){
   stops=clear(stops);
   items.forEach(s=>{if(s.lat==null||s.lon==null)return;const sel=s.id===selectedId;const x=mk(sel?'selected-dot':'stop-dot','',s.lon,s.lat,s.name,sel?1000:0);x.el.addEventListener('click',ev=>{ev.stopPropagation();post({type:'stop',id:String(s.id)})});stops[String(s.id)]=x;});
-  if(fit&&items.length){const b=new maplibregl.LngLatBounds();items.forEach(s=>{if(s.lat!=null&&s.lon!=null)b.extend([s.lon,s.lat])});if(!b.isEmpty())map.fitBounds(b,{padding:{top:110,left:30,right:30,bottom:(padBottom||0)+30},duration:600,maxZoom:15});}
+  if(fit&&items.length){const b=new maplibregl.LngLatBounds();items.forEach(s=>{if(s.lat!=null&&s.lon!=null)b.extend([s.lon,s.lat])});if(!b.isEmpty())map.fitBounds(b,{padding:{top:TOPPAD+30,left:30,right:30,bottom:(padBottom||0)+30},duration:600,maxZoom:15});}
 };
 function bearing(a,b){const r=Math.PI/180,y=Math.sin((b[0]-a[0])*r)*Math.cos(b[1]*r);const x=Math.cos(a[1]*r)*Math.sin(b[1]*r)-Math.sin(a[1]*r)*Math.cos(b[1]*r)*Math.cos((b[0]-a[0])*r);return (Math.atan2(y,x)/r+360)%360;}
+// ---- Buses ----------------------------------------------------------------------------
+// As the athens-transit-rt contract says: from each GPS fix (position_at), drive the marker along
+// `path` then `path_beyond` (the road ahead) at `path_speeds` (per 200 m; a missing step at `speed`,
+// or 1.5 m/s) and stop at the end of the known road. A new fix blends in from where the marker is
+// drawn; a huge gap fades and snaps instead of gliding through buildings; an older fix is ignored.
+const BLEND_MS=1500, SNAP_M=400, STALE_S=120;
+const MAX_DR_S=90;  // never extrapolate further than this past the GPS fix (about one update gap)
+let followAfter=0;  // a pinned bus is followed every frame once the pin's zoom animation is done
+// jumpTo cancels a zoom in progress, so following pauses while the user zooms (and a moment after);
+// otherwise every frame cuts the zoom off and the map pulses in and out.
+let userZoomUntil=0;
+['zoomstart','zoom','wheel'].forEach(ev=>map.on(ev,e=>{if(e.originalEvent)userZoomUntil=performance.now()+400;}));
 function ease(t){return t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2}
-function step(now){let active=false;Object.values(buses).forEach(x=>{const t=Math.min(1,(now-x.t0)/BUS_MS);if(t<1)active=true;const e=ease(t);x.cur=[x.from[0]+(x.to[0]-x.from[0])*e,x.from[1]+(x.to[1]-x.from[1])*e];x.m.setLngLat(x.cur);});if(active)requestAnimationFrame(step);else rafOn=false;}
+function metres(a,b){const k=Math.cos(a[1]*Math.PI/180);return Math.hypot((b[0]-a[0])*k,b[1]-a[1])*111320;}
+function mkRoute(b){
+  const pts=[].concat(b.path||[],(b.path_beyond||[]).slice(b.path&&b.path.length?1:0)).map(p=>[p[1],p[0]]);
+  if(pts.length<2)return null;
+  const cum=[0];for(let i=1;i<pts.length;i++)cum.push(cum[i-1]+metres(pts[i-1],pts[i]));
+  // only a bus that is actually moving is driven along its road; standing (0) or unknown (null) stays put
+  const moving=typeof b.speed==='number'&&b.speed>0;
+  return {pts,cum,total:cum[cum.length-1],speeds:b.path_speeds||[],speed:moving?b.speed:null,moving};
+}
+function travelled(r,secs){  // metres along the route after `secs` seconds
+  let d=0,t=secs;
+  for(let i=0;d<r.total;i++){
+    const seg=Math.min(200,r.total-d),v=r.speeds[i]||r.speed||1.5,dt=seg/v;
+    if(t<=dt)return d+t*v;
+    d+=seg;t-=dt;
+  }
+  return r.total;
+}
+function pointAt(r,d){  // [lon,lat] and road heading at d metres along the route
+  let i=1;while(i<r.pts.length-1&&r.cum[i]<d)i++;
+  const a=r.pts[i-1],b=r.pts[i],seg=r.cum[i]-r.cum[i-1],f=seg>0?Math.min(1,Math.max(0,(d-r.cum[i-1])/seg)):1;
+  return {p:[a[0]+(b[0]-a[0])*f,a[1]+(b[1]-a[1])*f],hdg:bearing(a,b)};
+}
+function estimate(x,nowS){  // where the bus should be now, from its last fix
+  if(!x.route)return {p:x.fix,hdg:x.hdg};
+  const age=nowS-x.fixAt;
+  // standing/unknown-speed buses stay at their real position; moving ones drive on for at most
+  // MAX_DR_S and then wait there (a stale bus is only faded, never snapped back)
+  const secs=x.route.moving?Math.min(Math.max(0,age),MAX_DR_S):0;
+  return pointAt(x.route,travelled(x.route,secs));
+}
+function turn(x,hdg){if(hdg==null)return;const d=((hdg-x.angle+540)%360)-180;if(Math.abs(d)<0.5)return;x.angle+=d;x.rot.style.transform='rotate('+x.angle+'deg)';x.rot.style.opacity=1;}
+function step(now){
+  const nowS=Date.now()/1000;let active=false;
+  Object.values(buses).forEach(x=>{
+    const est=estimate(x,nowS);
+    let p=est.p;
+    const t=Math.min(1,(now-x.blendT0)/BLEND_MS);
+    if(t<1){const e=ease(t);p=[x.blendFrom[0]+(p[0]-x.blendFrom[0])*e,x.blendFrom[1]+(p[1]-x.blendFrom[1])*e];active=true;}
+    if(x.route&&x.route.moving&&nowS-x.fixAt<MAX_DR_S)active=true;  // still driving along its road
+    x.cur=p;x.m.setLngLat(p);turn(x,est.hdg);
+    // faded: no fresh GPS for a while, or not on its route (waiting at the depot/terminus to start)
+    x.el.style.opacity=(nowS-x.fixAt>STALE_S||x.offRoute)?0.45:1;
+  });
+  if(pinned&&buses[pinned]&&now>followAfter&&now>userZoomUntil&&!map.isZooming())map.jumpTo({center:buses[pinned].cur,padding:{top:TOPPAD,left:0,right:0,bottom:padB}});
+  if(active)requestAnimationFrame(step);else rafOn=false;
+}
 function kick(){if(rafOn)return;rafOn=true;requestAnimationFrame(step);}
-function mkBus(id,to){const el=document.createElement('div');el.className='bus-wrap';el.title='Bus '+id;el.style.zIndex=2000;el.innerHTML='<div class="bus-rot"><div class="bus-arrow"></div></div><div class="bus-dot">🚌</div>';const m=new maplibregl.Marker({element:el}).setLngLat(to).addTo(map);el.addEventListener('click',ev=>{ev.stopPropagation();post({type:'bus',id:id})});return {m,el,rot:el.querySelector('.bus-rot'),cur:to,from:to,to:to,t0:0,angle:0,hdg:null};}
+function mkBus(id,to){const el=document.createElement('div');el.className='bus-wrap';el.title='Bus '+id;el.style.zIndex=2000;el.style.transition='opacity .4s';el.innerHTML='<div class="bus-rot"><div class="bus-arrow"></div></div><div class="bus-dot">🚌</div>';const m=new maplibregl.Marker({element:el}).setLngLat(to).addTo(map);el.addEventListener('click',ev=>{ev.stopPropagation();post({type:'bus',id:id})});return {m,el,rot:el.querySelector('.bus-rot'),cur:to,fix:to,fixAt:0,route:null,blendFrom:to,blendT0:0,angle:0,hdg:null};}
 window.setBuses=function(items){
-  const seen=new Set();
-  items.forEach(b=>{if(b.lat==null||b.lon==null)return;const id=String(b.id),to=[b.lon,b.lat];seen.add(id);
+  const seen=new Set(),nowS=Date.now()/1000,nowMs=performance.now();
+  items.forEach(b=>{if(b.lat==null||b.lon==null)return;const id=String(b.id),fix=[b.lon,b.lat];seen.add(id);
+    const at=b.position_at||nowS;
     let x=buses[id];
-    if(!x){x=buses[id]=mkBus(id,to);}
-    else{x.from=x.cur;x.to=to;x.t0=performance.now();const moved=Math.hypot((to[0]-x.from[0])*Math.cos(to[1]*Math.PI/180),to[1]-x.from[1])*111320;if(moved>5)x.hdg=bearing(x.from,to);}
+    if(!x){x=buses[id]=mkBus(id,fix);if(b.label){const d=x.el.querySelector('.bus-dot');d.textContent=b.label;d.classList.add('labelled');x.el.title='Bus '+id+' · '+b.label;}}
+    else if(at<x.fixAt)return;  // an older fix than the one we have: ignore it
+    x.fix=fix;x.fixAt=at;x.route=mkRoute(b);x.offRoute=!b.path&&!b.path_beyond;  // the API leaves both empty off-route
     if(typeof b.heading==='number'&&!isNaN(b.heading))x.hdg=b.heading;
-    if(x.hdg!=null){const d=((x.hdg-x.angle+540)%360)-180;x.angle+=d;x.rot.style.transform='rotate('+x.angle+'deg)';x.rot.style.opacity=1;}else x.rot.style.opacity=0;
+    const target=estimate(x,nowS).p;
+    if(metres(x.cur,target)>SNAP_M){  // long GPS gap: fade and snap, never glide through blocks
+      x.el.style.opacity=0;x.cur=target;x.m.setLngLat(target);x.blendFrom=target;x.blendT0=0;
+      setTimeout(()=>{x.el.style.opacity=1;},60);
+    }else{x.blendFrom=x.cur;x.blendT0=nowMs;}
     x.el.classList.toggle('pinned',id===pinned);
   });
   Object.keys(buses).forEach(id=>{if(!seen.has(id)){buses[id].m.remove();delete buses[id];}});
-  if(pinned&&buses[pinned])map.easeTo({center:buses[pinned].to,duration:BUS_MS,easing:t=>t,padding:{top:80,left:0,right:0,bottom:padB}});
   kick();
 };
-window.setPinned=function(id,pb){pinned=id||null;padB=pb||0;Object.keys(buses).forEach(k=>buses[k].el.classList.toggle('pinned',k===pinned));if(pinned&&buses[pinned])map.easeTo({center:buses[pinned].cur,zoom:Math.max(map.getZoom(),15),duration:700,padding:{top:80,left:0,right:0,bottom:padB}});};
+window.setPinned=function(id,pb){pinned=id||null;padB=pb||0;Object.keys(buses).forEach(k=>buses[k].el.classList.toggle('pinned',k===pinned));if(pinned&&buses[pinned]){followAfter=performance.now()+750;map.easeTo({center:buses[pinned].cur,zoom:Math.max(map.getZoom(),15),duration:700,padding:{top:TOPPAD,left:0,right:0,bottom:padB}});kick();}};
 map.on('dragstart',()=>{if(pinned){pinned=null;Object.values(buses).forEach(x=>x.el.classList.remove('pinned'));post({type:'unpin'});}});
 window.setUser=function(lat,lon){const to=[lon,lat];if(!userM){const el=document.createElement('div');el.className='user-dot';el.style.zIndex=900;userM=new maplibregl.Marker({element:el}).setLngLat(to).addTo(map);}else userM.setLngLat(to);};
 window.getCenter=function(){const c=map.getCenter();return JSON.stringify({lat:c.lat,lon:c.lng});};
-window.focusStop=function(lat,lon,zoom,padBottom){map.flyTo({center:[lon,lat],zoom:zoom||16,duration:500,padding:{top:80,left:0,right:0,bottom:padBottom||0}});};
+window.focusStop=function(lat,lon,zoom,padBottom){map.flyTo({center:[lon,lat],zoom:zoom||16,duration:500,padding:{top:TOPPAD,left:0,right:0,bottom:padBottom||0}});};
 </script></body></html>

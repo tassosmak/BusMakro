@@ -29,6 +29,7 @@ def install_menu(app_name, delegate):
 
     m = _submenu(bar, app_name)
     _item(m, t('m_about', app=app_name), 'orderFrontStandardAboutPanel:')
+    _item(m, t('m_check_updates'), 'checkUpdates:', target=delegate)
     m.addItem_(NSMenuItem.separatorItem())
     _item(m, t('m_hide', app=app_name), 'hide:', 'h')
     _item(m, t('m_hide_others'), 'hideOtherApplications:', 'h', mods=CMD | OPT)

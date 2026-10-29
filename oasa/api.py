@@ -79,10 +79,15 @@ def get_closest_stops(lat, lon, limit=NEAR_STOPS_LIMIT):
     return stops
 
 
-def get_stop_lines(stop_id):
+def error_kind(e):
+    """'offline' when there's no connection at all, 'service' when a server failed to answer properly."""
+    return 'offline' if isinstance(e, (requests.ConnectionError, requests.Timeout)) else 'service'
+
+
+def get_stop_lines(stop_id, with_schedule=True):
     """Every line serving a stop, with the next official arrivals (minutes), soonest first.
 
-    [{line, name, line_code, route_codes, routes, etas, sched}]: one entry per line, its route
+    [{line, name, line_code, route_codes, routes, etas, vehicles, sched}]: one entry per line, its route
     variants merged. Lines with no bus on the road get `sched`, a timetable-based estimate
     (see oasa.schedule), or None when nothing more runs today."""
     routes = oasa_call('webRoutesForStop', stop_id)
@@ -90,10 +95,12 @@ def get_stop_lines(stop_id):
         arrivals = oasa_call('getStopArrivals', stop_id)
     except Exception:
         arrivals = []  # lines are still worth showing without times
-    by_route = {}
+    by_route, veh_by_route = {}, {}
     for a in arrivals:
         try:
             by_route.setdefault(str(a['route_code']), []).append(int(a['btime2']))
+            if a.get('veh_code'):
+                veh_by_route.setdefault(str(a['route_code']), []).append(str(a['veh_code']))
         except (KeyError, TypeError, ValueError):
             continue
     lines = {}
@@ -103,17 +110,18 @@ def get_stop_lines(stop_id):
         ln = lines.setdefault(r['LineID'], {'line': r['LineID'], 'name': r.get('RouteDescr') or r.get('LineDescr') or '',
                                             'name_en': r.get('RouteDescrEng') or r.get('LineDescrEng') or '',
                                             'line_code': str(r.get('LineCode') or ''), 'route_codes': [],
-                                            'routes': [], 'etas': []})
+                                            'routes': [], 'etas': [], 'vehicles': []})
         code = str(r.get('RouteCode'))
         if code not in ln['route_codes']:  # OASA repeats routes
             ln['route_codes'].append(code)
             ln['routes'].append((code, str(r.get('RouteType') or '1')))
             ln['etas'].extend(by_route.get(code, []))
+            ln['vehicles'].extend(veh_by_route.get(code, []))  # the buses on their way here
     out = list(lines.values())
     for ln in out:
         ln['etas'] = sorted(set(ln['etas']))
         ln['sched'] = None
-    idle = [ln for ln in out if not ln['etas'] and ln['line_code']]
+    idle = [ln for ln in out if not ln['etas'] and ln['line_code']] if with_schedule else []
     if idle:
         from oasa.schedule import scheduled_arrival  # imported here: schedule.py imports this module
 
@@ -133,3 +141,26 @@ def get_stop_lines(stop_id):
         return (1, 0, ln['line'])
     out.sort(key=sort_key)
     return out
+
+
+def get_stop_buses(lines):
+    """Live positions of the buses on their way to a stop (from `get_stop_lines`), labelled with
+    their line: the same fields the map's setBuses takes."""
+    from urllib.parse import quote
+    from oasa.config import API_BASE
+    wanted = {ln['line']: set(ln['vehicles']) for ln in lines if ln.get('vehicles')}
+
+    def one(line_id):
+        try:
+            data = get_json(f'{API_BASE}/v1/lines/{quote(line_id, safe="")}')
+        except Exception:
+            return []
+        return [{'id': str(v['id']), 'label': line_id, 'line': line_id, 'lat': v['lat'], 'lon': v['lon'],
+                 'heading': v.get('bearing'), 'position_at': v.get('position_at'), 'speed': v.get('speed'),
+                 'path': v.get('path'), 'path_beyond': v.get('path_beyond'), 'path_speeds': v.get('path_speeds')}
+                for v in data.get('vehicles', [])
+                if str(v.get('id')) in wanted[line_id] and v.get('lat') is not None and v.get('lon') is not None]
+    if not wanted:
+        return []
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        return [b for found in pool.map(one, wanted) for b in found]

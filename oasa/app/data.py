@@ -3,7 +3,7 @@ import json, threading, time
 from urllib.parse import quote
 from AppKit import NSColor
 from Foundation import NSTimer
-from oasa.api import attach_oasa, get_json, official_eta_s
+from oasa.api import attach_oasa, error_kind, get_json, official_eta_s
 from oasa.config import API_BASE, REFRESH_SECONDS, STATIC_BASE
 from oasa.debug import log
 from oasa.eta import eta_seconds, route_distance_m
@@ -33,7 +33,7 @@ class DataMixin:
         try:
             self.results.put(('lines', get_json(STATIC_BASE + '/lines.json')))
         except Exception as e:
-            self.results.put(('error', str(e)))
+            self.results.put(('net_error', 'lines', error_kind(e), str(e)))
 
     def fetch_line(self, line_id):
         try:
@@ -42,14 +42,14 @@ class DataMixin:
             live = get_json(f'{API_BASE}/v1/lines/{enc}')
             self.results.put(('line', line_id, static, attach_oasa(live, self.selected_stop_id)))
         except Exception as e:
-            self.results.put(('error', str(e)))
+            self.results.put(('net_error', 'line', error_kind(e), str(e)))
 
     def fetch_live(self, line_id):
         try:
             live = get_json(f'{API_BASE}/v1/lines/{quote(line_id, safe="")}')
             self.results.put(('live', line_id, attach_oasa(live, self.selected_stop_id)))
         except Exception as e:
-            self.results.put(('error', str(e)))
+            self.results.put(('net_error', 'live', error_kind(e), str(e)))
 
     def stop_payload(self):
         if not self.line_data:
@@ -114,11 +114,14 @@ class DataMixin:
                 continue
             h = v.get('heading', v.get('bearing'))
             buses.append({'id': v.get('id'), 'lat': v['lat'], 'lon': v['lon'],
-                          'heading': h if isinstance(h, (int, float)) else None})
+                          'heading': h if isinstance(h, (int, float)) else None,
+                          # for moving the marker along its road between fixes (see map.html)
+                          'position_at': v.get('position_at'), 'speed': v.get('speed'),
+                          'path': v.get('path'), 'path_beyond': v.get('path_beyond'),
+                          'path_speeds': v.get('path_speeds')})
         log(f'arrivals: {len(vehicles)} vehicles on line, {len(rows)} approaching stop {self.selected_stop_id}')
-        self.table_source.rows = rows or [{'message': t('choose_stop')
-                                           if not self.selected_stop_id
-                                           else t('no_approaching')}]
+        self.table_source.rows = self.alert_rows([self.current_line] if self.current_line else []) + (
+            rows or [{'message': t('choose_stop') if not self.selected_stop_id else t('no_approaching')}])
         self.table.reloadData()
         self.bus_markers = buses
         self.push_buses(buses)

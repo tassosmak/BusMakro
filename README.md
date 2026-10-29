@@ -21,16 +21,24 @@ It is built with Python and AppKit (via PyObjC) and has a phone-style layout: a 
 
 ## Features
 
-- **Stops near you on launch.** When the app opens, it finds your location and lists the closest stops of *any* line, also shown on the map. Pan the map elsewhere and the stops update to that area ("Stops in this area"); distances and walking times still count from you.
+- **Stops near you on launch.** On the **Nearby** tab of the home screen, it finds your location and lists the closest stops of *any* line, also shown on the map. Pan the map elsewhere and the stops update to that area ("Stops in this area"); distances and walking times still count from you.
 - **Every line at a stop.** Tap a stop (in the list or on the map) to see all the lines that stop there, soonest first. Lines with a bus on the road show the live OASA prediction in green. Lines with no bus out yet show a timetable estimate in orange (`~N min`, with the departure time from the terminus).
+- **Buses on their way.** The stop screen also shows the buses heading to that stop on the map, each labelled with its line number. Click one to open its line with that bus followed.
+- **Service alerts.** OASA's current disruption notices (from oasa.gr's announcements) appear as an orange ⚠︎ card on the stop screen and at the top of a line's arrivals, and affected lines get a ⚠︎ in the stop's list. Click a card to read the full notice.
 - **Line view.** Tap a line to open it with that stop already selected. **‹ Back** steps back to the stop, then to the stops near you. You can also pick any line from the dropdown.
   - **Live map:** the route drawn along the roads (a blue line with an outline, for the selected variant), the line's stops, and its buses moving in real time, with a heading arrow on each bus. The map follows the system light/dark theme.
   - **Arrivals tab:** buses approaching the stop, with a live countdown, distance along the route and delay against the schedule ("On time", "+10 min").
   - **Route tab:** every stop on the line in order, with buses shown between the stops they're travelling between. If a line has several route variants, you can choose one.
   - **Nearby tab:** the line's stops closest to you, with walking times.
+- **Search.** The search field in the BusMakro bar finds lines (by number or name) and stops (by name, in Greek or Latin letters: "syntagma" finds ΣΥΝΤΑΓΜΑ), and shows which lines serve each stop. Clear it to go back to where you were.
+- **Favourite stops.** Tap the round ☆ on a stop to save it. The **Favourites** tab on the home screen lists your saved stops with their next live arrivals and shows them on the map.
+- **Works offline gracefully.** Without a connection the app says so ("No internet connection" or "Couldn't reach the bus service"). Click the message to retry, or just wait: it retries every 15 seconds and recovers on its own. In a line view, the last data stays on screen.
+- **Update check.** On launch it asks GitHub whether a newer release exists, and shows an **Update** button in the bar if there is one. *BusMakro → Check for Updates…* checks by hand.
 - **Follow a bus.** Pin a bus (⌖) and the map follows it.
 - **Auto-refresh.** Data updates every 15 seconds; you can also refresh by hand.
 - **Keyboard shortcuts.** ⌘Q quit, ⌘H hide, ⌘W close, ⌘M minimize, ⌘R refresh, ⌘L locate me, ⌘[ back, and ⌘C/⌘V/⌘A in the search field.
+- **Expand the map.** The round expand button on the map (or dragging the panel down by its body) slides the top bar away and drops the panel to a slim strip, giving the map the whole window. The button again, or dragging the strip up, brings everything back. The round location button next to it finds you.
+- **Full screen.** The top bar disappears, and its controls become round buttons on the sides: search on the left (the field grows out of the icon), refresh (and update, when there is one) on the right.
 - **Window drag bar.** Hover over the top edge of the window and a bar fades in, together with the red/yellow/green window buttons (hidden otherwise): drag it to move the window, or double-click it to zoom.
 - **Greek or English.** The whole app, including the menus, works in both. It starts in your Mac's language; switch it under **View → Language**. In English, stop and line names use OASA's official English names, or a standard (ELOT 743) transliteration where OASA has none.
 - **Debug mode.** Writes a detailed log to the terminal and to an in-app overlay (🐞).
@@ -52,7 +60,7 @@ python -m pip install pyobjc-framework-Cocoa pyobjc-framework-WebKit pyobjc-fram
 /opt/anaconda3/envs/oasa-gui/bin/python tools/build_app.py
 ```
 
-This creates `dist/BusMakro.app` and `dist/BusMakro-<version>-macOS.zip`. The app is fully standalone: it includes Python, every package and the shared libraries conda's Python needs (libffi, OpenSSL, zlib…). The script copies those libraries in, ad-hoc signs every library and the app, then zips it. The version number lives in `setup.py` (`VERSION`).
+This creates `dist/BusMakro.app` and `dist/BusMakro-<version>-macOS.zip`. The app is fully standalone: it includes Python, every package and the shared libraries conda's Python needs (libffi, OpenSSL, zlib…). The script copies those libraries in, ad-hoc signs every library and the app, then zips it. The version number lives in `oasa/__init__.py` (`__version__`).
 
 The icon is drawn by `tools/make_icon.py` (it writes `resources/icon.icns` and `resources/icon.png`).
 
@@ -91,6 +99,7 @@ You can also turn debug on by setting `BUSMAKRO_DEBUG=1`, or by setting `DEBUG_D
 | `angelospk.github.io/athens-transit-rt/static/v1` | Static data: the list of lines, and each line's stops and route variants |
 | `transit.haroldpoi.dev/v1/lines/<line>` | Live buses: position, speed, delay, trip label, next stop |
 | `telematics.oasa.gr/api/` | OASA: closest stops (`getClosestStops`), lines at a stop (`webRoutesForStop`), official arrival predictions (`getStopArrivals`), today's timetable (`getDailySchedule`), each route's stops (`webGetStops`) |
+| `oasa.gr/feed/`, `oasa.gr/en/feed/` | OASA announcements (RSS): service alerts, matched to lines by the numbers in their titles |
 | CARTO basemaps + MapLibre GL | Map tiles and rendering |
 
 The OASA API only answers **POST** requests; a GET returns an empty response. The CARTO key can be overridden with the `CARTO_KEY` environment variable.
@@ -131,6 +140,11 @@ oasa/
   eta.py             Distances, the fallback ETA estimate, ETA/distance formatting
   schedule.py        Timetable-based ETA for lines with no bus on the road yet
   i18n.py            Greek/English text, place names and ELOT 743 transliteration
+  favorites.py       Favourite stops (saved in the app's preferences)
+  stop_index.py      Every stop of every line, for search (cached for a day in ~/Library/Caches/BusMakro)
+  updates.py         Checks GitHub for a newer release
+  alerts.py          OASA service alerts from oasa.gr's RSS feeds, matched to line numbers
+  __init__.py        The version number (used by the app, the build and the update check)
   ui/
     widgets.py       Small AppKit helpers (labels, buttons, glass panels, fonts) and the list cards
     menu.py          The menu bar (keyboard shortcuts only work through menu items on macOS)

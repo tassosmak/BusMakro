@@ -12,9 +12,9 @@ Standalone release build (also bundles conda's shared libraries, signs and zips)
 The app ends up in dist/BusMakro.app.
 """
 from setuptools import setup
+from oasa import __version__ as VERSION
 
 APP_NAME = 'BusMakro'
-VERSION = '1.0.0'
 
 setup(
     name=APP_NAME,

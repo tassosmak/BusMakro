@@ -75,8 +75,8 @@ def sign():
 
 
 def version():
-    with open(os.path.join(ROOT, 'setup.py'), encoding='utf-8') as f:
-        return re.search(r"VERSION = '([^']+)'", f.read()).group(1)
+    with open(os.path.join(ROOT, 'oasa', '__init__.py'), encoding='utf-8') as f:
+        return re.search(r"__version__ = '([^']+)'", f.read()).group(1)
 
 
 def main():

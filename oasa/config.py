@@ -26,13 +26,23 @@ NEAR_ROW_H = 70     # nearby card
 
 LINE_ROW_H = 64     # a line serving the selected stop
 
+ALERT_ROW_H = 70    # an OASA service alert
+
+ALERTS_EVERY_S = 1800   # refetch OASA's alerts this often
+
 NEAR_STOPS_LIMIT = 12   # stops listed on the home screen
 
 TOP_INSET = 34      # room for the traffic-light buttons
 
 DRAG_BAR_H = 28     # hover strip at the top for moving the window
 
-PILL_H = 52
+PILL_H = 72          # title row, then the search field on its own row
+
+FOCUS_SHEET_H = 70   # sheet height while the map is expanded (just its top row)
+
+FLOAT_BTN = 40       # round floating buttons (map expand/locate, full-screen controls)
+
+ANIM_S = 0.3         # sheet / top bar animation length
 
 WALK_M_PER_MIN = 80.0
 

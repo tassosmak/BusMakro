@@ -4,14 +4,14 @@ from AppKit import (
     NSMakeRect, NSColor, NSFont, NSFontWeightSemibold, NSButton, NSTextField, NSView,
     NSVisualEffectView, NSVisualEffectMaterialPopover, NSVisualEffectBlendingModeWithinWindow,
     NSVisualEffectStateActive, NSTextAlignmentRight, NSTextAlignmentCenter,
-    NSFontDescriptorSystemDesignRounded, NSFontFeatureSettingsAttribute,
+    NSFontDescriptorSystemDesignRounded, NSFontFeatureSettingsAttribute, NSImage, NSImageSymbolConfiguration,
     NSFontFeatureTypeIdentifierKey, NSFontFeatureSelectorIdentifierKey,
 )
 try:  # trackpad haptics (optional)
     from AppKit import NSHapticFeedbackManager
 except Exception:  # pragma: no cover
     NSHapticFeedbackManager = None
-from oasa.config import BUS_ROW_H, LINE_ROW_H, MIN_X_MARGIN, NEAR_ROW_H, ROW_H, STOP_ROW_H, W_SIZABLE
+from oasa.config import ALERT_ROW_H, BUS_ROW_H, LINE_ROW_H, MIN_X_MARGIN, NEAR_ROW_H, ROW_H, STOP_ROW_H, W_SIZABLE
 from oasa.eta import fmt_eta
 from oasa.i18n import line_label, t
 
@@ -49,9 +49,9 @@ def button(title, target, action, bezel=1):
     b.setBezelStyle_(bezel)
     return b
 
-def glass(frame, radius):
+def glass(frame, radius, cls=NSVisualEffectView):
     """Translucent rounded 'iOS-style' card."""
-    v = NSVisualEffectView.alloc().initWithFrame_(frame)
+    v = cls.alloc().initWithFrame_(frame)
     v.setMaterial_(NSVisualEffectMaterialPopover)
     v.setBlendingMode_(NSVisualEffectBlendingModeWithinWindow)
     v.setState_(NSVisualEffectStateActive)
@@ -61,6 +61,23 @@ def glass(frame, radius):
     v.layer().setBorderWidth_(0.5)
     v.layer().setBorderColor_(NSColor.separatorColor().CGColor())
     return v
+
+def float_button(symbol, target, action, size, tooltip=''):
+    """Round translucent button with an SF Symbols icon (map controls). Returns (container, button)."""
+    wrap = glass(NSMakeRect(0, 0, size, size), size / 2)
+    b = NSButton.alloc().initWithFrame_(NSMakeRect(0, 0, size, size))
+    b.setBordered_(False); b.setImagePosition_(1)  # image only
+    b.setTarget_(target); b.setAction_(action); b.setToolTip_(tooltip)
+    b.setAutoresizingMask_(W_SIZABLE | 16)
+    set_symbol(b, symbol)
+    wrap.addSubview_(b)
+    return wrap, b
+
+def set_symbol(btn, symbol, size=15):
+    img = NSImage.imageWithSystemSymbolName_accessibilityDescription_(symbol, None)
+    if img is not None:
+        btn.setImage_(img.imageWithSymbolConfiguration_(NSImageSymbolConfiguration.configurationWithPointSize_weight_(size, 0.3)))
+        btn.setContentTintColor_(NSColor.labelColor())
 
 def solid(frame, color, radius=0):
     v = NSView.alloc().initWithFrame_(frame)
@@ -74,7 +91,10 @@ def solid(frame, color, radius=0):
 def row_height(row):
     if 'message' in row:
         return 60.0
-    return float({'stop': STOP_ROW_H, 'bus': BUS_ROW_H, 'near': NEAR_ROW_H, 'stopline': LINE_ROW_H}.get(row.get('kind'), ROW_H))
+    if row.get('kind') == 'header':
+        return 28.0
+    return float({'stop': STOP_ROW_H, 'bus': BUS_ROW_H, 'near': NEAR_ROW_H, 'fav': NEAR_ROW_H, 'alert': ALERT_ROW_H,
+                  'stopline': LINE_ROW_H}.get(row.get('kind'), ROW_H))
 
 def card_base(width, h):
     root = NSView.alloc().initWithFrame_(NSMakeRect(0, 0, width, h))
@@ -132,6 +152,35 @@ def make_row_view(row, width, app):
             txt = label(row['text'], 12, True, NSColor.systemGreenColor()); txt.setFrame_(NSMakeRect(52, 9, width - 64, 16))
             txt.setAutoresizingMask_(W_SIZABLE)
             root.addSubview_(txt)
+        return root
+
+    if kind == 'alert':  # OASA service alert: ⚠︎, title (2 lines), date and lines
+        root, card, cw = card_base(width, h)
+        card.layer().setBackgroundColor_(NSColor.systemOrangeColor().colorWithAlphaComponent_(0.14).CGColor())
+        icon = label('⚠︎', 18, True, NSColor.systemOrangeColor()); icon.setFrame_(NSMakeRect(12, h - 36, 24, 24))
+        title = label(row['title'], 12, True); title.setFrame_(NSMakeRect(42, 22, cw - 54, 34))
+        title.setMaximumNumberOfLines_(2); title.cell().setWraps_(True); title.cell().setTruncatesLastVisibleLine_(True)
+        meta = label(row['meta'], 11, color=NSColor.secondaryLabelColor()); meta.setFrame_(NSMakeRect(42, 6, cw - 54, 15))
+        title.setAutoresizingMask_(W_SIZABLE); meta.setAutoresizingMask_(W_SIZABLE)
+        for v in (icon, title, meta):
+            card.addSubview_(v)
+        return root
+
+    if kind == 'header':  # section title inside a list
+        root = NSView.alloc().initWithFrame_(NSMakeRect(0, 0, width, h))
+        txt = label(row['text'], 11, True, NSColor.secondaryLabelColor())
+        txt.setFrame_(NSMakeRect(12, 4, width - 24, 16)); txt.setAutoresizingMask_(W_SIZABLE)
+        root.addSubview_(txt)
+        return root
+
+    if kind == 'fav':  # favourite stop: ★, name, next live arrivals
+        root, card, cw = card_base(width, h)
+        star = label('★', 20, True, NSColor.systemYellowColor()); star.setFrame_(NSMakeRect(14, (h - 6) / 2 - 13, 28, 26))
+        name = label(row['name'], 13, True); name.setFrame_(NSMakeRect(48, 36, cw - 60, 18))
+        nxt = label(row['next_txt'], 12, color=NSColor.secondaryLabelColor(), tabular=True); nxt.setFrame_(NSMakeRect(48, 14, cw - 60, 18))
+        name.setAutoresizingMask_(W_SIZABLE); nxt.setAutoresizingMask_(W_SIZABLE)
+        for v in (star, name, nxt):
+            card.addSubview_(v)
         return root
 
     if kind == 'stopline':
