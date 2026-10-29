@@ -1,22 +1,11 @@
-# BusMakro 1.2.0
+# BusMakro 1.2.1
 
-BusMakro gets smarter about Athens buses, lives in your menu bar, feels alive, and is far kinder to your battery.
-
-## New
-
-- **Menu bar countdown.** A 🚌 in the menu bar shows the next live bus at your favourite stops ("046 · 4′"). Its menu lists each favourite with its next buses; click one to open it. Closing the window keeps BusMakro in the menu bar (*View → Show in Menu Bar* turns it off).
-- **Strike radar.** Strikes and work stoppages announced by OASA show as a red ⛔︎ card at the top of the home and stop screens, and notices about the whole network in orange. Notices disappear once their dates have passed.
-- **Bunching warning.** When two buses of a line arrive together, you see it, and how long the gap after them is: "2 together, then a 25 min gap".
-- **Ghost buses.** BusMakro notices when predicted buses vanish without arriving, and marks lines where it happens often ("👻 30% of buses vanish").
-- **Learned arrival times.** BusMakro compares OASA's predictions with when buses really arrived and corrects the times it shows once it has enough data for a line ("learned · OASA says 6 min"). This history stays on your Mac, and it takes a few days of use to kick in.
-- **3D buildings** (*View → 3D Buildings*, ⌘3) and **map styles** (*View → Map Style*: Match System, Light, Dark, Night).
+A small update: a lighter app and a nicer dark map.
 
 ## Improved
 
-- **Motion.** Lists ease in, arrival times roll to their new value, live times have a gently pulsing dot, buses arriving now glow green, and buses on the map ripple when they report a new position.
-- **Lighter glass.** The top bar and panel are more see-through, and the cards are frosted panes instead of grey boxes.
-- **Battery.** Idle CPU use dropped from about 14% to under 1%, and to almost nothing while the window is hidden: no more constant polling, and refreshing and animations pause when you can't see them. Data refreshes right away when the window comes back or the Mac wakes.
-- Expired alerts no longer show up.
+- **Uses less memory.** The map now keeps a limited number of map tiles in memory, and 3D buildings are only drawn at street level: about 300 MB in total instead of about 490 MB.
+- **Dark map = night look.** The dark map style now always has the glowing route and the deep blue 3D buildings. *View → Map Style* is simply Match System, Light and Dark.
 
 ## Known issue
 
@@ -24,7 +13,7 @@ BusMakro gets smarter about Athens buses, lives in your menu bar, feels alive, a
 
 ## Install
 
-1. Download **`BusMakro-1.2.0-macOS.zip`** below, unzip it, and move **BusMakro** to **Applications** (replace the old one if you have it).
+1. Download **`BusMakro-1.2.1-macOS.zip`** below, unzip it, and move **BusMakro** to **Applications** (replace the old one if you have it).
 2. **First launch:** the app isn't notarized by Apple, so macOS blocks it the first time.
    - **macOS 15 (Sequoia) and later:** open it once, then go to **System Settings → Privacy & Security** and click **Open Anyway**.
    - **macOS 14 and earlier:** right-click the app → **Open** → **Open**.
@@ -32,7 +21,7 @@ BusMakro gets smarter about Athens buses, lives in your menu bar, feels alive, a
 
 **Requirements:** macOS 11 or later, **Apple Silicon** (M1 or newer). Intel Macs aren't supported in this build.
 
-**SHA-256** (`BusMakro-1.2.0-macOS.zip`): `de104704f384c83ae57643be260c76171f2ef4b60accabadedcd6de0529c9ff6`
+**SHA-256** (`BusMakro-1.2.1-macOS.zip`): `5016d3350ed9db60f22c8164d5311bede92a81eec6ac09c900358095f0777052`
 
 ## Good to know
 
@@ -43,3 +32,7 @@ BusMakro gets smarter about Athens buses, lives in your menu bar, feels alive, a
 ## Thanks
 
 Data from **OASA** and **[athens-transit-rt](https://github.com/angelospk/athens-transit-rt)** by @angelospk (a port of [athens-gtfs-realtime](https://github.com/foivospro/athens-gtfs-realtime) by @foivospro). Maps by **MapLibre GL JS** and **CARTO**, map data © **OpenStreetMap** contributors. Built with **PyObjC**, **Requests** and **py2app**.
+
+## Also new since 1.1.0
+
+Menu bar countdown, strike radar, bunching warnings, ghost buses, learned arrival times, 3D buildings, motion, lighter glass and a big battery improvement. See the [1.2.0 notes](https://github.com/tassosmak/BusMakro/releases/tag/v1.2.0).
