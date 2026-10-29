@@ -34,7 +34,8 @@ function loadStyle(url){fetch(url).then(r=>r.json()).then(st=>{
   st.layers.forEach(l=>{const tf=l.layout&&l.layout['text-font'];if(Array.isArray(tf))l.layout['text-font']=tf.map(f=>FONT_SWAP[f]||f);});
   map.setStyle(st,{diff:false});
 }).catch(e=>{post({type:'error',msg:'style: '+e});map.setStyle(url);});}
-const map=new maplibregl.Map({container:'map',style:{version:8,sources:{},layers:[{id:'bg',type:'background',paint:{'background-color':darkMode.matches?'#202124':'#f2f2ef'}}]},center:[23.7275,37.9838],zoom:11,maxPitch:65,attributionControl:false});
+const map=new maplibregl.Map({container:'map',style:{version:8,sources:{},layers:[{id:'bg',type:'background',paint:{'background-color':darkMode.matches?'#202124':'#f2f2ef'}}]},center:[23.7275,37.9838],zoom:11,maxPitch:65,attributionControl:false,
+  maxTileCacheSize:60,refreshExpiredTiles:false});  // keep at most 60 decoded tiles: the cache was unbounded (~100+ MB)
 let loadedStyle=null;
 function applyStyle(){const u=isDark()?STYLES.dark:STYLES.light;if(u!==loadedStyle){loadedStyle=u;loadStyle(u);}else drawExtras();}
 applyStyle();
@@ -67,7 +68,8 @@ function drawExtras(){try{
   if(map.getLayer('bld-3d'))map.removeLayer('bld-3d');
   if(THREE_D&&map.getSource('protomaps')){
     const h=['coalesce',['get','height'],['*',3.2,['coalesce',['get','building:levels'],['get','levels'],3]]];
-    map.addLayer({id:'bld-3d',type:'fill-extrusion',source:'protomaps','source-layer':'buildings',minzoom:14,
+    map.addLayer({id:'bld-3d',type:'fill-extrusion',source:'protomaps','source-layer':'buildings',minzoom:15,  // street level only: far less geometry
+     
       paint:{'fill-extrusion-color':isNight()?'#1b2235':isDark()?'#2b2e36':'#dedbd4','fill-extrusion-height':h,
              'fill-extrusion-base':['coalesce',['get','min_height'],0],'fill-extrusion-opacity':0.85}},
       (map.getStyle().layers.find(l=>l.type==='symbol')||{}).id);
