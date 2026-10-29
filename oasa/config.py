@@ -38,7 +38,11 @@ DRAG_BAR_H = 28     # hover strip at the top for moving the window
 
 PILL_H = 72          # title row, then the search field on its own row
 
-FOCUS_SHEET_H = 70   # sheet height while the map is expanded (just its top row)
+FOCUS_SHEET_H = 66   # sheet height while the map is expanded (just its top row)
+
+SHEET_GAP = 13       # spacing around the sheet's handle and line menu: 13 + handle 5 + 13 + menu 22 + 13 = 66
+
+LINE_MENU_H = 22     # the "Browse a line" menu
 
 FLOAT_BTN = 40       # round floating buttons (map expand/locate, full-screen controls)
 

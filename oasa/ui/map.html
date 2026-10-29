@@ -91,8 +91,12 @@ function clear(o){Object.values(o).forEach(x=>x.m.remove());return {}}
 window.setStops=function(items,selectedId,fit,padBottom){
   stops=clear(stops);
   items.forEach(s=>{if(s.lat==null||s.lon==null)return;const sel=s.id===selectedId;const x=mk(sel?'selected-dot':'stop-dot','',s.lon,s.lat,s.name,sel?1000:0);x.el.addEventListener('click',ev=>{ev.stopPropagation();post({type:'stop',id:String(s.id)})});stops[String(s.id)]=x;});
-  if(fit&&items.length){const b=new maplibregl.LngLatBounds();items.forEach(s=>{if(s.lat!=null&&s.lon!=null)b.extend([s.lon,s.lat])});if(!b.isEmpty())map.fitBounds(b,{padding:{top:TOPPAD+30,left:30,right:30,bottom:(padBottom||0)+30},duration:600,maxZoom:15});}
+  if(fit&&items.length){const b=new maplibregl.LngLatBounds();items.forEach(s=>{if(s.lat!=null&&s.lon!=null)b.extend([s.lon,s.lat])});if(!b.isEmpty())map.fitBounds(b,{padding:fitPad(padBottom),duration:600,maxZoom:15});}
 };
+// Padding that always leaves room to show something: with the panel pulled up, top + bottom padding can
+// exceed the map's height, and MapLibre then zooms out to the whole city.
+function fitPad(padBottom){const h=map.getContainer().clientHeight,top=TOPPAD+30;
+  return {top,left:30,right:30,bottom:Math.max(30,Math.min((padBottom||0)+30,h-top-140))};}
 function bearing(a,b){const r=Math.PI/180,y=Math.sin((b[0]-a[0])*r)*Math.cos(b[1]*r);const x=Math.cos(a[1]*r)*Math.sin(b[1]*r)-Math.sin(a[1]*r)*Math.cos(b[1]*r)*Math.cos((b[0]-a[0])*r);return (Math.atan2(y,x)/r+360)%360;}
 // ---- Buses ----------------------------------------------------------------------------
 // As the athens-transit-rt contract says: from each GPS fix (position_at), drive the marker along
@@ -182,5 +186,5 @@ window.setPinned=function(id,pb){pinned=id||null;padB=pb||0;Object.keys(buses).f
 map.on('dragstart',()=>{if(pinned){pinned=null;Object.values(buses).forEach(x=>x.el.classList.remove('pinned'));post({type:'unpin'});}});
 window.setUser=function(lat,lon){const to=[lon,lat];if(!userM){const el=document.createElement('div');el.className='user-dot';el.style.zIndex=900;userM=new maplibregl.Marker({element:el}).setLngLat(to).addTo(map);}else userM.setLngLat(to);};
 window.getCenter=function(){const c=map.getCenter();return JSON.stringify({lat:c.lat,lon:c.lng});};
-window.focusStop=function(lat,lon,zoom,padBottom){map.flyTo({center:[lon,lat],zoom:zoom||16,duration:500,padding:{top:TOPPAD,left:0,right:0,bottom:padBottom||0}});};
+window.focusStop=function(lat,lon,zoom,padBottom){const p=fitPad(padBottom);map.flyTo({center:[lon,lat],zoom:zoom||16,duration:500,padding:{top:TOPPAD,left:0,right:0,bottom:p.bottom-30}});};
 </script></body></html>

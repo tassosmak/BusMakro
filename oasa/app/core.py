@@ -26,7 +26,7 @@ from oasa.app.glance import GLANCE_EVERY_S, GlanceMixin
 from oasa.app.location import LocationMixin
 from oasa.app.sheet import SheetMixin
 from oasa.app.tabs import TabsMixin
-from oasa.config import ALERTS_EVERY_S, ANIM_S, AUTH_GRANTED, AUTH_NOT_DETERMINED, CARTO_KEY, DRAG_BAR_H, FLOAT_BTN, FOCUS_SHEET_H, PILL_H, TABS, TOP_INSET, W_SIZABLE
+from oasa.config import LINE_MENU_H, SHEET_GAP, ALERTS_EVERY_S, ANIM_S, AUTH_GRANTED, AUTH_NOT_DETERMINED, CARTO_KEY, DRAG_BAR_H, FLOAT_BTN, FOCUS_SHEET_H, PILL_H, TABS, TOP_INSET, W_SIZABLE
 from oasa.debug import DEBUG, DEBUG_LINES, _debug_lock, _debug_seq, log
 from oasa.eta import fmt_eta
 from oasa.ui.map import HTML_MAP
@@ -186,6 +186,11 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
         self.explore_heading = label(t('h_stops_near_you'), 11, True, NSColor.secondaryLabelColor())
         self.line_menu = NSPopUpButton.alloc().initWithFrame_(NSMakeRect(0, 0, 100, 28))
         self.line_menu.setTarget_(self); self.line_menu.setAction_('lineChanged:')
+        # a smaller, borderless menu in a rounded field whose corners follow the sheet's (concentric)
+        self.line_menu.setControlSize_(1); self.line_menu.setFont_(NSFont.systemFontOfSize_(12))
+        self.line_menu.setBordered_(False); self.line_menu.setWantsLayer_(True)
+        self.line_menu.layer().setCornerRadius_(22 - SHEET_GAP)  # sheet radius minus the inset
+        self.line_menu.layer().setBackgroundColor_(NSColor.labelColor().colorWithAlphaComponent_(0.10).CGColor())
         self.tabs = NSSegmentedControl.segmentedControlWithLabels_trackingMode_target_action_([t(k) for k in TABS], 0, self, 'tabChanged:')
         self.tabs.setSelectedSegment_(0)
         self.search = NSSearchField.alloc().initWithFrame_(NSMakeRect(0, 0, 100, 26))
@@ -387,12 +392,14 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
         crowded = by + 2 * FLOAT_BTN + 10 > H - (TOP_INSET + PILL_H) * self.pill_alpha - 12  # sheet almost full
         self.map_locate_wrap.setHidden_(crowded); self.map_focus_wrap.setHidden_(crowded)
         self.handle.setFrame_(NSMakeRect(0, sh - 30, pw, 30))
-        self.handle_pill.setFrame_(NSMakeRect(pw / 2 - 20, 14, 40, 5))
+        # the same gap above the handle, between it and the menu, and (in the slim strip) below the menu
+        self.handle_pill.setFrame_(NSMakeRect(pw / 2 - 20, 30 - SHEET_GAP - 5, 40, 5))
 
-        y = sh - 34
+        y = sh - 2 * SHEET_GAP - 5
         back_w = 0 if self.mode in ('home', 'search') else 78
-        self.back_button.setFrame_(NSMakeRect(10, y - 28, back_w - 6, 28))
-        self.line_menu.setFrame_(NSMakeRect(12 + back_w, y - 28, pw - 24 - back_w, 28)); y -= 36
+        self.back_button.setFrame_(NSMakeRect(10, y - LINE_MENU_H / 2 - 14, back_w - 6, 28))
+        self.line_menu.setFrame_(NSMakeRect(SHEET_GAP + back_w, y - LINE_MENU_H, pw - 2 * SHEET_GAP - back_w, LINE_MENU_H))
+        y -= LINE_MENU_H + 12
         if self.mode == 'home':
             self.home_tabs.setFrame_(NSMakeRect(12, y - 24, pw - 24, 24)); y -= 32
         if self.mode != 'line':

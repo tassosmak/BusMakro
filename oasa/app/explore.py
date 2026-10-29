@@ -175,7 +175,8 @@ class ExploreMixin:
         self.near_from_map = from_map
         log(f'nearby stops: {len(stops)}{" (map area)" if from_map else ""}')
         if self.mode == 'home' and self.home_tab == 0:
-            self.show_near_stops(fit=not from_map)  # never move the map the user just moved
+            # never move the map the user just moved, nor away from a GPS fix we just zoomed to
+            self.show_near_stops(fit=not from_map and not me)
             self.rebuild_explore()
             self.status.setStringValue_(t('stops_in_area') if from_map
                                         else t('stops_near_you') if me else t('stops_near_centre'))
