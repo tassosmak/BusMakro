@@ -112,7 +112,7 @@ class ExploreMixin:
         self.home_tabs.setLabel_forSegment_(t('tab_home_nearby'), 0)
         self.home_tabs.setLabel_forSegment_(t('tab_favourites'), 1)
         if self.update_info:
-            self.update_button.setTitle_(t('update_available', v=self.update_info[0]))
+            self.update_button.setToolTip_(t('update_available', v=self.update_info[0]))
         for i, key in enumerate(TABS):
             self.tabs.setLabel_forSegment_(t(key), i)
         self.fill_line_menu()
@@ -272,6 +272,8 @@ class ExploreMixin:
         back, self.search_return = self.search_return or 'home', None
         log(f'search closed -> {back}')
         self.mode = back
+        if self.find.currentEditor() is None:  # not typing any more: the capsule gives the buttons back
+            self.set_find_expanded(False)
         if back != 'line':
             self.rebuild_explore()
         self.do_layout()
@@ -279,7 +281,10 @@ class ExploreMixin:
     def close_search(self):
         """Leaving search for a result: clear the field without restoring the old mode."""
         self.find.setStringValue_('')
+        self.find_clear.setHidden_(True)
         self.search_return = None
+        self.window.makeFirstResponder_(None)
+        self.set_find_expanded(False)
 
     def search_rows(self):
         q = self.search_query

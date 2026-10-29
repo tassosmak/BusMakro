@@ -36,7 +36,7 @@ TOP_INSET = 34      # room for the traffic-light buttons
 
 DRAG_BAR_H = 28     # hover strip at the top for moving the window
 
-PILL_H = 72          # title row, then the search field on its own row
+PILL_H = 40          # top bar: the search capsule and its round buttons
 
 FOCUS_SHEET_H = 66   # sheet height while the map is expanded (just its top row)
 

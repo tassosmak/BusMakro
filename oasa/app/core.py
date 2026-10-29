@@ -8,7 +8,7 @@ from AppKit import (
     NSApplication, NSWindow, NSWindowStyleMaskTitled, NSWindowStyleMaskClosable,
     NSWindowStyleMaskMiniaturizable, NSWindowStyleMaskResizable,
     NSWindowStyleMaskFullSizeContentView, NSBackingStoreBuffered, NSMakeRect, NSColor, NSFont,
-    NSPopUpButton, NSSearchField, NSTextView, NSScrollView, NSTableView, NSTableColumn, NSView,
+    NSPopUpButton, NSSearchField, NSTextField, NSImageView, NSImage, NSButton, NSTextView, NSScrollView, NSTableView, NSTableColumn, NSView,
     NSSegmentedControl,
 )
 from Foundation import NSObject, NSURL, NSMakeSize
@@ -155,24 +155,39 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
         for v in [self.map_focus_wrap, self.map_locate_wrap, self.find_float] + self.fs_wraps:
             content.addSubview_(v)
 
-        # --- Floating top bar ---
-        self.pill = glass(NSMakeRect(0, 0, 420, PILL_H), 18)
-        self.title = label('BusMakro', 16, True, rounded=True)
-        self.status = label(t('finding_stops'), 11, color=NSColor.secondaryLabelColor())
-        self.refresh_button = button('↻', self, 'refresh:', 7)  # circular
-        self.find = NSSearchField.alloc().initWithFrame_(NSMakeRect(0, 0, 100, 22))
+        # --- Top bar: a floating glass search capsule with round buttons beside it (no panel behind) ---
+        self.pill = NSView.alloc().initWithFrame_(NSMakeRect(0, 0, 420, PILL_H))  # plain holder, see-through
+        self.status = label(t('finding_stops'), 11, color=NSColor.secondaryLabelColor())  # not shown; kept for messages
+        self.find_wrap = glass(NSMakeRect(0, 0, 300, PILL_H), PILL_H / 2)
+        # a plain text field with our own magnifier and clear button (a borderless NSSearchField draws
+        # its icon on top of the text)
+        self.find = NSTextField.alloc().initWithFrame_(NSMakeRect(0, 0, 100, 18))
         self.find.setPlaceholderString_(t('search_bar'))
-        self.find.setSendsSearchStringImmediately_(True)
         self.find.setTarget_(self); self.find.setAction_('findChanged:')
-        self.find.setControlSize_(1); self.find.setFont_(NSFont.systemFontOfSize_(12))
-        self.update_button = button('', self, 'openUpdate:', 1)
-        self.update_button.setControlSize_(1); self.update_button.setFont_(NSFont.systemFontOfSize_weight_(10, 0.3))
-        self.update_button.setHidden_(True)
-        for v in (self.title, self.refresh_button, self.find, self.update_button):
-            self.pill.addSubview_(v)  # no status line under the name any more
+        self.find.setDelegate_(self)  # typing, editing begins/ends: results update, the capsule grows and back
+        self.find.setFont_(NSFont.systemFontOfSize_(13))
+        self.find.setBezeled_(False); self.find.setBordered_(False); self.find.setDrawsBackground_(False)
+        self.find.setFocusRingType_(1); self.find.cell().setScrollable_(True); self.find.cell().setUsesSingleLineMode_(True)
+        self.find_icon = NSImageView.alloc().initWithFrame_(NSMakeRect(0, 0, 16, 16))
+        self.find_icon.setImage_(NSImage.imageWithSystemSymbolName_accessibilityDescription_('magnifyingglass', None))
+        self.find_icon.setContentTintColor_(NSColor.secondaryLabelColor())
+        self.find_clear = NSButton.alloc().initWithFrame_(NSMakeRect(0, 0, 18, 18))
+        self.find_clear.setBordered_(False); self.find_clear.setImagePosition_(1)
+        self.find_clear.setImage_(NSImage.imageWithSystemSymbolName_accessibilityDescription_('xmark.circle.fill', None))
+        self.find_clear.setContentTintColor_(NSColor.tertiaryLabelColor())
+        self.find_clear.setTarget_(self); self.find_clear.setAction_('clearFind:'); self.find_clear.setHidden_(True)
+        for v in (self.find_icon, self.find, self.find_clear):
+            self.find_wrap.addSubview_(v)
+        self.refresh_wrap, self.refresh_button = float_button('arrow.clockwise', self, 'refresh:', PILL_H, t('m_refresh'))
+        self.update_wrap, self.update_button = float_button('arrow.down.circle', self, 'openUpdate:', PILL_H)
+        self.update_wrap.setHidden_(True)
+        self.bar_buttons = [self.refresh_wrap, self.update_wrap]
         if DEBUG:
-            self.debug_button = button('🐞', self, 'toggleDebug:', 7)
-            self.pill.addSubview_(self.debug_button)
+            self.debug_wrap, self.debug_button = float_button('ladybug', self, 'toggleDebug:', PILL_H, 'Debug')
+            self.bar_buttons.append(self.debug_wrap)
+        self.find_expanded = False  # searching: the capsule covers the buttons until the search is cleared
+        for v in [self.find_wrap] + self.bar_buttons:
+            self.pill.addSubview_(v)
         content.addSubview_(self.pill)
 
         # --- Bottom sheet ---
@@ -253,6 +268,7 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
         install_menu('BusMakro', self)
         self.drag_bar.fade(0.0, animate=False)  # traffic lights start hidden, like the bar
         self.window.makeKeyAndOrderFront_(None)
+        self.window.makeFirstResponder_(None)  # don't start with the cursor in the search field
         NSApplication.sharedApplication().activateIgnoringOtherApps_(True)
         threading.Thread(target=self.fetch_lines, daemon=True).start()
         threading.Thread(target=self.check_updates, args=(False,), daemon=True).start()
@@ -347,16 +363,7 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
         self.pill.setFrame_(NSMakeRect(px, pill_y, pw, PILL_H))
         self.pill.setAlphaValue_(self.pill_alpha)
         self.pill.setHidden_(self.fullscreen or self.pill_alpha < 0.01)
-        right = 76 if DEBUG else 42                           # buttons on the right edge
-        row_c = (PILL_H + 33) / 2   # centre of the top row: between the search field (top at 33) and the edge
-        upd_w = 0 if self.update_button.isHidden() else 128   # 'Update x.y' next to them
-        self.title.setFrame_(NSMakeRect(16, row_c - 11, pw - 16 - right - upd_w - 4, 22))
-        self.update_button.setFrame_(NSMakeRect(pw - right - upd_w, row_c - 10, upd_w - 4, 20))
-        if not self.fullscreen:
-            self.find.setFrame_(NSMakeRect(12, 9, pw - 24, 24))   # search: its own row at the bottom of the bar
-        self.refresh_button.setFrame_(NSMakeRect(pw - 40, row_c - 14, 28, 28))
-        if DEBUG:
-            self.debug_button.setFrame_(NSMakeRect(pw - 74, row_c - 14, 28, 28))
+        self.layout_bar(pw)
         self.drag_bar.setHidden_(self.fullscreen)
 
         # full screen: round buttons on the sides instead of the bar
@@ -370,7 +377,7 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
             self.find_float.setHidden_(not (self.fullscreen and self.find_open))
             self.find_float.setFrame_(final if self.find_open else start)
         if self.fullscreen:
-            self.find.setFrame_(NSMakeRect(10, (fb - 24) / 2, final.size.width - 20, 24))
+            self.find.setFrame_(NSMakeRect(14, (fb - 18) / 2, final.size.width - 28, 18))
         x = W - 16 - fb
         for v in [self.fs_refresh_wrap] + ([self.fs_update_wrap] if self.update_info else []) + self.fs_wraps[3:]:
             v.setFrame_(NSMakeRect(x, fy, fb, fb)); x -= fb + 8
@@ -400,39 +407,39 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
 
         y = sh - 2 * SHEET_GAP - 5
         back_w = 0 if self.mode in ('home', 'search') else 78
-        self.back_button.setFrame_(NSMakeRect(10, y - LINE_MENU_H / 2 - 14, back_w - 6, 28))
+        self.back_button.setFrame_(NSMakeRect(SHEET_GAP - 3, y - LINE_MENU_H / 2 - 14, back_w - 6, 28))  # bezel has 3 pt of air
         self.line_menu.setFrame_(NSMakeRect(SHEET_GAP + back_w, y - LINE_MENU_H, pw - 2 * SHEET_GAP - back_w, LINE_MENU_H))
         y -= LINE_MENU_H + 12
         if self.mode == 'home':
-            self.home_tabs.setFrame_(NSMakeRect(12, y - 24, pw - 24, 24)); y -= 32
+            self.home_tabs.setFrame_(NSMakeRect(SHEET_GAP, y - 24, pw - 2 * SHEET_GAP, 24)); y -= 32
         if self.mode != 'line':
             self.explore_heading.setFrame_(NSMakeRect(16, y - 18, pw - 32 - (130 if self.mode in ('home', 'stop') else 0), 16))
-            self.locate_button.setFrame_(NSMakeRect(pw - 134, y - 22, 122, 22))
-            self.fav_button.setFrame_(NSMakeRect(pw - 42, y - 26, 30, 30))
+            self.locate_button.setFrame_(NSMakeRect(pw - SHEET_GAP - 122, y - 22, 122, 22))
+            self.fav_button.setFrame_(NSMakeRect(pw - SHEET_GAP - 30, y - 26, 30, 30))
             y -= 26
-            self.explore_scroll.setFrame_(NSMakeRect(6, 6, pw - 12, max(1, y - 6)))
-            self.explore_col.setWidth_(self.explore_scroll.contentSize().width)
+            self.explore_scroll.setFrame_(self.list_frame(pw, y))
+            self.explore_col.setWidth_(self.list_col_w(pw))
             if reload:
                 self.explore_table.reloadData()
             y = sh - 34 - 36  # line-mode controls are hidden; keep their frames sane
-        self.tabs.setFrame_(NSMakeRect(12, y - 24, pw - 24, 24)); y -= 32
+        self.tabs.setFrame_(NSMakeRect(SHEET_GAP, y - 24, pw - 2 * SHEET_GAP, 24)); y -= 32
         if self.tab == 0:
-            self.search.setFrame_(NSMakeRect(12, y - 26, pw - 24, 26)); y -= 32
-            self.stop_menu.setFrame_(NSMakeRect(12, y - 28, pw - 24, 28)); y -= 36
+            self.search.setFrame_(NSMakeRect(SHEET_GAP, y - 26, pw - 2 * SHEET_GAP, 26)); y -= 32
+            self.stop_menu.setFrame_(NSMakeRect(SHEET_GAP, y - 28, pw - 2 * SHEET_GAP, 28)); y -= 36
         if self.tab == 1 and len(self.variant_keys) > 1:
-            self.variant_menu.setFrame_(NSMakeRect(12, y - 26, pw - 24, 26)); y -= 32
+            self.variant_menu.setFrame_(NSMakeRect(SHEET_GAP, y - 26, pw - 2 * SHEET_GAP, 26)); y -= 32
         else:
             self.arrival_heading.setFrame_(NSMakeRect(16, y - 18, pw - 32, 16))
             if self.mode == 'line':
                 self.locate_button.setFrame_(NSMakeRect(pw - 134, y - 22, 122, 22))
             y -= 26
-        area = NSMakeRect(6, 6, pw - 12, max(1, y - 6))
+        area = self.list_frame(pw, y)
         for scroll, col, table in ((self.arr_scroll, self.table_col, self.table),
                                    (self.route_scroll, self.route_col, self.route_table),
                                    (self.near_scroll, self.near_col, self.near_table),
                                    (self.tt_scroll, self.tt_col, self.tt_table)):
             scroll.setFrame_(area)
-            col.setWidth_(scroll.contentSize().width)  # exact visible width, so cards stay centred
+            col.setWidth_(self.list_col_w(pw))
             if reload:
                 table.reloadData()
 
@@ -451,6 +458,83 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
             self.debug_panel.setFrame_(NSMakeRect(px, pill_y - 8 - dh, pw, dh))
             self.debug_stats.setFrame_(NSMakeRect(10, dh - 22, pw - 20, 16))
             self.debug_scroll.setFrame_(NSMakeRect(6, 6, pw - 12, dh - 30))
+
+    # Lists: the table draws each row 6 pt in and each card is 6 pt inside its row, so the scroll view
+    # starts 12 pt left of where the cards should; this lines the cards up with the menu and tabs above.
+    LIST_PAD = 12
+
+    def list_frame(self, pw, top):
+        return NSMakeRect(SHEET_GAP - self.LIST_PAD, 6, pw - 2 * (SHEET_GAP - self.LIST_PAD) - 6, max(1, top - 6))
+
+    def list_col_w(self, pw):
+        return pw - 2 * SHEET_GAP + 12  # card width = column - 12
+
+    def bar_frames(self, pw):
+        """Top bar: (search capsule frame, [(button, frame)]) collapsed, and the capsule frame expanded."""
+        shown = [b for b in self.bar_buttons if not b.isHidden() or (b is self.update_wrap and self.update_info)]
+        x, frames = pw, []
+        for b in shown:  # right to left: refresh, update, debug
+            x -= PILL_H
+            frames.append((b, NSMakeRect(x, 0, PILL_H, PILL_H)))
+            x -= 8
+        return NSMakeRect(0, 0, x, PILL_H), frames, NSMakeRect(0, 0, pw, PILL_H)
+
+    def layout_bar(self, pw, animate=False):
+        collapsed, buttons, expanded = self.bar_frames(pw)
+        target = expanded if self.find_expanded else collapsed
+        w = target.size.width
+        self.find_icon.setFrame_(NSMakeRect(14, (PILL_H - 16) / 2, 16, 16))
+        self.find_clear.setFrame_(NSMakeRect(w - 30, (PILL_H - 18) / 2, 18, 18))
+        self.find_clear.setAutoresizingMask_(1)  # stays at the right edge while the capsule grows
+        if not self.fullscreen:
+            self.find.setFrame_(NSMakeRect(38, (PILL_H - 18) / 2, max(10, w - 38 - 34), 18))
+            self.find.setAutoresizingMask_(2)
+        if animate:
+            def changes(ctx):
+                ctx.setDuration_(0.28); ctx.setAllowsImplicitAnimation_(True)
+                self.find_wrap.animator().setFrame_(target)
+                for b, fr in buttons:
+                    b.animator().setAlphaValue_(0.0 if self.find_expanded else 1.0)
+            for b, fr in buttons:
+                b.setFrame_(fr)
+            NSAnimationContext.runAnimationGroup_completionHandler_(changes, None)
+        else:
+            self.find_wrap.setFrame_(target)
+            for b, fr in buttons:
+                b.setFrame_(fr); b.setAlphaValue_(0.0 if self.find_expanded else 1.0)
+
+    def set_find_expanded(self, on):
+        if on == self.find_expanded or self.fullscreen:
+            return
+        self.find_expanded = on
+        self.layout_bar(self.pill.frame().size.width, animate=True)
+
+    def controlTextDidChange_(self, notification):
+        if notification.object() is self.find:
+            self.find_clear.setHidden_(not str(self.find.stringValue() or ''))
+            self.findChanged_(self.find)
+
+    def control_textView_doCommandBySelector_(self, control, textview, selector):
+        if control is self.find and selector == 'cancelOperation:':  # Esc clears the search
+            self.clearFind_(None)
+            return True
+        return False
+
+    def clearFind_(self, sender):
+        self.find.setStringValue_('')
+        self.find_clear.setHidden_(True)
+        self.findChanged_(self.find)
+        self.window.makeFirstResponder_(None)
+        self.set_find_expanded(False)
+
+    def controlTextDidBeginEditing_(self, notification):
+        if notification.object() is self.find:
+            self.set_find_expanded(True)
+
+    def controlTextDidEndEditing_(self, notification):
+        if notification.object() is not self.find:
+            return
+        self.set_find_expanded(bool(str(self.find.stringValue() or '').strip()))  # stays wide while a search is on
 
     def windowDidResize_(self, notification):
         self.do_layout()
@@ -662,7 +746,7 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
     def windowWillExitFullScreen_(self, notification):
         log('full screen -> off')
         self.fullscreen = False
-        self.find.removeFromSuperview(); self.pill.addSubview_(self.find)
+        self.find.removeFromSuperview(); self.find_wrap.addSubview_(self.find)
         self.find_open = False
         self.do_layout()
 
@@ -889,8 +973,8 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
                 info, manual = item[1], item[2]
                 if info:
                     self.update_info = info
-                    self.update_button.setTitle_(t('update_available', v=info[0]))
-                    self.update_button.setHidden_(False)
+                    self.update_button.setToolTip_(t('update_available', v=info[0]))
+                    self.update_wrap.setHidden_(False)
                     self.fs_update_btn.setToolTip_(t('update_available', v=info[0]))
                     self.do_layout(reload=False)
                 elif manual:
