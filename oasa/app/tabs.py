@@ -22,7 +22,7 @@ class TabsMixin:
                                       else NSColor.secondaryLabelColor(),
                                       NSFontAttributeName: NSFont.systemFontOfSize_(15)}))
             self.fav_button.setToolTip_(i18n.t('fav_remove') if fav else i18n.t('fav_add'))
-        self.explore_heading.setHidden_(line); self.explore_scroll.setHidden_(line)
+        self.explore_heading.setHidden_(line or self.mode == 'home'); self.explore_scroll.setHidden_(line)
         self.explore_heading.setStringValue_(self.explore_heading_text())
         self.tabs.setHidden_(not line)
         if not line:

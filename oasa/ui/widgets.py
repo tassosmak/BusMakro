@@ -234,21 +234,22 @@ def make_row_view(row, width, app):
             app.prev_eta[key] = row['eta_txt']
         return root
 
-    if kind == 'near':
+    if kind == 'near':  # stop name and street on the left, distance and walk on the right
         root, card, cw = card_base(width, h)
-        dist = label(row['dist_txt'], 20, True, rounded=True, tabular=True); dist.setFrame_(NSMakeRect(14, 30, 108, 26))
-        walk = label(row['walk'], 11, color=NSColor.secondaryLabelColor()); walk.setFrame_(NSMakeRect(14, 10, 108, 16))
-        name_w = cw - 134 - (86 if row.get('closest') else 12)
-        name = label(row['name'], 13, True); name.setFrame_(NSMakeRect(134, 36, name_w, 18)); name.setAutoresizingMask_(W_SIZABLE)
-        nxt = label(row['next_txt'], 12, color=NSColor.secondaryLabelColor(), tabular=True); nxt.setFrame_(NSMakeRect(134, 14, cw - 146, 18))
-        nxt.setAutoresizingMask_(W_SIZABLE)
+        right_w = 108
+        name = label(row['name'], 13, True); name.setFrame_(NSMakeRect(14, 36, cw - 28 - right_w - 8, 18))
+        nxt = label(row['next_txt'], 12, color=NSColor.secondaryLabelColor(), tabular=True)
+        nxt.setFrame_(NSMakeRect(14, 14, cw - 28 - right_w - 8, 18))
+        dist = label(row['dist_txt'], 20, True, rounded=True, tabular=True); dist.setFrame_(NSMakeRect(cw - 14 - right_w, 30, right_w, 26))
+        walk = label(row['walk'], 11, color=NSColor.secondaryLabelColor()); walk.setFrame_(NSMakeRect(cw - 14 - right_w, 10, right_w, 16))
+        if row.get('closest'):  # no tag: the nearest stop's distance is simply in the accent colour
+            dist.setTextColor_(NSColor.systemOrangeColor())
+        for v in (dist, walk):
+            v.setAlignment_(NSTextAlignmentRight); v.setAutoresizingMask_(MIN_X_MARGIN)
+        name.setAutoresizingMask_(W_SIZABLE); nxt.setAutoresizingMask_(W_SIZABLE)
         row['next_label'] = nxt
-        for v in (dist, walk, name, nxt):
+        for v in (name, nxt, dist, walk):
             card.addSubview_(v)
-        if row.get('closest'):
-            tag = label(t('closest'), 9, True, NSColor.systemOrangeColor()); tag.setFrame_(NSMakeRect(cw - 78, 40, 66, 12))
-            tag.setAlignment_(NSTextAlignmentRight); tag.setAutoresizingMask_(MIN_X_MARGIN)
-            card.addSubview_(tag)
         return root
 
     # arrival card

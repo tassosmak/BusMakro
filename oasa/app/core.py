@@ -448,7 +448,8 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
             self.explore_heading.setFrame_(NSMakeRect(16, y - 18, pw - 32 - (130 if self.mode in ('home', 'stop') else 0), 16))
             self.locate_button.setFrame_(NSMakeRect(pw - SHEET_GAP - 122, y - 22, 122, 22))
             self.fav_button.setFrame_(NSMakeRect(pw - SHEET_GAP - 30, y - 26, 30, 30))
-            y -= 26
+            if self.mode != 'home':  # home: the tabs already say what the list is
+                y -= 26
             self.explore_scroll.setFrame_(self.list_frame(pw, y))
             self.explore_col.setWidth_(self.list_col_w(pw))
             if reload:
