@@ -23,10 +23,12 @@ except Exception:  # pragma: no cover
 from oasa.app.data import DataMixin
 from oasa.app.explore import ExploreMixin
 from oasa.app.glance import GLANCE_EVERY_S, GlanceMixin
+from oasa.app.palette import PaletteMixin
+from oasa.app.onboarding import OnboardingMixin
 from oasa.app.location import LocationMixin
 from oasa.app.sheet import SheetMixin
 from oasa.app.tabs import TabsMixin
-from oasa.config import MAP_FREE_AFTER_S, LINE_MENU_H, SHEET_GAP, ALERTS_EVERY_S, ANIM_S, AUTH_GRANTED, AUTH_NOT_DETERMINED, CARTO_KEY, DRAG_BAR_H, FLOAT_BTN, FOCUS_SHEET_H, PILL_H, TABS, TOP_INSET, W_SIZABLE
+from oasa.config import CHIP_H, MAP_FREE_AFTER_S, LINE_MENU_H, SHEET_GAP, ALERTS_EVERY_S, ANIM_S, AUTH_GRANTED, AUTH_NOT_DETERMINED, CARTO_KEY, DRAG_BAR_H, FLOAT_BTN, FOCUS_SHEET_H, PILL_H, TABS, TOP_INSET, W_SIZABLE
 from oasa.debug import DEBUG, DEBUG_LINES, _debug_lock, _debug_seq, log
 from oasa.eta import fmt_eta
 from oasa.ui.map import HTML_MAP
@@ -49,7 +51,7 @@ class MainQueue(queue.Queue):
         self.app.performSelectorOnMainThread_withObject_waitUntilDone_('checkResults:', None, False)
 
 
-class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, ExploreMixin, GlanceMixin):
+class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, ExploreMixin, GlanceMixin, PaletteMixin, OnboardingMixin):
     def applicationDidFinishLaunching_(self, notification):
         self.results = MainQueue(self)   # worker threads -> main thread (wakes it only when something arrives)
         self.visible = True         # window on screen (not minimised, hidden, closed or covered)
@@ -183,6 +185,9 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
         for v in [self.find_wrap] + self.bar_buttons:
             self.pill.addSubview_(v)
         content.addSubview_(self.pill)
+        self.chips = NSView.alloc().initWithFrame_(NSMakeRect(0, 0, 420, CHIP_H))  # recent stops, under the bar
+        content.addSubview_(self.chips)
+        self.chip_buttons = []
 
         # --- Bottom sheet ---
         self.sheet = glass(NSMakeRect(0, 0, 420, 360), 22, SheetView)
@@ -258,11 +263,15 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
             self.debug_panel.addSubview_(self.debug_stats); self.debug_panel.addSubview_(self.debug_scroll)
             content.addSubview_(self.debug_panel)
 
+        self.build_palette()
         self.do_layout()
+        self.rebuild_chips()
         install_menu('BusMakro', self)
         self.drag_bar.fade(0.0, animate=False)  # traffic lights start hidden, like the bar
         self.window.makeKeyAndOrderFront_(None)
         self.window.makeFirstResponder_(None)  # don't start with the cursor in the search field
+        self.ob = None
+        self.maybe_onboard()
         NSApplication.sharedApplication().activateIgnoringOtherApps_(True)
         threading.Thread(target=self.fetch_lines, daemon=True).start()
         threading.Thread(target=self.check_updates, args=(False,), daemon=True).start()
@@ -344,6 +353,54 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
         scroll.setDocumentView_(table)
         return scroll, table, col
 
+    def rebuild_chips(self):
+        """Recent stops as small glass capsules under the search bar (home screen)."""
+        from oasa import recents
+        for b in self.chip_buttons:
+            b.removeFromSuperview()
+        self.chip_buttons = []
+        self.recent_stops = recents.load()
+        for i, r in enumerate(self.recent_stops):
+            text = i18n.name(r.get('name'), r.get('name_en')) or r['id']
+            text = text if len(text) <= 22 else text[:21] + '…'
+            lab = label(text, 11, True)
+            w = min(190, lab.fittingSize().width + 34)
+            wrap = glass(NSMakeRect(0, 0, w, CHIP_H), CHIP_H / 2)
+            btn = NSButton.alloc().initWithFrame_(NSMakeRect(0, 0, w, CHIP_H))
+            btn.setBordered_(False); btn.setTitle_('')
+            btn.setTarget_(self); btn.setAction_('recentClicked:'); btn.setTag_(i)
+            ico = NSImageView.alloc().initWithFrame_(NSMakeRect(10, (CHIP_H - 12) / 2, 12, 12))
+            ico.setImage_(NSImage.imageWithSystemSymbolName_accessibilityDescription_('clock.arrow.circlepath', None))
+            ico.setContentTintColor_(NSColor.secondaryLabelColor())
+            lab.setFrame_(NSMakeRect(26, (CHIP_H - 15) / 2, w - 32, 15))
+            for v in (ico, lab, btn):
+                wrap.addSubview_(v)
+            self.chips.addSubview_(wrap)
+            self.chip_buttons.append(wrap)
+        self.do_layout(reload=False)
+
+    def onboardNext_(self, sender):
+        self.onboard_next()
+
+    def showWelcome_(self, sender):
+        if self.ob is None:
+            self.show_onboarding()
+
+    def showPalette_(self, sender):
+        self.show_palette()
+
+    def paletteRowClicked_(self, sender):
+        self.palette_open_item(int(sender.tag()))
+
+    def paletteBackdrop_(self, sender):
+        self.hide_palette()
+
+    def recentClicked_(self, sender):
+        i = int(sender.tag())
+        if 0 <= i < len(self.recent_stops):
+            haptic()
+            self.open_stop(self.recent_stops[i]['id'], dict(self.recent_stops[i]))
+
     def make_map(self):
         """Create the map's web view (again, after it was freed) underneath everything else."""
         config = WKWebViewConfiguration.alloc().init()
@@ -395,6 +452,16 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
         self.pill.setFrame_(NSMakeRect(px, pill_y, pw, PILL_H))
         self.pill.setAlphaValue_(self.pill_alpha)
         self.pill.setHidden_(self.fullscreen or self.pill_alpha < 0.01)
+        chips_on = (self.mode == 'home' and not self.fullscreen and bool(self.chip_buttons)
+                    and not self.find_expanded and self.pill_alpha > 0.01)
+        self.chips.setHidden_(not chips_on)
+        self.chips.setAlphaValue_(self.pill_alpha)
+        self.chips.setFrame_(NSMakeRect(px, pill_y - 8 - CHIP_H, pw, CHIP_H))
+        x = 0
+        for b in self.chip_buttons:  # as many as fit, left to right
+            w = b.frame().size.width
+            b.setHidden_(x + w > pw)
+            b.setFrameOrigin_((x, 0)); x += w + 6
         self.layout_bar(pw)
         self.drag_bar.setHidden_(self.fullscreen)
 
@@ -415,7 +482,7 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
             v.setFrame_(NSMakeRect(x, fy, fb, fb)); x -= fb + 8
 
         # tell the map how much room the top controls take (fits and zoom buttons stay clear of them)
-        inset = int(16 + fb + 8 if self.fullscreen else top + PILL_H * self.pill_alpha + 10)
+        inset = int(16 + fb + 8 if self.fullscreen else top + (PILL_H + (CHIP_H + 8 if not self.chips.isHidden() else 0)) * self.pill_alpha + 10)
         if inset != self.top_inset_sent and self.map_ready:
             self.top_inset_sent = inset
             self.evaluate_js(f'window.setTopInset({inset});')
@@ -543,11 +610,25 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
         self.layout_bar(self.pill.frame().size.width, animate=True)
 
     def controlTextDidChange_(self, notification):
+        if notification.object() is self.pal_field:
+            self.update_palette()
         if notification.object() is self.find:
             self.find_clear.setHidden_(not str(self.find.stringValue() or ''))
             self.findChanged_(self.find)
 
     def control_textView_doCommandBySelector_(self, control, textview, selector):
+        if control is self.pal_field:  # palette keys: ↑ ↓ move, ⏎ open, Esc close
+            if selector == 'moveDown:':
+                self.palette_move(1)
+            elif selector == 'moveUp:':
+                self.palette_move(-1)
+            elif selector == 'insertNewline:':
+                self.palette_open_item(self.pal_sel)
+            elif selector == 'cancelOperation:':
+                self.hide_palette()
+            else:
+                return False
+            return True
         if control is self.find and selector == 'cancelOperation:':  # Esc clears the search
             self.clearFind_(None)
             return True
@@ -571,6 +652,9 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
 
     def windowDidResize_(self, notification):
         self.do_layout()
+        if self.palette_open():
+            self.layout_palette()
+        self.layout_onboarding()
 
     def animTick_(self, timer):
         a = self.anim

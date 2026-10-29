@@ -9,7 +9,7 @@ The app has four modes:
 """
 import json, threading, time
 from concurrent.futures import ThreadPoolExecutor
-from oasa import alerts, favorites, history, stop_index
+from oasa import alerts, favorites, history, recents, stop_index
 from oasa.api import error_kind, get_closest_stops, get_stop_buses, get_stop_lines
 from oasa.config import NEAR_MIN_ZOOM, NEAR_REFETCH_KM, TABS, WALK_M_PER_MIN
 from oasa.debug import log
@@ -42,6 +42,8 @@ class ExploreMixin:
             log(f'open_stop: unknown stop {sid}', 'WARN')
             return
         log(f'mode -> stop {stop["name"]} [{sid}]')
+        recents.add(stop)
+        self.rebuild_chips()
         self.close_search()
         self.mode = 'stop'
         self.leave_line()
@@ -105,6 +107,8 @@ class ExploreMixin:
         self.locate_button.setTitle_(t('locate_me'))
         self.search.setPlaceholderString_(t('search_stop'))
         self.find.setPlaceholderString_(t('search_bar'))
+        self.rebuild_chips()  # recent stops: names in the new language
+        self.layout_onboarding()  # the welcome, if it is open
         self.update_focus_button()
         self.map_locate_btn.setToolTip_(t('m_locate'))
         self.fs_search_btn.setToolTip_(t('search_bar'))

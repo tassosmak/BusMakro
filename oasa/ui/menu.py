@@ -47,6 +47,7 @@ def install_menu(app_name, delegate):
     _item(m, t('m_select_all'), 'selectAll:', 'a')
 
     m = _submenu(bar, t('m_view'))
+    _item(m, t('m_goto'), 'showPalette:', 'k', target=delegate)
     _item(m, t('m_refresh'), 'refresh:', 'r', target=delegate)
     _item(m, t('m_locate'), 'locateMe:', 'l', target=delegate)
     _item(m, t('m_back'), 'backClicked:', '[', target=delegate)
@@ -82,5 +83,9 @@ def install_menu(app_name, delegate):
     _item(m, t('m_zoom'), 'performZoom:')
     _item(m, t('m_close'), 'performClose:', 'w')
     app.setWindowsMenu_(m)
+
+    m = _submenu(bar, t('m_help'))
+    _item(m, t('m_welcome'), 'showWelcome:', target=delegate)
+    app.setHelpMenu_(m)
 
     app.setMainMenu_(bar)
