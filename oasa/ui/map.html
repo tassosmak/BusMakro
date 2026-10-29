@@ -111,8 +111,10 @@ let userZoomUntil=0;
 ['zoomstart','zoom','wheel'].forEach(ev=>map.on(ev,e=>{if(e.originalEvent)userZoomUntil=performance.now()+400;}));
 function ease(t){return t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2}
 function metres(a,b){const k=Math.cos(a[1]*Math.PI/180);return Math.hypot((b[0]-a[0])*k,b[1]-a[1])*111320;}
+// Only `path` (the road to the bus's next stop) is driven, not `path_beyond`: buses stop there, and
+// driving past it ran markers far ahead, so the next GPS fix pulled them back (~1 update in 4).
 function mkRoute(b){
-  const pts=[].concat(b.path||[],(b.path_beyond||[]).slice(b.path&&b.path.length?1:0)).map(p=>[p[1],p[0]]);
+  const pts=(b.path||[]).map(p=>[p[1],p[0]]);
   if(pts.length<2)return null;
   const cum=[0];for(let i=1;i<pts.length;i++)cum.push(cum[i-1]+metres(pts[i-1],pts[i]));
   // only a bus that is actually moving is driven along its road; standing (0) or unknown (null) stays put
@@ -139,8 +141,21 @@ function estimate(x,nowS){  // where the bus should be now, from its last fix
   // standing/unknown-speed buses stay at their real position; moving ones drive on for at most
   // MAX_DR_S and then wait there (a stale bus is only faded, never snapped back)
   const secs=x.route.moving?Math.min(Math.max(0,age),MAX_DR_S):0;
-  return pointAt(x.route,travelled(x.route,secs));
+  return pointAt(x.route,Math.max(travelled(x.route,secs),x.hold||0));  // never behind where it was held
 }
+// Where `p` lies along a route: {off: metres from it, d: metres along it}.
+function along(r,p){
+  let best={off:Infinity,d:0};
+  for(let i=1;i<r.pts.length;i++){
+    const a=r.pts[i-1],b=r.pts[i],k=Math.cos(a[1]*Math.PI/180);
+    const bx=(b[0]-a[0])*k,by=b[1]-a[1],px=(p[0]-a[0])*k,py=p[1]-a[1],L=bx*bx+by*by;
+    const f=L>0?Math.max(0,Math.min(1,(px*bx+py*by)/L)):0;
+    const off=Math.hypot(px-bx*f,py-by*f)*111320;
+    if(off<best.off)best={off,d:r.cum[i-1]+(r.cum[i]-r.cum[i-1])*f};
+  }
+  return best;
+}
+const HOLD_M=150;  // a new fix up to this far behind the drawn marker: wait there instead of backing up
 function turn(x,hdg){if(hdg==null)return;const d=((hdg-x.angle+540)%360)-180;if(Math.abs(d)<0.5)return;x.angle+=d;x.rot.style.transform='rotate('+x.angle+'deg)';x.rot.style.opacity=1;}
 function step(now){
   const nowS=Date.now()/1000;let active=false;
@@ -170,6 +185,11 @@ window.setBuses=function(items){
     else if(at<x.fixAt)return;  // an older fix than the one we have: ignore it
     if(at>x.fixAt&&x.fixAt){x.el.classList.remove('ping');void x.el.offsetWidth;x.el.classList.add('ping');}  // fresh GPS fix: a ring ripples out
     x.fix=fix;x.fixAt=at;x.route=mkRoute(b);x.offRoute=!b.path&&!b.path_beyond;  // the API leaves both empty off-route
+    x.hold=0;
+    if(x.route&&x.fixAt){  // the marker ran a little ahead of the bus: let the bus catch up, don't reverse
+      const a=along(x.route,x.cur);
+      if(a.off<40&&a.d>0&&a.d<=HOLD_M)x.hold=a.d;
+    }
     if(typeof b.heading==='number'&&!isNaN(b.heading))x.hdg=b.heading;
     const target=estimate(x,nowS).p;
     if(metres(x.cur,target)>SNAP_M){  // long GPS gap: fade and snap, never glide through blocks

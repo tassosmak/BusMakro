@@ -25,6 +25,7 @@ It is built with Python and AppKit (via PyObjC) and has a phone-style layout: a 
 - **Every line at a stop.** Tap a stop (in the list or on the map) to see all the lines that stop there, soonest first. Lines with a bus on the road show the live OASA prediction in green. Lines with no bus out yet show a timetable estimate in orange (`~N min`, with the departure time from the terminus).
 - **Buses on their way.** The stop screen also shows the buses heading to that stop on the map, each labelled with its line number. Click one to open its line with that bus followed.
 - **Service alerts.** OASA's current disruption notices (from oasa.gr's announcements) appear as an orange ⚠︎ card on the stop screen and at the top of a line's arrivals, and affected lines get a ⚠︎ in the stop's list. Click a card to read the full notice.
+- **Timetable.** A line's **Timetable** tab lists today's departures from each end of the line, the next one highlighted.
 - **Line view.** Tap a line to open it with that stop already selected. **‹ Back** steps back to the stop, then to the stops near you. You can also pick any line from the dropdown.
   - **Live map:** the route drawn along the roads (a blue line with an outline, for the selected variant), the line's stops, and its buses moving in real time, with a heading arrow on each bus. The map follows the system light/dark theme.
   - **Arrivals tab:** buses approaching the stop, with a live countdown, distance along the route and delay against the schedule ("On time", "+10 min").
