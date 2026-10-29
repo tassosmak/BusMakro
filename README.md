@@ -22,7 +22,7 @@ It is built with Python and AppKit (via PyObjC) and has a phone-style layout: a 
 ## Features
 
 - **Stops near you on launch.** On the **Nearby** tab of the home screen, it finds your location and lists the closest stops of *any* line, also shown on the map. Pan the map elsewhere and the stops update to that area ("Stops in this area"); distances and walking times still count from you.
-- **Every line at a stop.** Tap a stop (in the list or on the map) to see all the lines that stop there, soonest first. Lines with a bus on the road show the live OASA prediction in green. Lines with no bus out yet show a timetable estimate in orange (`~N min`, with the departure time from the terminus).
+- **Every line at a stop.** Tap a stop (in the list or on the map) to see all the lines that stop there, soonest first. Lines with a bus on the road show the live OASA prediction in green. Lines with no bus out yet show, in orange, the clock time the timetable says the bus should get there (`10:55`, with its departure time from the terminus).
 - **Buses on their way.** The stop screen also shows the buses heading to that stop on the map, each labelled with its line number. Click one to open its line with that bus followed.
 - **Service alerts.** OASA's current disruption notices (from oasa.gr's announcements) appear as an orange ⚠︎ card on the stop screen and at the top of a line's arrivals, and affected lines get a ⚠︎ in the stop's list. Click a card to read the full notice.
 - **Timetable.** A line's **Timetable** tab lists today's departures from each end of the line, the next one highlighted.
@@ -125,7 +125,7 @@ Only buses that haven't yet passed the stop on their route variant are listed.
 
 ### Lines with no bus on the road yet
 
-On the stop screen, a line with no live prediction gets a **timetable estimate**, shown in orange as `~N min`:
+On the stop screen, a line with no live prediction gets a **timetable estimate**, shown in orange as the clock time it should arrive (`10:55`):
 
 `next departure from the route's first stop (today's OASA timetable) + distance along the route to this stop ÷ 3.2 m/s`
 

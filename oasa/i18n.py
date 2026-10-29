@@ -58,7 +58,7 @@ STRINGS = {
         'approx_min': '~{n} min',
         'then': 'Then {list}',
         'live': 'Live',
-        'scheduled': 'Scheduled · leaves the terminus {depart}, here ~{arrive}',
+        'scheduled': 'Scheduled · leaves the terminus {depart} · in about {n} min',
         'no_more_today': 'No more buses today',
         # line view
         'unnamed_stop': 'Unnamed stop',
@@ -168,7 +168,7 @@ STRINGS = {
         'approx_min': '~{n} λεπ.',
         'then': 'Μετά {list}',
         'live': 'Ζωντανά',
-        'scheduled': 'Προγραμματισμένο · αναχώρηση από αφετηρία {depart}, εδώ ~{arrive}',
+        'scheduled': 'Προγραμματισμένο · αναχώρηση από αφετηρία {depart} · σε περίπου {n} λεπ.',
         'no_more_today': 'Δεν υπάρχουν άλλα δρομολόγια σήμερα',
         'unnamed_stop': 'Στάση χωρίς όνομα',
         'no_route_data': 'Δεν υπάρχουν δεδομένα διαδρομής για αυτή τη γραμμή.',

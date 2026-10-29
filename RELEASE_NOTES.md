@@ -41,17 +41,3 @@ A new look, full timetables, and buses that finally move the way they should.
 ## Thanks
 
 Data from **OASA** and **[athens-transit-rt](https://github.com/angelospk/athens-transit-rt)** by @angelospk (a port of [athens-gtfs-realtime](https://github.com/foivospro/athens-gtfs-realtime) by @foivospro). Maps by **MapLibre GL JS** and **CARTO**, map data © **OpenStreetMap** contributors. Built with **PyObjC**, **Requests** and **py2app**.
-
-## Good to know
-
-- Timetable estimates (orange `~N min`), learned times and the movement of buses between updates are a guide; the live OASA predictions are the official times.
-- The app depends on public data services: OASA (telematics API and oasa.gr announcements) and [athens-transit-rt](https://github.com/angelospk/athens-transit-rt). If one of them is down, parts of the app will be empty.
-- This is an unofficial app, not affiliated with or endorsed by OASA.
-
-## Thanks
-
-Data from **OASA** and **[athens-transit-rt](https://github.com/angelospk/athens-transit-rt)** by @angelospk (a port of [athens-gtfs-realtime](https://github.com/foivospro/athens-gtfs-realtime) by @foivospro). Maps by **MapLibre GL JS** and **CARTO**, map data © **OpenStreetMap** contributors. Built with **PyObjC**, **Requests** and **py2app**.
-
-## Also new since 1.1.0
-
-Menu bar countdown, strike radar, bunching warnings, ghost buses, learned arrival times, 3D buildings, motion, lighter glass and a big battery improvement. See the [1.2.0 notes](https://github.com/tassosmak/BusMakro/releases/tag/v1.2.0).

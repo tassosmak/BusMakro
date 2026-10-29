@@ -479,8 +479,8 @@ class ExploreMixin:
                             hints.append(t('learned', n=etas[0]))
                         row['next_txt'] = ' · '.join([h for h in hints if h] + [row['next_txt']])
                     elif sched:  # not on the road yet: timetable + rough travel time
-                        row['eta_txt'] = t('approx_min', n=sched['eta_min'])
-                        row['next_txt'] = t('scheduled', depart=f'{sched["depart"]:%H:%M}', arrive=f'{sched["arrive"]:%H:%M}')
+                        row['eta_txt'] = f'{sched["arrive"]:%H:%M}'  # not on the road yet: the clock time it should be here
+                        row['next_txt'] = t('scheduled', depart=f'{sched["depart"]:%H:%M}', n=sched['eta_min'])
                         row['scheduled'] = True
                     else:
                         row['eta_txt'] = '—'
