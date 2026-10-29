@@ -7,6 +7,7 @@ that are real lines, so dates and street numbers aren't mistaken for lines.
 """
 import html, re, time
 import xml.etree.ElementTree as ET
+from datetime import date, timedelta
 from email.utils import parsedate_to_datetime
 import requests
 from oasa.debug import log
@@ -19,8 +20,44 @@ _STOP = re.compile(r'\s(λόγω|στον|στην|στο|στη|στις|από
 _TOKEN = re.compile(r'[A-ZΑ-Ω]?\d{1,3}[A-ZΑ-Ω]?', re.I)
 # strike radar: work stoppages / strikes, announced days ahead (any category, no line needed)
 _STRIKE = re.compile(r'στάσ\w* εργασίας|απεργ\w*|strike|work stoppage', re.I)
-NETWORK_MAX_AGE_DAYS = 7   # notices about the whole network (no line named) are kept this long
+NETWORK_MAX_AGE_DAYS = 3   # a whole-network notice that names no date is dropped this long after posting
+# dates named in a title ("28ης Οκτωβρίου", "September 13 & 14", "29/10"): a notice whose dates have all passed is old
+_MONTHS = {m: i for i, ms in enumerate((
+    ('ιαν', 'jan'), ('φεβ', 'feb'), ('μαρ', 'mar'), ('απρ', 'apr'), ('μαΐ', 'μαι', 'may'), ('ιουν', 'jun'),
+    ('ιουλ', 'jul'), ('αυγ', 'aug'), ('σεπ', 'sep'), ('οκτ', 'oct'), ('νοε', 'nov'), ('δεκ', 'dec')), 1) for m in ms}
+_DAY_MONTH = re.compile(r'(\d{1,2})(?:η|ης|st|nd|rd|th)?\s+([A-Za-zΑ-Ωα-ωάέήίόύώΐϊ]{3,})', re.I)
+_MONTH_DAY = re.compile(r'([A-Za-z]{3,})\s+(\d{1,2})(?:\s*(?:&|and|-|και)\s*(\d{1,2}))?', re.I)
+_NUMERIC = re.compile(r'\b(\d{1,2})[/.](\d{1,2})(?:[/.](\d{2,4}))?\b')
 _LATIN = str.maketrans({'A': 'Α', 'B': 'Β', 'E': 'Ε', 'X': 'Χ', 'a': 'Α', 'b': 'Β', 'e': 'Ε', 'x': 'Χ'})
+
+
+def _month(word):
+    w = word.lower()
+    return next((n for k, n in _MONTHS.items() if w.startswith(k)), None)
+
+
+def dates_in(title, posted):
+    """The days a notice is about, read from its title (the year is the one after it was posted)."""
+    found = []
+    for d, w in _DAY_MONTH.findall(title):
+        if _month(w):
+            found.append((_month(w), int(d)))
+    for w, d1, d2 in _MONTH_DAY.findall(title):
+        if _month(w):
+            found += [(_month(w), int(d)) for d in (d1, d2) if d]
+    for d, m, _ in _NUMERIC.findall(title):
+        if 1 <= int(m) <= 12:
+            found.append((int(m), int(d)))
+    out = []
+    for m, d in found:
+        try:
+            day = posted.date().replace(month=m, day=d)
+        except ValueError:
+            continue
+        if day < posted.date() - timedelta(days=60):  # "5 January" posted in December
+            day = day.replace(year=day.year + 1)
+        out.append(day)
+    return out
 
 
 def lines_in(title, known):
@@ -66,7 +103,11 @@ def fetch(known_lines):
             if when.timestamp() < cutoff or link in seen:
                 continue
             lines = lines_in(title, known)
-            network = not lines and (strike or not _AFTER.search(title) and when.timestamp() >= time.time() - NETWORK_MAX_AGE_DAYS * 86400)
+            days = dates_in(title, when)
+            if days and max(days) < date.today():
+                continue  # every day it is about has passed
+            network = not lines and (strike or not _AFTER.search(title)) and (
+                bool(days) or when.timestamp() >= time.time() - NETWORK_MAX_AGE_DAYS * 86400)
             if lines or network:
                 seen.add(link)
                 out.append({'title': re.sub(r'\s+', ' ', title), 'link': link, 'date': when, 'lines': lines,
