@@ -184,6 +184,8 @@ window.setBuses=function(items){
 window.setPinned=function(id,pb){pinned=id||null;padB=pb||0;Object.keys(buses).forEach(k=>buses[k].el.classList.toggle('pinned',k===pinned));if(pinned&&buses[pinned]){followAfter=performance.now()+750;map.easeTo({center:buses[pinned].cur,zoom:Math.max(map.getZoom(),15),duration:700,padding:{top:TOPPAD,left:0,right:0,bottom:padB}});kick();}};
 map.on('dragstart',()=>{if(pinned){pinned=null;Object.values(buses).forEach(x=>x.el.classList.remove('pinned'));post({type:'unpin'});}});
 window.setUser=function(lat,lon){const to=[lon,lat];if(!userM){const el=document.createElement('div');el.className='user-dot';el.style.zIndex=900;userM=new maplibregl.Marker({element:el}).setLngLat(to).addTo(map);}else userM.setLngLat(to);};
+window.getCamera=function(){const c=map.getCenter();return JSON.stringify({lat:c.lat,lon:c.lng,zoom:map.getZoom(),pitch:map.getPitch(),bearing:map.getBearing()});};
+window.setCamera=function(c){map.jumpTo({center:[c.lon,c.lat],zoom:c.zoom,pitch:c.pitch,bearing:c.bearing});};
 window.getCenter=function(){const c=map.getCenter();return JSON.stringify({lat:c.lat,lon:c.lng});};
 window.focusStop=function(lat,lon,zoom,padBottom){const p=fitPad(padBottom);map.flyTo({center:[lon,lat],zoom:zoom||16,duration:500,padding:{top:TOPPAD,left:0,right:0,bottom:p.bottom-30}});};
 </script></body></html>

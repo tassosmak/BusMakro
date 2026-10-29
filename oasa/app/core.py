@@ -26,7 +26,7 @@ from oasa.app.glance import GLANCE_EVERY_S, GlanceMixin
 from oasa.app.location import LocationMixin
 from oasa.app.sheet import SheetMixin
 from oasa.app.tabs import TabsMixin
-from oasa.config import LINE_MENU_H, SHEET_GAP, ALERTS_EVERY_S, ANIM_S, AUTH_GRANTED, AUTH_NOT_DETERMINED, CARTO_KEY, DRAG_BAR_H, FLOAT_BTN, FOCUS_SHEET_H, PILL_H, TABS, TOP_INSET, W_SIZABLE
+from oasa.config import MAP_FREE_AFTER_S, LINE_MENU_H, SHEET_GAP, ALERTS_EVERY_S, ANIM_S, AUTH_GRANTED, AUTH_NOT_DETERMINED, CARTO_KEY, DRAG_BAR_H, FLOAT_BTN, FOCUS_SHEET_H, PILL_H, TABS, TOP_INSET, W_SIZABLE
 from oasa.debug import DEBUG, DEBUG_LINES, _debug_lock, _debug_seq, log
 from oasa.eta import fmt_eta
 from oasa.ui.map import HTML_MAP
@@ -124,16 +124,10 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
         self.window.setContentView_(content); self.content = content
 
         # --- Map (full-bleed) ---
-        config = WKWebViewConfiguration.alloc().init()
-        controller = WKUserContentController.alloc().init()
-        self.map_handler = MapHandler.alloc().initWithApp_(self)
-        controller.addScriptMessageHandler_name_(self.map_handler, 'oasa')
-        config.setUserContentController_(controller)
-        self.map = WKWebView.alloc().initWithFrame_configuration_(NSMakeRect(0, 0, 440, 880), config)
-        self.map.setNavigationDelegate_(self)
-        content.addSubview_(self.map)
-        self.map.loadHTMLString_baseURL_(HTML_MAP.replace('__CARTO_KEY__', CARTO_KEY),
-                                         NSURL.URLWithString_('https://localhost/'))
+        self.map = None
+        self.map_camera = None      # where the map was looking when it was freed
+        self.free_timer = None
+        self.make_map()
 
         # --- Window drag strip along the very top (fades in on hover) ---
         self.drag_bar = WindowDragBar.alloc().initWithFrame_(NSMakeRect(0, 852, 440, DRAG_BAR_H))
@@ -284,6 +278,7 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
 
     def applicationShouldHandleReopen_hasVisibleWindows_(self, app, visible):
         self.window.makeKeyAndOrderFront_(None)  # Dock icon click brings the window back
+        self.set_visible(True)
         return True
 
     def applicationWillTerminate_(self, notification):
@@ -349,12 +344,49 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
         scroll.setDocumentView_(table)
         return scroll, table, col
 
+    def make_map(self):
+        """Create the map's web view (again, after it was freed) underneath everything else."""
+        config = WKWebViewConfiguration.alloc().init()
+        controller = WKUserContentController.alloc().init()
+        self.map_handler = MapHandler.alloc().initWithApp_(self)
+        controller.addScriptMessageHandler_name_(self.map_handler, 'oasa')
+        config.setUserContentController_(controller)
+        self.map = WKWebView.alloc().initWithFrame_configuration_(self.content.bounds(), config)
+        self.map.setNavigationDelegate_(self)
+        self.content.addSubview_positioned_relativeTo_(self.map, -1, None)  # NSWindowBelow: under the panels
+        self.map.loadHTMLString_baseURL_(HTML_MAP.replace('__CARTO_KEY__', CARTO_KEY),
+                                         NSURL.URLWithString_('https://localhost/'))
+
+    def freeMap_(self, timer):
+        """Hidden for a while: drop the whole map page (WebKit frees its process, ~170 MB). It is rebuilt,
+        at the same spot, when the window comes back."""
+        self.free_timer = None
+        if self.visible or self.map is None:
+            return
+
+        def done(result, error):
+            try:
+                self.map_camera = json.loads(str(result))
+            except Exception:
+                self.map_camera = None
+            if self.visible or self.map is None:
+                return
+            log('map freed while hidden')
+            self.map_ready = False
+            self.top_inset_sent = None
+            self.map.setNavigationDelegate_(None)
+            self.map.configuration().userContentController().removeScriptMessageHandlerForName_('oasa')
+            self.map.removeFromSuperview()
+            self.map = None
+        self.map.evaluateJavaScript_completionHandler_('window.getCamera()', done)
+
     def do_layout(self, reload=True):
         self.update_tab_ui()
         self.update_timers()
         b = self.content.bounds()
         W, H = b.size.width, b.size.height
-        self.map.setFrame_(NSMakeRect(0, 0, W, H))
+        if self.map is not None:
+            self.map.setFrame_(NSMakeRect(0, 0, W, H))
         self.drag_bar.setFrame_(NSMakeRect(0, H - DRAG_BAR_H, W, DRAG_BAR_H))
         pw = min(W - 20, 480); px = (W - pw) / 2
 
@@ -565,6 +597,23 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
         self.map_ready = True
         log('webview: page loaded')
         self.apply_map_prefs()
+        if self.map_camera:  # rebuilt after being freed: back to where it was looking
+            self.evaluate_js(f'window.setCamera({json.dumps(self.map_camera)});')
+            self.map_camera = None
+            self.do_layout(reload=False)  # resends the top inset
+            if self.mode == 'home':
+                self.show_home_stops()
+            elif self.mode == 'stop' and self.explore_stop:
+                self.show_near_stops(selected=self.explore_stop['id'])
+                self.fetch_stop_lines_async(self.explore_stop['id'])  # its buses on the map
+            if self.line_data:
+                self.push_stops(fit=False)
+                self.push_buses(self.bus_markers)
+                vid, self.drawn_variant = self.drawn_variant, None
+                self.push_route(vid)
+            if self.user_loc:
+                self.evaluate_js(f'window.setUser({self.user_loc[0]},{self.user_loc[1]});')
+            return
         if self.line_data:
             self.push_stops(fit=True)
             self.push_buses(self.bus_markers)
@@ -887,15 +936,46 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
             self.tick_timer.invalidate()
             self.tick_timer = None
 
+    # The window leaves or returns to the screen. Occlusion covers being covered, but isn't always sent,
+    # so hiding the app, minimising and closing report it too.
     def windowDidChangeOcclusionState_(self, notification):
+        self.set_visible(bool(self.window.occlusionState() & 2))  # NSWindowOcclusionStateVisible
+
+    def applicationDidHide_(self, notification):
+        self.set_visible(False)
+
+    def applicationDidUnhide_(self, notification):
+        self.set_visible(True)
+
+    def windowDidMiniaturize_(self, notification):
+        self.set_visible(False)
+
+    def windowDidDeminiaturize_(self, notification):
+        self.set_visible(True)
+
+    def windowWillClose_(self, notification):
+        self.set_visible(False)
+
+    def windowDidBecomeKey_(self, notification):
+        self.set_visible(True)
+
+    def set_visible(self, vis):
         """Minimised, hidden, closed or covered: pause everything; back on screen: catch up at once."""
-        vis = bool(self.window.occlusionState() & 2)  # NSWindowOcclusionStateVisible
         if vis == self.visible:
             return
         self.visible = vis
         log(f'window {"visible" if vis else "hidden"}: {"resuming" if vis else "pausing"}')
         self.evaluate_js(f'window.setPaused({json.dumps(not vis)});')
         self.update_timers()
+        from Foundation import NSTimer
+        if self.free_timer is not None:
+            self.free_timer.invalidate(); self.free_timer = None
+        if not vis:
+            self.free_timer = NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(
+                MAP_FREE_AFTER_S, self, 'freeMap:', None, False)
+        elif self.map is None:
+            log('window back: rebuilding the map')
+            self.make_map()
         if vis and time.time() - self.last_refresh > 10:
             self.last_refresh = time.time()
             self.refresh_current()

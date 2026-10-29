@@ -76,3 +76,5 @@ SCHED_DEPARTED_SLACK_MIN = 3    # still count a departure this many minutes late
 # Home screen: stops follow the map
 NEAR_MIN_ZOOM = 13.0     # below this the map shows too much area to list "nearby" stops
 NEAR_REFETCH_KM = 0.4    # refetch only after the map centre moved at least this far
+
+MAP_FREE_AFTER_S = 180   # window hidden this long: the map page is dropped to free memory (rebuilt when shown)

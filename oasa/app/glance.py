@@ -105,6 +105,7 @@ class GlanceMixin:
     def open_from_glance(self, sid=None):
         from AppKit import NSApplication
         self.window.makeKeyAndOrderFront_(None)
+        self.set_visible(True)
         NSApplication.sharedApplication().activateIgnoringOtherApps_(True)
         f = next((f for f in favorites.load() if f['id'] == sid), None) if sid else None
         if f:

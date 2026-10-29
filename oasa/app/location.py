@@ -41,7 +41,7 @@ class LocationMixin:
         """Fallback when GPS is unavailable: treat the map centre as 'you are here'."""
         log(f'location fallback -> map centre ({why})', 'WARN')
         self.loc_pending = None
-        if not self.map_ready:
+        if not self.map_ready or self.map is None:
             self.status.setStringValue_(t('loc_unavailable'))
             return
 
