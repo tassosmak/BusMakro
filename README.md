@@ -30,6 +30,12 @@ It is built with Python and AppKit (via PyObjC) and has a phone-style layout: a 
   - **Arrivals tab:** buses approaching the stop, with a live countdown, distance along the route and delay against the schedule ("On time", "+10 min").
   - **Route tab:** every stop on the line in order, with buses shown between the stops they're travelling between. If a line has several route variants, you can choose one.
   - **Nearby tab:** the line's stops closest to you, with walking times.
+- **Menu bar countdown.** A 🚌 in the menu bar shows the soonest live bus at your favourite stops ("046 · 4′"); its menu lists every favourite with its next buses, and a click opens the stop. Closing the window keeps BusMakro there (*View → Show in Menu Bar* turns it off).
+- **Strike radar.** Strikes and work stoppages announced by OASA appear as a red ⛔︎ card on top of the home and stop screens; other notices about the whole network in orange. Notices disappear once the days they are about have passed.
+- **Bunching warning.** When two buses of a line arrive within 2 minutes of each other, the line says so, and how long the gap after them is ("2 together, then a 25 min gap").
+- **Ghost buses.** BusMakro notices when buses OASA predicted vanish without ever arriving, and marks lines where that happens often ("👻 30% of buses vanish").
+- **Learned arrival times.** It compares OASA's predictions with when buses actually arrived (kept only on your Mac) and, once it has enough samples for a line, corrects the time shown ("learned · OASA says 6 min").
+- **3D buildings and map styles.** *View → 3D Buildings* (⌘3) tilts the map and raises the buildings; *View → Map Style* has Match System, Light, Dark and Night (with a glowing route).
 - **Search.** The search field in the BusMakro bar finds lines (by number or name) and stops (by name, in Greek or Latin letters: "syntagma" finds ΣΥΝΤΑΓΜΑ), and shows which lines serve each stop. Clear it to go back to where you were.
 - **Favourite stops.** Tap the round ☆ on a stop to save it. The **Favourites** tab on the home screen lists your saved stops with their next live arrivals and shows them on the map.
 - **Works offline gracefully.** Without a connection the app says so ("No internet connection" or "Couldn't reach the bus service"). Click the message to retry, or just wait: it retries every 15 seconds and recovers on its own. In a line view, the last data stays on screen.
@@ -163,7 +169,7 @@ oasa/
 ### How the pieces fit together
 
 - `OasaNativeApp` (in `app/core.py`) is the app delegate. It combines the `ExploreMixin`, `DataMixin`, `TabsMixin`, `SheetMixin` and `LocationMixin` classes from the other `app/` files.
-- **Network requests run on background threads.** Their results go into a queue, and a timer on the main thread (`checkResults_`) reads the queue and updates the UI. AppKit must only be touched from the main thread.
+- **Network requests run on background threads.** Their results go into a queue (`MainQueue`) that wakes the main thread (`checkResults_`) only when something arrives, and it updates the UI. While the window is hidden, refreshing, countdowns and the map's animation pause. AppKit must only be touched from the main thread.
 - **The map is a web page in a `WKWebView`.** Python calls JavaScript functions on the page (`window.setStops`, `window.setBuses`, `window.setPinned`, …). The page sends clicks back through `MapHandler`.
 
 ### Adding code: where things go
