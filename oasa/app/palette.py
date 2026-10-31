@@ -24,7 +24,7 @@ class PaletteMixin:
         self.pal_backdrop.setWantsLayer_(True)
         self.pal_backdrop.layer().setBackgroundColor_(NSColor.blackColor().colorWithAlphaComponent_(0.25).CGColor())
         self.pal = glass(NSMakeRect(0, 0, PAL_W, FIELD_H), 16)
-        ico = NSImageView.alloc().initWithFrame_(NSMakeRect(16, (FIELD_H - 18) / 2, 18, 18))
+        self.pal_icon = ico = NSImageView.alloc().initWithFrame_(NSMakeRect(16, (FIELD_H - 18) / 2, 18, 18))
         ico.setImage_(NSImage.imageWithSystemSymbolName_accessibilityDescription_('magnifyingglass', None))
         ico.setContentTintColor_(NSColor.secondaryLabelColor())
         ico.setAutoresizingMask_(8)  # stays at the top while the palette grows
@@ -47,7 +47,6 @@ class PaletteMixin:
         if self.palette_open():
             self.window.makeFirstResponder_(self.pal_field)
             return
-        self.pal_field.setFrame_(NSMakeRect(44, (FIELD_H - 22) / 2, self.palette_width() - 60, 22))
         log('palette open')
         self.pal_field.setStringValue_('')
         self.pal_field.setPlaceholderString_(t('pal_placeholder'))
@@ -148,6 +147,10 @@ class PaletteMixin:
         h = FIELD_H + self.pal_rows.frame().size.height
         self.pal_backdrop.setFrame_(b)
         self.pal.setFrame_(NSMakeRect((W - w) / 2, H - 70 - h, w, h))
+        # the field row is always the top FIELD_H points (placed here, after the panel's height is known:
+        # placing it before, on a palette left tall from last time, put it at the bottom over the rows)
+        self.pal_icon.setFrame_(NSMakeRect(16, h - FIELD_H + (FIELD_H - 18) / 2, 18, 18))
+        self.pal_field.setFrame_(NSMakeRect(44, h - FIELD_H + (FIELD_H - 22) / 2, w - 60, 22))
         self.pal_rows.setFrame_(NSMakeRect(0, 0, w, self.pal_rows.frame().size.height))
 
     def palette_move(self, d):
