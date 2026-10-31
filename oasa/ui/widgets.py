@@ -265,7 +265,7 @@ def make_row_view(row, width, app):
     row['eta_label'] = eta
     sub = label(row['sub'], 11, color=NSColor.secondaryLabelColor()); sub.setFrame_(NSMakeRect(14, 10, 112, 16))
     title = label(row['title'], 13, True); title.setFrame_(NSMakeRect(134, 38, cw - 134 - 92, 18))
-    trip = label(row['trip'], 12, color=NSColor.secondaryLabelColor()); trip.setFrame_(NSMakeRect(134, 14, cw - 134 - 46, 18))
+    trip = label(row['trip'], 12, color=NSColor.secondaryLabelColor()); trip.setFrame_(NSMakeRect(134, 14, cw - 134 - 78, 18))
     delay = label(row['delay'], 12, True, row['delay_color']); delay.setFrame_(NSMakeRect(cw - 92, 38, 80, 18))
     delay.setAlignment_(NSTextAlignmentRight)
     title.setAutoresizingMask_(W_SIZABLE); trip.setAutoresizingMask_(W_SIZABLE); delay.setAutoresizingMask_(MIN_X_MARGIN)
@@ -275,6 +275,14 @@ def make_row_view(row, width, app):
     pin.setToolTip_(t('follow_bus'))
     pin.setIdentifier_(row['id']); pin.setTarget_(app); pin.setAction_('pinBus:')
     pin.setAutoresizingMask_(MIN_X_MARGIN)
-    for v in (eta, sub, title, trip, delay, pin):
+    bell = NSButton.alloc().initWithFrame_(NSMakeRect(cw - 70, 8, 30, 24))  # "notify me N stops before"
+    bell.setBordered_(False); bell.setImagePosition_(1)
+    set_symbol(bell, 'bell.fill' if row.get('watching') else 'bell', 14)
+    if row.get('watching'):
+        bell.setContentTintColor_(NSColor.systemOrangeColor())
+    bell.setToolTip_(t('watch_tip_on', n=row['watching']) if row.get('watching') else t('watch_tip'))
+    bell.setIdentifier_(row['id']); bell.setTarget_(app); bell.setAction_('watchBus:')
+    bell.setAutoresizingMask_(MIN_X_MARGIN)
+    for v in (eta, sub, title, trip, delay, pin, bell):
         card.addSubview_(v)
     return root

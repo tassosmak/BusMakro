@@ -10,6 +10,7 @@ from AppKit import (
     NSMakeRect, NSTextAlignmentCenter, NSView, NSVisualEffectView,
 )
 from Foundation import NSUserDefaults
+from oasa import notify
 from oasa.debug import log
 from oasa.i18n import t
 from oasa.ui.motion import appear
@@ -19,7 +20,8 @@ _KEY = 'onboarded'
 FEATURES = [('bus.fill', 'ob_f1', 'ob_f1_sub'),
             ('mappin.and.ellipse', 'ob_f2', 'ob_f2_sub'),
             ('star.fill', 'ob_f3', 'ob_f3_sub'),
-            ('command', 'ob_f4', 'ob_f4_sub')]
+            ('command', 'ob_f4', 'ob_f4_sub'),
+            ('bell.badge', 'ob_f5', 'ob_f5_sub')]
 COL_W, ROW_H = 380, 62
 
 
@@ -81,6 +83,40 @@ class OnboardingMixin:
         btn.setKeyEquivalent_('\r')  # the default button: blue, Return presses it
         btn.setTarget_(self); btn.setAction_('onboardNext:')
         self.ob.addSubview_(btn); animate and appear(btn, k + 1)
+        # a quiet link-style button under Continue: ask for notifications, or open their settings
+        self.ob_notify = NSButton.alloc().initWithFrame_(NSMakeRect((W - 260) / 2, 18, 260, 22))
+        self.ob_notify.setBordered_(False)
+        self.ob_notify.setTarget_(self); self.ob_notify.setAction_('onboardNotify:')
+        self.ob.addSubview_(self.ob_notify); animate and appear(self.ob_notify, k + 2)
+        self.refresh_ob_notify()
+
+    def refresh_ob_notify(self):
+        """Label the notifications button by the current permission (asked on a background thread)."""
+        def got(state):
+            self.ob_notify_state = state
+            self.results.put(('ob_notify',))
+        notify.status(got)
+
+    def draw_ob_notify(self):
+        if getattr(self, 'ob', None) is None:
+            return
+        from AppKit import NSAttributedString, NSForegroundColorAttributeName, NSFontAttributeName, NSFont
+        state = getattr(self, 'ob_notify_state', 'not_asked')
+        text = {'allowed': t('ob_notify_on'), 'denied': t('ob_notify_settings')}.get(state, t('ob_notify_ask'))
+        color = NSColor.secondaryLabelColor() if state == 'allowed' else NSColor.linkColor()
+        self.ob_notify.setAttributedTitle_(NSAttributedString.alloc().initWithString_attributes_(
+            text, {NSForegroundColorAttributeName: color, NSFontAttributeName: NSFont.systemFontOfSize_(12)}))
+        self.ob_notify.setEnabled_(state != 'allowed')
+        self.ob_notify.sizeToFit()  # as wide as its text, centred under Continue (was cut off at 260 pt)
+        f, W = self.ob_notify.frame(), self.content.bounds().size.width
+        self.ob_notify.setFrame_(NSMakeRect((W - f.size.width) / 2, 18, f.size.width, 22))
+
+    def onboard_notify(self):
+        state = getattr(self, 'ob_notify_state', 'not_asked')
+        if state == 'not_asked':
+            notify.ask_permission(lambda granted: self.refresh_ob_notify())
+        else:  # turned off earlier: macOS won't ask again, only Settings can change it
+            notify.open_settings()
 
     def layout_onboarding(self):
         if getattr(self, 'ob', None) is not None:

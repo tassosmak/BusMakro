@@ -24,7 +24,7 @@ setup(
     options={'py2app': {
         'iconfile': 'resources/icon.icns',
         'packages': ['oasa', 'requests', 'certifi'],
-        'includes': ['CoreLocation', 'WebKit'],
+        'includes': ['CoreLocation', 'WebKit', 'UserNotifications'],
         'excludes': ['tkinter', 'setuptools', 'pip', 'pytest'],
         'plist': {
             'CFBundleName': APP_NAME,

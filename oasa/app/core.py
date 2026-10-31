@@ -26,6 +26,7 @@ from oasa.app.glance import GLANCE_EVERY_S, GlanceMixin
 from oasa.app.palette import PaletteMixin
 from oasa.app.onboarding import OnboardingMixin
 from oasa.app.settings import SettingsMixin, show_recents
+from oasa.app.watch import WatchMixin
 from oasa.app.location import LocationMixin
 from oasa.app.sheet import SheetMixin
 from oasa.app.tabs import TabsMixin
@@ -52,7 +53,7 @@ class MainQueue(queue.Queue):
         self.app.performSelectorOnMainThread_withObject_waitUntilDone_('checkResults:', None, False)
 
 
-class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, ExploreMixin, GlanceMixin, PaletteMixin, OnboardingMixin, SettingsMixin):
+class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, ExploreMixin, GlanceMixin, PaletteMixin, OnboardingMixin, SettingsMixin, WatchMixin):
     def applicationDidFinishLaunching_(self, notification):
         self.results = MainQueue(self)   # worker threads -> main thread (wakes it only when something arrives)
         self.visible = True         # window on screen (not minimised, hidden, closed or covered)
@@ -90,6 +91,7 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
         self.stop_lines = None
         self.pending_stop = None    # stop to select once a line opened from a stop has loaded
         self.drawn_variant = None   # route variant whose shape is on the map
+        self.watches = {}           # bus id -> stop alert (oasa/app/watch.py)
         self.timetable = None       # (line id, today's timetable) for the Timetable tab
         self.prev_eta = {}          # row -> last ETA text shown (a change rolls to the new value)
         self.fav_at = {}            # favourite stop id -> when its lines were fetched
@@ -391,6 +393,9 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
 
     def clearRecents_(self, sender):
         self.clear_recents()
+
+    def onboardNotify_(self, sender):
+        self.onboard_notify()
 
     def showWelcome_(self, sender):
         if self.ob is None:
@@ -952,6 +957,13 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
             self.open_line_at_stop(row['line'])
 
     # ---- Pin / follow a bus ---------------------------------------------------
+    def watchBus_(self, sender):
+        self.watch_menu(sender)
+
+    def watchStops_(self, sender):
+        bid, n = str(sender.representedObject()).split('|')
+        self.set_watch(bid, int(n))
+
     def pinBus_(self, sender):
         self.toggle_pin(str(sender.identifier()))
 
@@ -1053,6 +1065,8 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
 
     def windowDidBecomeKey_(self, notification):
         self.set_visible(True)
+        if getattr(self, 'ob', None) is not None:
+            self.refresh_ob_notify()  # back from System Settings: show the new state
 
     def set_visible(self, vis):
         """Minimised, hidden, closed or covered: pause everything; back on screen: catch up at once."""
@@ -1134,6 +1148,10 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
                     self.fetch_alerts_async()
             elif kind == 'alerts':
                 self.on_alerts(item[1])
+            elif kind == 'ob_notify':
+                self.draw_ob_notify()
+            elif kind == 'watch_live':
+                self.check_watches(item[2], item[1])
             elif kind == 'timetable':
                 self.on_timetable(item[1], item[2])
             elif kind == 'net_error':
@@ -1201,6 +1219,7 @@ class OasaNativeApp(NSObject, SheetMixin, DataMixin, TabsMixin, LocationMixin, E
                 if line_id != self.current_line:
                     log(f'dropped stale live response {line_id} (current {self.current_line})', 'WARN')
                     continue
+                self.check_watches(live)
                 self.render_arrivals(live)
                 self.last_live_ok = datetime.now()
                 self.status.setStringValue_(t('line_updated', line=line_label(line_id), time=f'{datetime.now().astimezone():%H:%M:%S}'))

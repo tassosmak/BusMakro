@@ -91,9 +91,12 @@ class DataMixin:
             else:
                 delay_txt = t('min', n=f'{delay / 60:+.0f}')
                 delay_col = NSColor.systemOrangeColor() if delay > 0 else NSColor.systemBlueColor()
+            n_stops = route.index(sid) - route.index(nxt)
             rows.append({'kind': 'arrival', 'id': bid, 'distance': dist, 'eta_s': eta_s, 't0': now, 'estimated': est,
+                         'watching': self.watches.get(bid, {}).get('stops'),
                          'delay': delay_txt, 'delay_color': delay_col,
-                         'sub': f'{dist:.2f} km' + (f' · {t("est")}' if est else ''),
+                         'sub': (t('stops_away_1') if n_stops == 1 else t('stops_away', n=n_stops)) if n_stops
+                                else t('next_stop_here'),
                          'title': t('bus_n', id=bid), 'trip': name(v.get('trip_label')) or t('trip_unavailable'),
                          'pinned': bid == self.pinned_id})
         rows.sort(key=lambda x: x['distance'])
