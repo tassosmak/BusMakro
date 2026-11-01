@@ -39,18 +39,20 @@ struct ContentView: View {
                         VStack(spacing: 10) {
                             RoundButton(symbol: sheetHeight <= 66 ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right",
                                         help: "Expand the map") {
-                                withAnimation(.spring(duration: 0.3)) { sheetHeight = sheetHeight <= 66 ? 360 : 66 }
+                                withAnimation(.spring(response: 0.38, dampingFraction: 0.88)) { sheetHeight = sheetHeight <= 66 ? 360 : 66 }
                             }
                             RoundButton(symbol: "location", help: "Locate Me") { locate() }
                         }
                     }
                     Sheet(model: model, height: $sheetHeight, range: 66...(geo.size.height - 120))
                 }
-                .padding(.horizontal, 10)
-                .padding(.top, 4)      // right under the status bar
-                .padding(.bottom, 0)   // the panel sits on the home-indicator line
+                .padding(.horizontal, Style.panelInset)
+                .padding(.top, 4)                  // right under the status bar
+                .padding(.bottom, Style.panelInset) // the panel hugs the screen's bottom corners
+                .ignoresSafeArea(.container, edges: .bottom)  // measured from the screen edge, not the home indicator
             }
         }
+        .ignoresSafeArea(.keyboard)
         .preferredColorScheme(mapStyle == "light" ? .light : mapStyle == "dark" ? .dark : nil)
         .sheet(isPresented: $model.showSettings) { SettingsView(model: model) }
         .fullScreenCoverOrSheet(isPresented: $model.showWelcome) {

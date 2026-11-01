@@ -5,6 +5,15 @@ enum Style {
     static let barHeight: CGFloat = 40        // PILL_H: search capsule and round buttons
     static let roundButton: CGFloat = 40      // FLOAT_BTN
     static let sheetRadius: CGFloat = 22
+    /// The panel hugs the phone's rounded corners: its bottom corners are concentric with the
+    /// screen's (about 47 pt on current iPhones) at the panel's inset from the edges.
+    static let screenRadius: CGFloat = 47
+    static let panelInset: CGFloat = 8
+    static var panelShape: UnevenRoundedRectangle {
+        let bottom = screenRadius - panelInset
+        return UnevenRoundedRectangle(topLeadingRadius: sheetRadius, bottomLeadingRadius: bottom,
+                                      bottomTrailingRadius: bottom, topTrailingRadius: sheetRadius, style: .continuous)
+    }
     static let gap: CGFloat = 13              // SHEET_GAP: one inset for everything in the panel
     static let lineMenuHeight: CGFloat = 22   // LINE_MENU_H
     static let cardRadius: CGFloat = 14
@@ -40,14 +49,9 @@ struct PanelGlass<S: Shape>: ViewModifier {
 struct Glass<S: Shape>: ViewModifier {
     let shape: S
     func body(content: Content) -> some View {
-        // iOS 26 / macOS 26: Liquid Glass, which follows the user's Clear / Tinted choice in Settings
-        if #available(iOS 26, macOS 26, *) {
-            content.glassEffect(.regular, in: shape)
-        } else {
-            content
-                .background(.ultraThinMaterial, in: shape)
-                .overlay(shape.stroke(.separator, lineWidth: 0.5))
-        }
+        content
+            .background(.ultraThinMaterial, in: shape)
+            .overlay(shape.stroke(.separator, lineWidth: 0.5))
     }
 }
 

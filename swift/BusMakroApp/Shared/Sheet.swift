@@ -15,15 +15,16 @@ struct Sheet: View {
             header
             if !model.online || model.serviceDown { offline }
             // fades out as the panel nears the slim strip (the strip shows just the handle and the menu)
-            content.opacity(height > 140 ? 1 : 0)
-                .animation(.easeOut(duration: 0.15), value: height > 140)
+            // fades with the panel's height, so it follows the drag and the snap exactly
+            content.opacity(Double(min(1, max(0, (height - 90) / 70))))
         }
         .padding(.horizontal, Style.gap)
+        .padding(.bottom, 16)  // clear of the rounded bottom corners and the home indicator
         .frame(height: height, alignment: .top)
         .frame(maxWidth: 480)
         // what doesn't fit stays inside the panel (dragged small, the tabs and list were drawn below it)
-        .clipShape(RoundedRectangle(cornerRadius: Style.sheetRadius))
-        .panelGlass(RoundedRectangle(cornerRadius: Style.sheetRadius))
+        .clipShape(Style.panelShape)
+        .panelGlass(Style.panelShape)
     }
 
     // Drag the handle to resize; it snaps to the nearest of strip / normal / full.
@@ -40,7 +41,7 @@ struct Sheet: View {
                 .onEnded { _ in
                     dragStart = nil
                     let stops = [range.lowerBound, (range.lowerBound + range.upperBound) / 2, range.upperBound]
-                    withAnimation(.spring(duration: 0.3)) {
+                    withAnimation(.spring(response: 0.38, dampingFraction: 0.88)) {
                         height = stops.min { abs($0 - height) < abs($1 - height) }!
                     }
                 })
