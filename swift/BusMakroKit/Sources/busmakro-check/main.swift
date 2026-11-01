@@ -3,6 +3,28 @@
 import BusMakroKit
 import Foundation
 
+// `swift run busmakro-check plan path/to/Rail.json`: a few trips across Athens (downloads every line)
+if CommandLine.arguments.dropFirst().first == "plan" {
+    let lines = try await TransitClient().lines()
+    let index = try await StopIndex.load(lines: lines.map(\.id))
+    let rail = CommandLine.arguments.count > 2 ? try? Rail.load(Data(contentsOf: URL(fileURLWithPath: CommandLine.arguments[2]))) : nil
+    let t0 = Date()
+    let planner = TripPlanner(index: index, rail: rail)
+    print("planner ready in \(String(format: "%.2f", Date().timeIntervalSince(t0))) s, \(index.routes.count) routes")
+    let places = [("Syntagma", 37.9755, 23.7348), ("Kifisia", 38.0739, 23.8083), ("Glyfada", 37.8627, 23.7531),
+                  ("Piraeus", 37.9480, 23.6430), ("Peristeri", 38.0136, 23.6914), ("Zografou", 37.9775, 23.7700)]
+    for (i, a) in places.enumerated() {
+        let b = places[(i + 2) % places.count]
+        let t1 = Date()
+        let trips = planner.plan(from: .init(name: a.0, lat: a.1, lon: a.2), to: .init(name: b.0, lat: b.1, lon: b.2))
+        print("\n\(a.0) → \(b.0) (\(String(format: "%.2f", Date().timeIntervalSince(t1))) s)")
+        for t in trips {
+            print("  \(t.minutes) min: " + t.legs.map { $0.mode == .walk ? "walk \($0.minutes)" : "\($0.line) \($0.from.name)→\($0.to.name) (\($0.stops) st, \($0.minutes)+\($0.wait))" }.joined(separator: " · "))
+        }
+    }
+    exit(0)
+}
+
 let args = CommandLine.arguments.dropFirst().compactMap(Double.init)
 let (lat, lon) = args.count == 2 ? (args[0], args[1]) : (37.9755, 23.7348)  // Syntagma
 let oasa = OASAClient(), transit = TransitClient()

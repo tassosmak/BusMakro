@@ -10,18 +10,29 @@ public struct StopIndex: Sendable {
         public var lines: [String]
         var norm: String?
     }
+    /// One way of a line: its stops in order (for the trip planner).
+    public struct Route: Sendable, Codable {
+        public let line: String
+        public let headsign: String
+        public let stops: [String]
+    }
     public let stops: [String: Entry]
+    /// Every line's variants, from the same files (empty in an index cached before routes were kept).
+    public var routes: [Route] = []
+
+    public init(stops: [String: Entry], routes: [Route] = []) { self.stops = stops; self.routes = routes }
 
     static var cacheURL: URL {
         FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0].appendingPathComponent("stop_index.json")
     }
+    static var routesURL: URL { cacheURL.deletingLastPathComponent().appendingPathComponent("line_routes.json") }
     static let maxAge: TimeInterval = 24 * 3600
 
     /// The last saved index, however old (for Siri and Shortcuts, which shouldn't download it all).
     public static func cached() -> StopIndex? {
         guard let data = try? Data(contentsOf: cacheURL),
               let stops = try? JSONDecoder().decode([String: Entry].self, from: data) else { return nil }
-        return StopIndex(stops: stops)
+        return StopIndex(stops: stops, routes: (try? JSONDecoder().decode([Route].self, from: Data(contentsOf: routesURL))) ?? [])
     }
 
     /// From the cache when it is fresh, else downloaded (one file per line, 8 at a time).
@@ -29,10 +40,11 @@ public struct StopIndex: Sendable {
         if let attrs = try? FileManager.default.attributesOfItem(atPath: cacheURL.path),
            let date = attrs[.modificationDate] as? Date, Date().timeIntervalSince(date) < maxAge,
            let data = try? Data(contentsOf: cacheURL),
-           let stops = try? JSONDecoder().decode([String: Entry].self, from: data) {
-            return StopIndex(stops: stops)
+           let stops = try? JSONDecoder().decode([String: Entry].self, from: data),
+           let routes = try? JSONDecoder().decode([Route].self, from: Data(contentsOf: routesURL)) {
+            return StopIndex(stops: stops, routes: routes)
         }
-        var stops: [String: Entry] = [:], failed = 0
+        var stops: [String: Entry] = [:], routes: [Route] = [], failed = 0
         try await withThrowingTaskGroup(of: (String, LineDetail?).self) { group in
             var it = lines.makeIterator()
             func add() { if let id = it.next() { group.addTask { (id, try? await transit.detail(line: id)) } } }
@@ -40,6 +52,7 @@ public struct StopIndex: Sendable {
             while let (id, detail) = try await group.next() {
                 add()
                 guard let detail else { failed += 1; continue }
+                routes += detail.variants.values.map { Route(line: id, headsign: $0.headsign, stops: $0.stops) }
                 for (sid, s) in detail.stops {
                     var e = stops[sid] ?? Entry(name: s.name, lat: s.lat, lon: s.lon, lines: [], norm: nil)
                     if !e.lines.contains(id) { e.lines.append(id) }
@@ -50,10 +63,11 @@ public struct StopIndex: Sendable {
         if stops.isEmpty { throw URLError(.cannotLoadFromNetwork) }
         if failed <= lines.count / 20 {  // don't keep an incomplete index for a day
             let normed = stops.mapValues { var e = $0; e.norm = Translit.normalize(e.name); return e }
+            try? JSONEncoder().encode(routes).write(to: routesURL)
             try? JSONEncoder().encode(normed).write(to: cacheURL)
-            return StopIndex(stops: normed)
+            return StopIndex(stops: normed, routes: routes)
         }
-        return StopIndex(stops: stops)
+        return StopIndex(stops: stops, routes: routes)
     }
 
     /// Stops whose name contains the query, best first: exact name, then word starts, then anywhere.

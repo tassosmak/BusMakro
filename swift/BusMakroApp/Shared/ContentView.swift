@@ -44,11 +44,12 @@ struct ContentView: View {
                 .ignoresSafeArea(.container, edges: .bottom)  // measured from the screen edge, not the home indicator
             }
         }
-        .overlay { SideMenu(open: $menuOpen, onMetroMap: { showMetro = true }, onSettings: { model.showSettings = true }, onDebug: { showDebug = true }) }
+        .overlay { SideMenu(open: $menuOpen, onMetroMap: { showMetro = true }, onSettings: { model.showSettings = true }, onTrip: { model.showTrip = true }, onDebug: { showDebug = true }) }
         .fullScreenCoverOrSheet(isPresented: $showMetro) { MetroMapView() }
         .ignoresSafeArea(.keyboard)
         .preferredColorScheme(mapStyle == "light" ? .light : mapStyle == "dark" ? .dark : nil)
         .sheet(isPresented: $model.showSettings) { SettingsView(model: model) }
+        .sheet(isPresented: $model.showTrip) { TripView(model: model) }
         #if DEBUG
         .sheet(isPresented: $showDebug) { DebugView(model: model) }
         #endif

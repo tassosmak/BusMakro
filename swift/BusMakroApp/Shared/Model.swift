@@ -46,6 +46,8 @@ final class Model: NSObject, CLLocationManagerDelegate {
     var watches: [String: BusWatch] = [:]
     var showWelcome = !UserDefaults.standard.bool(forKey: "onboarded")
     var showSettings = false
+    var showTrip = false
+    @ObservationIgnored var cachedPlanner: TripPlanner?
     var watchTask: Task<Void, Never>?
     private var lineCodes: [String: [(code: String, name: String, nameEnglish: String)]]?
     // follow a bus (the map keeps it centred), buses heading to the open stop, favourites' live times
@@ -361,7 +363,7 @@ final class Model: NSObject, CLLocationManagerDelegate {
 
     nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         let s = manager.authorizationStatus
-        if s == .authorizedWhenInUse || s == .authorizedAlways { manager.startUpdatingLocation() }
+        if s != .notDetermined && s != .denied && s != .restricted { manager.startUpdatingLocation() }  // (no "when in use" on Mac)
     }
 
     nonisolated func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
