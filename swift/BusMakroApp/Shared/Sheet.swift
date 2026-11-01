@@ -12,7 +12,7 @@ struct Sheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             handle
-            header
+            header.simultaneousGesture(drag)  // the menu row drags the panel too (taps still work)
             if !model.online || model.serviceDown { offline }
             // fades out as the panel nears the slim strip (the strip shows just the handle and the menu)
             // fades with the panel's height, so it follows the drag and the snap exactly
@@ -30,21 +30,33 @@ struct Sheet: View {
     // Drag the handle to resize; it snaps to the nearest of strip / normal / full.
     private var handle: some View {
         Capsule().fill(.tertiary).frame(width: 40, height: 5)
-            .frame(maxWidth: .infinity).padding(.top, Style.gap)
+            .frame(maxWidth: .infinity).padding(.top, Style.gap).padding(.bottom, 6)
             .contentShape(Rectangle())
-            .gesture(DragGesture()
-                .onChanged { g in
-                    let start = dragStart ?? height
-                    dragStart = start
-                    height = min(range.upperBound, max(range.lowerBound, start - g.translation.height))
-                }
-                .onEnded { _ in
-                    dragStart = nil
-                    let stops = [range.lowerBound, (range.lowerBound + range.upperBound) / 2, range.upperBound]
-                    withAnimation(.spring(response: 0.36, dampingFraction: 1)) {
-                        height = stops.min { abs($0 - height) < abs($1 - height) }!
-                    }
-                })
+            .gesture(drag)
+    }
+
+    /// Drag the panel by its handle or header. Measured in screen coordinates: the handle moves with the
+    /// panel, so measuring against itself made the drag fight its own movement (jitter).
+    private var drag: some Gesture {
+        DragGesture(minimumDistance: 2, coordinateSpace: .global)
+            .onChanged { g in
+                let start = dragStart ?? height
+                dragStart = start
+                let raw = start - g.translation.height
+                // past the ends it gives a little, like iOS sheets, instead of stopping dead
+                if raw > range.upperBound { height = range.upperBound + (raw - range.upperBound) * 0.2 }
+                else if raw < range.lowerBound { height = range.lowerBound - (range.lowerBound - raw) * 0.2 }
+                else { height = raw }
+            }
+            .onEnded { g in
+                dragStart = nil
+                // where a flick would carry it, then the nearest of strip / normal / full
+                let projected = height - (g.predictedEndTranslation.height - g.translation.height)
+                let normal = min(360, range.upperBound)
+                let stops = [range.lowerBound, normal, range.upperBound]
+                let target = stops.min { abs($0 - projected) < abs($1 - projected) }!
+                withAnimation(.spring(response: 0.36, dampingFraction: 1)) { height = target }
+            }
     }
 
     /// No connection, or the bus service didn't answer: say so; it retries by itself, or tap.
