@@ -12,3 +12,8 @@ DEV_README.md
 build/
 dist/
 .eggs/
+
+# Swift
+swift/**/.build/
+swift/**/*.xcodeproj/
+swift/**/.swiftpm/

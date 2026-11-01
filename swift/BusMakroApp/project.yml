@@ -1,0 +1,25 @@
+# XcodeGen spec: `brew install xcodegen && xcodegen` here creates BusMakro.xcodeproj
+# (one SwiftUI app for iPhone and Mac, on top of ../BusMakroKit). Needs the full Xcode.
+name: BusMakro
+options:
+  bundleIdPrefix: com.tassosmak
+  deploymentTarget: { iOS: "17.0", macOS: "14.0" }
+packages:
+  BusMakroKit: { path: ../BusMakroKit }
+targets:
+  BusMakro:
+    type: application
+    supportedDestinations: [iOS, macOS]
+    sources: [Shared]
+    dependencies: [{ package: BusMakroKit }]
+    info:
+      path: Info.plist
+      properties:
+        CFBundleDisplayName: BusMakro
+        NSLocationWhenInUseUsageDescription: BusMakro uses your location to show the bus stops near you.
+        UILaunchScreen: {}
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.tassosmak.busmakro
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: 1
