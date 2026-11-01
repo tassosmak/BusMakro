@@ -19,7 +19,7 @@ struct TopBar: View {
                     .font(.system(size: 13))
                     .focused($focused)
                     .onSubmit { focused = false }
-                if !text.isEmpty {
+                if expanded {  // ✕ ends the search (clears it and closes the keyboard)
                     Button { text = ""; focused = false } label: {
                         Image(systemName: "xmark.circle.fill").foregroundStyle(.tertiary)
                     }.buttonStyle(.plain)

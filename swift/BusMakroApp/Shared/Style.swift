@@ -29,9 +29,14 @@ struct CardBackground: ViewModifier {
 struct Glass<S: Shape>: ViewModifier {
     let shape: S
     func body(content: Content) -> some View {
-        content
-            .background(.ultraThinMaterial, in: shape)
-            .overlay(shape.stroke(.separator, lineWidth: 0.5))
+        // iOS 26 / macOS 26: Liquid Glass, which follows the user's Clear / Tinted choice in Settings
+        if #available(iOS 26, macOS 26, *) {
+            content.glassEffect(.regular, in: shape)
+        } else {
+            content
+                .background(.ultraThinMaterial, in: shape)
+                .overlay(shape.stroke(.separator, lineWidth: 0.5))
+        }
     }
 }
 

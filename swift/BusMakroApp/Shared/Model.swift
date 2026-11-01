@@ -341,14 +341,19 @@ final class Model: NSObject, CLLocationManagerDelegate {
     }
 
     // MARK: Location
+    /// Location, fast: the last known fix at once, then live updates (requestLocation alone waits
+    /// for one accurate fix, which can take many seconds).
     func askLocation() {
+        location.desiredAccuracy = kCLLocationAccuracyHundredMeters
+        location.distanceFilter = 25
         location.requestWhenInUseAuthorization()
-        location.requestLocation()
+        if let c = location.location?.coordinate { userLocation = c }
+        location.startUpdatingLocation()
     }
 
     nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         let s = manager.authorizationStatus
-        if s == .authorizedWhenInUse || s == .authorizedAlways { manager.requestLocation() }
+        if s == .authorizedWhenInUse || s == .authorizedAlways { manager.startUpdatingLocation() }
     }
 
     nonisolated func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {

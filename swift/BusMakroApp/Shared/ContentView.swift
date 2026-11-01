@@ -39,7 +39,7 @@ struct ContentView: View {
                         VStack(spacing: 10) {
                             RoundButton(symbol: sheetHeight <= 66 ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right",
                                         help: "Expand the map") {
-                                withAnimation(.spring(duration: 0.3)) { sheetHeight = sheetHeight <= 66 ? 360 : 66 }
+                                withAnimation(.smooth(duration: 0.45)) { sheetHeight = sheetHeight <= 66 ? 360 : 66 }
                             }
                             RoundButton(symbol: "location", help: "Locate Me") { locate() }
                         }
@@ -47,8 +47,8 @@ struct ContentView: View {
                     Sheet(model: model, height: $sheetHeight, range: 66...(geo.size.height - 120))
                 }
                 .padding(.horizontal, 10)
-                .padding(.top, 34)
-                .padding(.bottom, 10)
+                .padding(.top, 4)      // right under the status bar
+                .padding(.bottom, 0)   // the panel sits on the home-indicator line
             }
         }
         .preferredColorScheme(mapStyle == "light" ? .light : mapStyle == "dark" ? .dark : nil)
@@ -150,16 +150,13 @@ struct ContentView: View {
             ForEach(shownStops) { stop in
                 Annotation("", coordinate: CLLocationCoordinate2D(latitude: stop.latitude, longitude: stop.longitude)) {
                     let selected = model.screen == .stop(stop)
-                    Circle().fill(selected ? Color.orange : Color(red: 0.09, green: 0.47, blue: 1.0))  // #1677ff
-                        .frame(width: selected ? 15 : 12, height: selected ? 15 : 12)
-                        .overlay(Circle().stroke(.white, lineWidth: selected ? 3 : 2))
-                        .shadow(color: .black.opacity(0.3), radius: 2, y: 1)
-                        .onTapGesture { model.open(stop) }
+                    StopPin(selected: selected).onTapGesture { model.open(stop) }
                 }
             }
         }
         .mapStyle(.standard(elevation: map3D ? .realistic : .flat, pointsOfInterest: .excludingAll))
         .mapControls { }  // no zoom or compass buttons, like the Mac app
+        .safeAreaPadding(.bottom, sheetHeight + 8)  // the Maps logo and Legal sit just above the panel
         .onMapCameraChange(frequency: .onEnd) { ctx in
             visibleRegion = ctx.region
             if model.screen == .home { fittedLine = nil; Task { await model.loadStops(near: ctx.region.center) } }
@@ -232,5 +229,25 @@ extension View {
         #else
         sheet(isPresented: isPresented, content: content)
         #endif
+    }
+}
+
+/// A bus-stop pin: a small rounded sign with a bus, on a short stem; orange and larger when selected.
+struct StopPin: View {
+    var selected = false
+    var body: some View {
+        let tint = selected ? Color.orange : Color(red: 0.09, green: 0.47, blue: 1.0)
+        let size: CGFloat = selected ? 30 : 22
+        VStack(spacing: 0) {
+            Image(systemName: "bus.fill")
+                .font(.system(size: size * 0.48, weight: .semibold)).foregroundStyle(.white)
+                .frame(width: size, height: size)
+                .background(tint, in: RoundedRectangle(cornerRadius: size * 0.3))
+                .overlay(RoundedRectangle(cornerRadius: size * 0.3).stroke(.white, lineWidth: 1.5))
+            Rectangle().fill(tint).frame(width: 2, height: selected ? 8 : 5)
+        }
+        .shadow(color: .black.opacity(0.3), radius: 2, y: 1)
+        .offset(y: -(size + (selected ? 8 : 5)) / 2)  // the stem's foot is on the stop
+        .animation(.smooth(duration: 0.25), value: selected)
     }
 }
