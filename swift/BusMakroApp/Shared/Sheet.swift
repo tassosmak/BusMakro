@@ -15,7 +15,8 @@ struct Sheet: View {
             header
             if !model.online || model.serviceDown { offline }
             // fades out as the panel nears the slim strip (the strip shows just the handle and the menu)
-            content.opacity(Double(min(1, max(0, (height - 90) / 110))))
+            content.opacity(height > 140 ? 1 : 0)
+                .animation(.easeOut(duration: 0.15), value: height > 140)
         }
         .padding(.horizontal, Style.gap)
         .frame(height: height, alignment: .top)
@@ -39,7 +40,7 @@ struct Sheet: View {
                 .onEnded { _ in
                     dragStart = nil
                     let stops = [range.lowerBound, (range.lowerBound + range.upperBound) / 2, range.upperBound]
-                    withAnimation(.smooth(duration: 0.45)) {
+                    withAnimation(.spring(duration: 0.3)) {
                         height = stops.min { abs($0 - height) < abs($1 - height) }!
                     }
                 })

@@ -39,7 +39,7 @@ struct ContentView: View {
                         VStack(spacing: 10) {
                             RoundButton(symbol: sheetHeight <= 66 ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right",
                                         help: "Expand the map") {
-                                withAnimation(.smooth(duration: 0.45)) { sheetHeight = sheetHeight <= 66 ? 360 : 66 }
+                                withAnimation(.spring(duration: 0.3)) { sheetHeight = sheetHeight <= 66 ? 360 : 66 }
                             }
                             RoundButton(symbol: "location", help: "Locate Me") { locate() }
                         }

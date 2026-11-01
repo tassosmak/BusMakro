@@ -7,8 +7,11 @@ struct TopBar: View {
     var onRefresh: () -> Void
     var onSettings: () -> Void = {}
     @FocusState private var focused: Bool
+    /// Searching: set when the field gets focus, cleared only by ✕ (or emptying it unfocused). Tapping ✕
+    /// takes the focus first, so a state tied to focus removed the button before its tap landed.
+    @State private var searching = false
 
-    private var expanded: Bool { focused || !text.isEmpty }
+    private var expanded: Bool { searching || !text.isEmpty }
 
     var body: some View {
         HStack(spacing: 8) {
@@ -19,8 +22,9 @@ struct TopBar: View {
                     .font(.system(size: 13))
                     .focused($focused)
                     .onSubmit { focused = false }
+                    .onChange(of: focused) { if focused { searching = true } else if text.isEmpty { searching = false } }
                 if expanded {  // ✕ ends the search (clears it and closes the keyboard)
-                    Button { text = ""; focused = false } label: {
+                    Button { text = ""; focused = false; searching = false } label: {
                         Image(systemName: "xmark.circle.fill").foregroundStyle(.tertiary)
                     }.buttonStyle(.plain)
                 }
