@@ -37,7 +37,16 @@ struct ContentView: View {
                 .padding(.bottom, 10)
             }
         }
-        .task { await model.start() }
+        .task {
+            await model.start()
+            await model.loadStops(near: CLLocationCoordinate2D(latitude: 37.9755, longitude: 23.7348))  // until a fix arrives
+        }
+        .onChange(of: model.userLocation?.latitude) {
+            // first fix: centre on you and list the stops around you (the map's own move reloads them too)
+            guard let c = model.userLocation, model.screen == .home else { return }
+            withAnimation { camera = .region(MKCoordinateRegion(center: c, span: MKCoordinateSpan(latitudeDelta: 0.008, longitudeDelta: 0.008))) }
+            Task { await model.loadStops(near: c) }
+        }
     }
 
     private var map: some View {

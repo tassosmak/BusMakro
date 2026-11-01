@@ -21,7 +21,11 @@ public struct OASAClient: Sendable {
     }
 
     private static func rows(_ any: Any) -> [[String: Any]] { any as? [[String: Any]] ?? [] }
-    private static func str(_ v: Any?) -> String { (v as? String) ?? (v.map { "\($0)" } ?? "") }
+    /// A field as text; OASA sends JSON null for missing ones (NSNull, which would print "<null>").
+    private static func str(_ v: Any?) -> String {
+        guard let v, !(v is NSNull) else { return "" }
+        return (v as? String) ?? "\(v)"
+    }
 
     /// The stops nearest a point, nearest first.
     public func closestStops(latitude: Double, longitude: Double, limit: Int = 12) async throws -> [Stop] {

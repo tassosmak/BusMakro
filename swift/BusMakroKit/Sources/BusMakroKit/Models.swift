@@ -22,6 +22,9 @@ public struct LineSummary: Identifiable, Hashable, Sendable, Decodable {
     public let nameEnglish: String?
 
     enum CodingKeys: String, CodingKey { case id, name, nameEnglish = "name_en" }
+
+    /// The English name when there is one (the static data often has "" there), else the Greek one.
+    public var title: String { (nameEnglish ?? "").isEmpty ? name : nameEnglish! }
 }
 
 /// A bus on the road, as athens-transit-rt reports it (`/v1/lines/{id}`).

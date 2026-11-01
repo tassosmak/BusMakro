@@ -47,7 +47,7 @@ struct Sheet: View {
                 Button { withAnimation { model.screen = .home } } label: { Label("Back", systemImage: "chevron.left") }
             }
             Menu {
-                ForEach(model.lines) { Text("\($0.id) — \($0.nameEnglish ?? $0.name)") }
+                ForEach(model.lines) { Text("\($0.id) — \($0.title)") }
             } label: {
                 Text("Browse a line…").font(.system(size: 12)).frame(maxWidth: .infinity, alignment: .leading)
             }
