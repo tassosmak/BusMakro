@@ -53,8 +53,7 @@ final class Model: NSObject, CLLocationManagerDelegate {
     }
 
     func start() async {
-        location.requestWhenInUseAuthorization()
-        location.requestLocation()
+        if !showWelcome { askLocation() }  // during the welcome, Continue asks (not over it)
         lines = (try? await transit.lines()) ?? []
         async let index = StopIndex.load(lines: lines.map(\.id))  // for search; cached for a day
         alerts = await Alerts.fetch(known: Set(lines.map(\.id)))
@@ -231,6 +230,16 @@ final class Model: NSObject, CLLocationManagerDelegate {
     }
 
     // MARK: Location
+    func askLocation() {
+        location.requestWhenInUseAuthorization()
+        location.requestLocation()
+    }
+
+    nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        let s = manager.authorizationStatus
+        if s == .authorizedWhenInUse || s == .authorizedAlways { manager.requestLocation() }
+    }
+
     nonisolated func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard let c = locations.last?.coordinate else { return }
         Task { @MainActor in self.userLocation = c }

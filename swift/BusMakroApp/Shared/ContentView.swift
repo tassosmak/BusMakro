@@ -46,6 +46,7 @@ struct ContentView: View {
             WelcomeView {
                 UserDefaults.standard.set(true, forKey: "onboarded")
                 model.showWelcome = false
+                model.askLocation()
             }
         }
         .task {

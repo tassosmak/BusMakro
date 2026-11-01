@@ -51,7 +51,11 @@ public struct OASAClient: Sendable {
     public func stopLines(stopID: String) async throws -> [StopLine] {
         async let routesCall = call("webRoutesForStop", [stopID])
         let arrivals = (try? await stopArrivals(stopID: stopID)) ?? []  // lines are worth showing without times
-        let routes = Self.rows(try await routesCall)
+        var routes = Self.rows(try await routesCall)
+        if routes.isEmpty {  // OASA sometimes answers null for a stop that has lines: ask once more
+            try? await Task.sleep(for: .milliseconds(800))
+            routes = Self.rows(try await call("webRoutesForStop", [stopID]))
+        }
         var lines: [String: StopLine] = [:]
         for r in routes where Self.str(r["hidden"]) != "1" {
             let id = Self.str(r["LineID"]), code = Self.str(r["RouteCode"])

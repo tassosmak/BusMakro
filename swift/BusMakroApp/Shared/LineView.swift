@@ -117,7 +117,7 @@ struct ArrivalCard: View {
             .frame(width: 112, alignment: .leading)
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
-                    Text("Bus \(item.vehicle.id)").font(.system(size: 13, weight: .semibold))
+                    Text("Bus \(item.vehicle.id)").font(.system(size: 13, weight: .semibold)).lineLimit(1).minimumScaleFactor(0.8)
                     Spacer()
                     Text(delay.0).font(.system(size: 12, weight: .semibold)).foregroundStyle(delay.1)
                     // 🔔: notify me when this bus is N stops from my stop
@@ -148,7 +148,7 @@ struct ArrivalCard: View {
     private var delay: (String, Color) {
         guard let d = item.vehicle.delaySeconds else { return ("", .secondary) }
         if abs(d) < 60 { return (String(localized: "On time"), .green) }
-        return ("\(d > 0 ? "+" : "")\(d / 60) min", d > 0 ? .orange : .blue)
+        return ((d > 0 ? "+" : "") + String(localized: "\(d / 60) min"), d > 0 ? .orange : .blue)
     }
 }
 
