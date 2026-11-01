@@ -109,6 +109,11 @@ struct MetroMapView: View {
                     }
             }
             .background(Color(white: 0.93))
+            .overlay(alignment: .bottom) {
+                Text("Map: STASY S.A.").font(.system(size: 11)).foregroundStyle(.secondary)
+                    .padding(.horizontal, 10).padding(.vertical, 4)
+                    .background(.thinMaterial, in: Capsule()).padding(.bottom, 10)
+            }
             .environment(\.colorScheme, .light)  // the map is a light image: keep the title and Done readable
             .navigationTitle("Metro Map")
             #if os(iOS)
