@@ -39,6 +39,11 @@ struct DebugView: View {
                     Toggle("Offline", isOn: $model.online.inverted)
                     Toggle("Service down banner", isOn: $model.serviceDown)
                     Button(sent ? "Sent — lock the phone to see it" : "Test notification in 5 s") { testNotification() }
+                    Button("Test Live Activity (040, 4 stops, 3 min)") {
+                        LiveBus.update("TEST", watch: BusWatch(line: "040", stop: "400022", stopName: "Σύνταγμα", stops: 2),
+                                       stopsAway: 4, seconds: 180)
+                    }
+                    Button("End test Live Activity") { LiveBus.end("TEST", arrived: true) }
                 }
                 Section("Reset") {
                     Button("Show the welcome screen") { dismiss(); model.showWelcome = true }

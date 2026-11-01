@@ -11,8 +11,11 @@ targets:
   BusMakro:
     type: application
     supportedDestinations: [iOS, macOS]
-    sources: [Shared]
-    dependencies: [{ package: BusMakroKit }]
+    sources: [Shared, Activity]
+    dependencies:
+      - package: BusMakroKit
+      - target: BusMakroWidgets  # Live Activity (iPhone only)
+        destinationFilters: [iOS]
     info:
       path: Info.plist
       properties:
@@ -21,6 +24,7 @@ targets:
         CFBundleAllowMixedLocalizations: true
         NSLocationWhenInUseUsageDescription: BusMakro uses your location to show the bus stops near you.
         UILaunchScreen: {}
+        NSSupportsLiveActivities: true
         CFBundleURLTypes:  # busmakro://stop/ID, busmakro://line/ID (quick actions, Siri, Spotlight, Live Activity)
           - CFBundleURLName: com.tassosmak.busmakro
             CFBundleURLSchemes: [busmakro]
@@ -33,3 +37,21 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         MARKETING_VERSION: "0.1.0"
         CURRENT_PROJECT_VERSION: 1
+  BusMakroWidgets:
+    type: app-extension
+    platform: iOS
+    sources: [Widgets, Activity]
+    info:
+      path: Widgets/Info.plist
+      properties:
+        CFBundleDisplayName: BusMakro
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.tassosmak.busmakro.LiveActivity
+        DEVELOPMENT_TEAM: LXL43GG782
+        CODE_SIGN_STYLE: Automatic
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: 1
+        IPHONEOS_DEPLOYMENT_TARGET: "17.0"
