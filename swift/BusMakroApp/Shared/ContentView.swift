@@ -9,6 +9,7 @@ struct ContentView: View {
     @State private var sheetHeight: CGFloat = 360
     @State private var fittedLine: String?
     @State private var menuOpen = false
+    @State private var showMetro = false
     @State private var followedAt: CLLocationCoordinate2D?
     @State private var visibleRegion: MKCoordinateRegion?
     @AppStorage("mapStyle") private var mapStyle = "system"
@@ -39,7 +40,8 @@ struct ContentView: View {
                 .ignoresSafeArea(.container, edges: .bottom)  // measured from the screen edge, not the home indicator
             }
         }
-        .overlay { SideMenu(open: $menuOpen, onSettings: { model.showSettings = true }) }
+        .overlay { SideMenu(open: $menuOpen, onMetroMap: { showMetro = true }, onSettings: { model.showSettings = true }) }
+        .fullScreenCoverOrSheet(isPresented: $showMetro) { MetroMapView() }
         .ignoresSafeArea(.keyboard)
         .preferredColorScheme(mapStyle == "light" ? .light : mapStyle == "dark" ? .dark : nil)
         .sheet(isPresented: $model.showSettings) { SettingsView(model: model) }

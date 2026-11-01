@@ -4,8 +4,8 @@ import SwiftUI
 /// Settings. Slides in from the left over a dimmed map; tap outside or swipe left to close.
 struct SideMenu: View {
     @Binding var open: Bool
+    var onMetroMap: () -> Void
     var onSettings: () -> Void
-    @Environment(\.openURL) private var openURL
     @State private var dragX: CGFloat = 0
     private let width: CGFloat = 290
 
@@ -33,7 +33,7 @@ struct SideMenu: View {
                 .padding(.top, 70).padding(.bottom, 26)
                 Divider()
                 VStack(spacing: 4) {
-                    row("tram.fill", "Metro Map", external: true) { close(); openURL(URL(string: "https://www.stasy.gr")!) }
+                    row("tram.fill", "Metro Map") { close(); onMetroMap() }
                     row("gearshape.fill", "Settings") { close(); onSettings() }
                 }
                 .padding(.top, 14)
@@ -61,17 +61,63 @@ struct SideMenu: View {
 
     private func close() { open = false }
 
-    private func row(_ symbol: String, _ title: LocalizedStringKey, external: Bool = false, action: @escaping () -> Void) -> some View {
+    private func row(_ symbol: String, _ title: LocalizedStringKey, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 14) {
                 Image(systemName: symbol).font(.system(size: 17)).foregroundStyle(.tint).frame(width: 28)
                 Text(title).font(.system(size: 16, weight: .medium))
                 Spacer()
-                Image(systemName: external ? "arrow.up.right" : "chevron.right").font(.system(size: 13)).foregroundStyle(.tertiary)
+                Image(systemName: "chevron.right").font(.system(size: 13)).foregroundStyle(.tertiary)
             }
             .padding(.vertical, 12).padding(.horizontal, 10)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
+}
+
+/// The STASY metro / tram map: pinch to zoom, drag to pan, double-tap to zoom in or out.
+struct MetroMapView: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var scale: CGFloat = 1
+    @State private var baseScale: CGFloat = 1
+    @State private var offset: CGSize = .zero
+    @State private var baseOffset: CGSize = .zero
+
+    var body: some View {
+        NavigationStack {
+            GeometryReader { geo in
+                Image("MetroMap").resizable().scaledToFit()
+                    .frame(width: geo.size.width, height: geo.size.height)
+                    .scaleEffect(scale)
+                    .offset(offset)
+                    .gesture(SimultaneousGesture(
+                        MagnifyGesture()
+                            .onChanged { scale = min(6, max(1, baseScale * $0.magnification)) }
+                            .onEnded { _ in baseScale = scale; if scale == 1 { reset() } },
+                        DragGesture()
+                            .onChanged { g in
+                                guard scale > 1 else { return }
+                                offset = CGSize(width: baseOffset.width + g.translation.width,
+                                                height: baseOffset.height + g.translation.height)
+                            }
+                            .onEnded { _ in baseOffset = offset }))
+                    .onTapGesture(count: 2) {
+                        withAnimation(.spring(response: 0.36, dampingFraction: 1)) {
+                            if scale > 1 { reset() } else { scale = 2.5; baseScale = 2.5 }
+                        }
+                    }
+            }
+            .background(Color(white: 0.93))
+            .environment(\.colorScheme, .light)  // the map is a light image: keep the title and Done readable
+            .navigationTitle("Metro Map")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar { Button("Done") { dismiss() } }
+        }
+        .preferredColorScheme(.light)
+    }
+
+    private func reset() { scale = 1; baseScale = 1; offset = .zero; baseOffset = .zero }
 }
