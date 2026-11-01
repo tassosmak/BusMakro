@@ -28,6 +28,7 @@ final class Model: NSObject, CLLocationManagerDelegate {
     var lineStop: String?          // the stop the line was opened at (selected)
     private var lineTask: Task<Void, Never>?
     var timetable: (line: String, variants: [Timetable])?
+    var stopIndex: StopIndex?
     private var lineCodes: [String: [(code: String, name: String, nameEnglish: String)]]?
 
     private let oasa = OASAClient(), transit = TransitClient()
@@ -42,6 +43,24 @@ final class Model: NSObject, CLLocationManagerDelegate {
         location.requestWhenInUseAuthorization()
         location.requestLocation()
         lines = (try? await transit.lines()) ?? []
+        stopIndex = try? await StopIndex.load(lines: lines.map(\.id))  // for search; cached for a day
+    }
+
+    // MARK: Search (the bar at the top): lines by number or name, then stops by name
+    var lineResults: [LineSummary] {
+        let q = Translit.normalize(searchText)
+        guard !q.isEmpty else { return [] }
+        let hits = lines.filter {
+            Translit.normalize($0.id).hasPrefix(q) || (q.count > 2 && Translit.normalize($0.name).contains(q))
+        }
+        return Array(hits.sorted { (Translit.normalize($0.id) == q ? 0 : 1) < (Translit.normalize($1.id) == q ? 0 : 1) }.prefix(8))
+    }
+
+    var stopResults: [(stop: Stop, lines: [String])] {
+        (stopIndex?.search(searchText) ?? []).map {
+            (Stop(id: $0.id, name: $0.entry.name, nameEnglish: "", street: "", latitude: $0.entry.lat, longitude: $0.entry.lon),
+             $0.entry.lines)
+        }
     }
 
     // MARK: Stops

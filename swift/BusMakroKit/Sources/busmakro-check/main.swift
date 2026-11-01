@@ -44,3 +44,12 @@ let f = DateFormatter(); f.dateFormat = "HH:mm"; f.timeZone = OASAClient.athens
 for v in tt {
     print("timetable 040 [\(v.code)] \(v.name): go \(v.go.count) (first \(v.go.first.map(f.string) ?? "-")), come \(v.come.count)")
 }
+
+// Search
+print("translit:", Translit.latin("Πλατεία Ελευθερίας"), "·", Translit.latin("ΜΠΟΥΜΠΟΥΛΙΝΑΣ"), "·", Translit.latin("Ευαγγελισμός"))
+let t0 = Date()
+let index = try await StopIndex.load(lines: all.map(\.id))
+print("stop index: \(index.stops.count) stops in \(String(format: "%.1f", Date().timeIntervalSince(t0)))s")
+for q in ["syntagma", "ΣΥΝΤΑΓΜΑ", "evangel"] {
+    print("  \(q): " + index.search(q, limit: 3).map { "\($0.entry.name) [\($0.id)] lines \($0.entry.lines.prefix(4).joined(separator: ","))" }.joined(separator: "; "))
+}

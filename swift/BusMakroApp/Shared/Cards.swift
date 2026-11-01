@@ -7,12 +7,13 @@ struct StopCard: View {
     let stop: Stop
     let metres: Double?
     var closest = false
+    var subtitle: String? = nil
 
     var body: some View {
         HStack(alignment: .center, spacing: 8) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(stop.title).font(.system(size: 13, weight: .semibold)).lineLimit(1)
-                Text((stop.street.isEmpty ? "" : stop.street + " · ") + "Stop \(stop.id)")
+                Text(subtitle ?? ((stop.street.isEmpty ? "" : stop.street + " · ") + "Stop \(stop.id)"))
                     .font(.system(size: 12)).foregroundStyle(.secondary).lineLimit(1)
             }
             Spacer(minLength: 8)
@@ -57,5 +58,20 @@ struct LineCard: View {
     private var next: String {
         let rest = line.arrivalsMinutes.dropFirst().prefix(2).map { "\($0) min" }
         return rest.isEmpty ? (line.arrivalsMinutes.isEmpty ? "No live bus" : "Live") : "then " + rest.joined(separator: ", ")
+    }
+}
+
+/// A line in search results: badge and name.
+struct LineRow: View {
+    let line: LineSummary
+    var body: some View {
+        HStack(spacing: 12) {
+            LineBadge(line: line.id)
+            Text(line.title).font(.system(size: 13, weight: .semibold)).lineLimit(2)
+            Spacer()
+        }
+        .padding(.horizontal, 12)
+        .frame(height: 52)
+        .card()
     }
 }

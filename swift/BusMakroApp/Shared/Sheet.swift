@@ -77,6 +77,48 @@ struct Sheet: View {
     }
 
     @ViewBuilder private var content: some View {
+        if !model.searchText.trimmingCharacters(in: .whitespaces).isEmpty {
+            results
+        } else {
+            screenContent
+        }
+    }
+
+    /// Search results: lines, then stops (with the lines that serve them), as the Mac app.
+    private var results: some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 6) {
+                let lines = model.lineResults, stops = model.stopResults
+                if !lines.isEmpty { sectionTitle("LINES") }
+                ForEach(Array(lines.enumerated()), id: \.element.id) { i, l in
+                    Button { model.searchText = ""; withAnimation { model.openLine(l.id, at: nil) } } label: { LineRow(line: l) }
+                        .buttonStyle(.plain).appearing(i)
+                }
+                if model.stopIndex == nil {
+                    Text("Preparing stop search…").font(.system(size: 12)).foregroundStyle(.secondary).padding(.top, 12)
+                } else if !stops.isEmpty {
+                    sectionTitle("STOPS")
+                }
+                ForEach(Array(stops.enumerated()), id: \.element.stop.id) { i, r in
+                    Button { model.searchText = ""; Task { await model.open(r.stop) } } label: {
+                        StopCard(stop: r.stop, metres: model.distance(to: r.stop),
+                                 subtitle: "Lines " + r.lines.prefix(8).joined(separator: ", "))
+                    }
+                    .buttonStyle(.plain).appearing(lines.count + i)
+                }
+                if lines.isEmpty && stops.isEmpty && model.stopIndex != nil {
+                    Text("No results for \"\(model.searchText)\"").font(.system(size: 12)).foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity).padding(.top, 20)
+                }
+            }
+        }
+    }
+
+    private func sectionTitle(_ t: String) -> some View {
+        Text(t).font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary).padding(.top, 4)
+    }
+
+    @ViewBuilder private var screenContent: some View {
         switch model.screen {
         case .home:
             Picker("", selection: $model.homeTab) {
