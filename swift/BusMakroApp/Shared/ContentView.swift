@@ -19,17 +19,24 @@ struct ContentView: View {
             ZStack(alignment: .bottom) {
                 map
                 VStack(spacing: 8) {
-                    TopBar(text: $model.searchText, onRefresh: { Task { await refresh() } },
-                           onSettings: { model.showSettings = true })
-                    if model.screen == .home && !model.recents.isEmpty && model.searchText.isEmpty && showRecents {
-                        RecentChips(stops: model.recents.map(\.title)) { i in model.open(model.recents[i]) }
+                    // the top bar slides away as the panel goes down to the strip (the Mac app's map focus)
+                    VStack(spacing: 8) {
+                        TopBar(text: $model.searchText, onRefresh: { Task { await refresh() } },
+                               onSettings: { model.showSettings = true })
+                        if model.screen == .home && !model.recents.isEmpty && model.searchText.isEmpty && showRecents {
+                            RecentChips(stops: model.recents.map(\.title)) { i in model.open(model.recents[i]) }
+                        }
                     }
+                    .opacity(barShown)
+                    .offset(y: (barShown - 1) * 40)
+                    .allowsHitTesting(barShown > 0.5)
                     Spacer()
                     HStack {
                         Spacer()
                         VStack(spacing: 10) {
-                            RoundButton(symbol: "arrow.up.left.and.arrow.down.right", help: "Expand the map") {
-                                withAnimation(.spring(duration: 0.3)) { sheetHeight = 66 }
+                            RoundButton(symbol: sheetHeight <= 66 ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right",
+                                        help: "Expand the map") {
+                                withAnimation(.spring(duration: 0.3)) { sheetHeight = sheetHeight <= 66 ? 360 : 66 }
                             }
                             RoundButton(symbol: "location", help: "Locate Me") { locate() }
                         }
@@ -75,6 +82,9 @@ struct ContentView: View {
             Task { await model.loadStops(near: c, force: true) }
         }
     }
+
+    /// 0 with the panel at the strip, 1 from the normal height up.
+    private var barShown: Double { min(1, max(0, (sheetHeight - 66) / (360 - 66))) }
 
     private var map: some View {
         Map(position: $camera) {

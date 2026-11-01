@@ -13,11 +13,13 @@ struct Sheet: View {
         VStack(alignment: .leading, spacing: 12) {
             handle
             header
-            content
+            content.opacity(height > 140 ? 1 : 0)  // the slim strip shows just the handle and the menu
         }
         .padding(.horizontal, Style.gap)
         .frame(height: height, alignment: .top)
         .frame(maxWidth: 480)
+        // what doesn't fit stays inside the panel (dragged small, the tabs and list were drawn below it)
+        .clipShape(RoundedRectangle(cornerRadius: Style.sheetRadius))
         .glass(RoundedRectangle(cornerRadius: Style.sheetRadius))
     }
 
