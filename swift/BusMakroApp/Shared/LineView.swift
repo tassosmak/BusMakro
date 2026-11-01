@@ -10,15 +10,20 @@ struct LineContent: View {
         Picker("", selection: $model.lineTab) {
             Text("Arrivals").tag(Model.LineTab.arrivals)
             Text("Route").tag(Model.LineTab.route)
+            Text("Nearby").tag(Model.LineTab.nearby)
+            Text("Timetable").tag(Model.LineTab.timetable)
         }
         .pickerStyle(.segmented).labelsHidden()
         if model.lineDetail == nil {
             Text("Loading the line…").font(.system(size: 12)).foregroundStyle(.secondary).padding(.top, 20)
                 .frame(maxWidth: .infinity)
-        } else if model.lineTab == .arrivals {
-            arrivals
         } else {
-            route
+            switch model.lineTab {
+            case .arrivals: arrivals
+            case .route: route
+            case .nearby: nearby
+            case .timetable: TimetableList(model: model)
+            }
         }
     }
 
@@ -57,6 +62,35 @@ struct LineContent: View {
                 }
             }
             .onAppear { if let s = model.lineStop { proxy.scrollTo(s, anchor: .center) } }
+        }
+    }
+
+    /// The line's stops nearest you; tapping one selects it and shows its arrivals.
+    private var nearby: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("NEAREST STOPS ON THIS LINE").font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary)
+            ScrollView {
+                LazyVStack(spacing: 6) {
+                    let rows = model.nearestOnLine(from: nil)
+                    if rows.isEmpty {
+                        Text("Tap the location button to find the stops near you.")
+                            .font(.system(size: 12)).foregroundStyle(.secondary).padding(.top, 20)
+                    }
+                    ForEach(Array(rows.enumerated()), id: \.element.0) { i, row in
+                        Button {
+                            model.lineStop = row.0
+                            model.lineTab = .arrivals
+                            Task { await model.refreshLine(currentLine) }
+                        } label: {
+                            StopCard(stop: Stop(id: row.0, name: row.1.name, nameEnglish: "", street: "",
+                                                latitude: row.1.lat, longitude: row.1.lon),
+                                     metres: row.2, closest: i == 0)
+                        }
+                        .buttonStyle(.plain)
+                        .appearing(i)
+                    }
+                }
+            }
         }
     }
 
@@ -148,5 +182,71 @@ struct RouteBusRow: View {
         }
         .padding(.horizontal, 6)
         .frame(height: 34)
+    }
+}
+
+/// Today's departures from each end of the line, five to a row: gone ones dimmed, the next one in a
+/// green pill, scrolled to now (the Mac app's Timetable tab).
+struct TimetableList: View {
+    @Bindable var model: Model
+    private static let fmt: DateFormatter = {
+        let f = DateFormatter(); f.dateFormat = "HH:mm"; f.timeZone = OASAClient.athens; return f
+    }()
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("TODAY'S DEPARTURES FROM EACH END").font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary)
+            if let tt = model.timetable?.variants {
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 4) {
+                            if tt.isEmpty {
+                                Text("No timetable for today").font(.system(size: 12)).foregroundStyle(.secondary).padding(.top, 20)
+                            }
+                            ForEach(Array(tt.enumerated()), id: \.offset) { vi, v in
+                                let ends = v.name.components(separatedBy: " - ")
+                                if vi > 0 { header("Also: \(v.name)") }
+                                section(v.go, from: ends.first ?? v.name, key: "\(vi)g")
+                                section(v.come, from: ends.last ?? v.name, key: "\(vi)c")
+                            }
+                        }
+                    }
+                    .onAppear { proxy.scrollTo("next", anchor: .center) }
+                }
+            } else {
+                Text("Loading the timetable…").font(.system(size: 12)).foregroundStyle(.secondary).padding(.top, 20)
+                    .frame(maxWidth: .infinity)
+            }
+        }
+        .task { await model.loadTimetable() }
+    }
+
+    private func header(_ text: String) -> some View {
+        Text(text).font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary).padding(.top, 8)
+    }
+
+    @ViewBuilder private func section(_ times: [Date], from place: String, key: String) -> some View {
+        if !times.isEmpty {
+            let now = Date()
+            let next = times.first { $0 >= now }
+            header("From \(place)  ·  \(times.filter { $0 >= now }.count) more today")
+            let rows = stride(from: 0, to: times.count, by: 5).map { Array(times[$0..<min($0 + 5, times.count)]) }
+            ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
+                HStack(spacing: 0) {
+                    ForEach(row, id: \.self) { t in
+                        let isNext = t == next
+                        Text(Self.fmt.string(from: t))
+                            .font(Style.rounded(14, isNext ? .bold : .regular))
+                            .foregroundStyle(isNext ? Color.green : t < now ? Color.secondary.opacity(0.5) : Color.primary)
+                            .frame(maxWidth: .infinity).frame(height: 24)
+                            .background(isNext ? Color.green.opacity(0.22) : .clear, in: Capsule())
+                            .padding(.horizontal, 4)
+                    }
+                    ForEach(0..<(5 - row.count), id: \.self) { _ in Color.clear.frame(maxWidth: .infinity) }
+                }
+                .frame(height: 30)
+                .id(row.contains { $0 == next } ? "next" : "\(key)\(row[0].timeIntervalSince1970)")
+            }
+        }
     }
 }

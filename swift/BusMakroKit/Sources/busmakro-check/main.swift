@@ -36,3 +36,11 @@ if let vid = LineMath.variant(for: detail, stop: nil, live: live040.vehicles), l
     print("  to \(detail.stops[stop]?.name ?? stop): " + coming.prefix(3).map {
         "bus \($0.vehicle.id) \($0.stopsAway) stops, \(Int($0.seconds / 60)) min\($0.official ? "" : " (est.)")" }.joined(separator: "; "))
 }
+
+// Timetable
+let codes = try await oasa.lineCodes()
+let tt = await oasa.timetable(line: "040", codes: codes)
+let f = DateFormatter(); f.dateFormat = "HH:mm"; f.timeZone = OASAClient.athens
+for v in tt {
+    print("timetable 040 [\(v.code)] \(v.name): go \(v.go.count) (first \(v.go.first.map(f.string) ?? "-")), come \(v.come.count)")
+}

@@ -7,7 +7,7 @@ import Observation
 @MainActor @Observable
 final class Model: NSObject, CLLocationManagerDelegate {
     enum Screen: Equatable { case home, stop(Stop), line(String, Stop?) }
-    enum LineTab: Hashable { case arrivals, route }
+    enum LineTab: Hashable { case arrivals, route, nearby, timetable }
     enum HomeTab: Hashable { case nearby, favourites }
 
     var screen: Screen = .home
@@ -27,6 +27,8 @@ final class Model: NSObject, CLLocationManagerDelegate {
     var official: [String: Int] = [:]
     var lineStop: String?          // the stop the line was opened at (selected)
     private var lineTask: Task<Void, Never>?
+    var timetable: (line: String, variants: [Timetable])?
+    private var lineCodes: [String: [(code: String, name: String, nameEnglish: String)]]?
 
     private let oasa = OASAClient(), transit = TransitClient()
     private let location = CLLocationManager()
@@ -88,6 +90,21 @@ final class Model: NSObject, CLLocationManagerDelegate {
     func refreshLine(_ id: String) async {
         if let live = try? await transit.live(line: id) { vehicles = live.vehicles }
         if let s = lineStop { official = await oasa.predictions(stopID: s) }
+    }
+
+    /// Today's timetable of the open line (fetched once per line).
+    func loadTimetable() async {
+        guard case .line(let id, _) = screen, timetable?.line != id else { return }
+        if lineCodes == nil { lineCodes = try? await oasa.lineCodes() }
+        let variants = await oasa.timetable(line: id, codes: lineCodes ?? [:])
+        if case .line(id, _) = screen { timetable = (id, variants) }
+    }
+
+    /// The line's stops nearest you (or the map's centre without a fix): (stop id, info, metres).
+    func nearestOnLine(from c: CLLocationCoordinate2D?, limit: Int = 6) -> [(String, LineDetail.StopInfo, Double)] {
+        guard let d = lineDetail, let c = c ?? userLocation else { return [] }
+        return d.stops.map { ($0.key, $0.value, Geo.distance(c.latitude, c.longitude, $0.value.lat, $0.value.lon)) }
+            .sorted { $0.2 < $1.2 }.prefix(limit).map { $0 }
     }
 
     func closeLine() {
