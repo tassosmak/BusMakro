@@ -8,6 +8,8 @@ struct ContentView: View {
     @State private var model = Model()
     @State private var sheetHeight: CGFloat = 360
     @State private var fittedLine: String?
+    @State private var followedAt: CLLocationCoordinate2D?
+    @State private var visibleRegion: MKCoordinateRegion?
     @AppStorage("mapStyle") private var mapStyle = "system"
     @AppStorage("showRecents") private var showRecents = true
     @AppStorage("map3D") private var map3D = false
@@ -76,9 +78,23 @@ struct ContentView: View {
                 center: CLLocationCoordinate2D(latitude: center.latitude - span.latitudeDelta * 0.2, longitude: center.longitude), span: span)) }
         }
         .onChange(of: model.tick) {
-            guard let p = model.pinnedPosition else { return }
-            withAnimation(.linear(duration: 1)) {
+            // follow the pinned bus: re-centre only once it has moved ~25 m, with a short animation.
+            // (Animating the camera every second kept the map always mid-animation, and taps on the
+            // panel were lost while following.)
+            guard let p = model.pinnedPosition else { followedAt = nil; return }
+            if let f = followedAt, Geo.distance(f.latitude, f.longitude, p.latitude, p.longitude) < 25 { return }
+            followedAt = p
+            withAnimation(.easeInOut(duration: 0.4)) {
                 camera = .camera(MapCamera(centerCoordinate: p, distance: 1400, pitch: map3D ? 45 : 0))
+            }
+        }
+        .onChange(of: map3D) {
+            // 3D buildings only show on a tilted map: tilt to 55° (and back to flat) around the current centre
+            guard let region = visibleRegion else { return }
+            withAnimation(.easeInOut(duration: 0.6)) {
+                camera = .camera(MapCamera(centerCoordinate: region.center,
+                                           distance: max(600, region.span.latitudeDelta * 111_000 * 1.6),
+                                           pitch: map3D ? 55 : 0))
             }
         }
         .onChange(of: model.homeTab) { if model.homeTab == .favourites { Task { await model.loadFavourites() } } }
@@ -145,6 +161,7 @@ struct ContentView: View {
         .mapStyle(.standard(elevation: map3D ? .realistic : .flat, pointsOfInterest: .excludingAll))
         .mapControls { }  // no zoom or compass buttons, like the Mac app
         .onMapCameraChange(frequency: .onEnd) { ctx in
+            visibleRegion = ctx.region
             if model.screen == .home { fittedLine = nil; Task { await model.loadStops(near: ctx.region.center) } }
         }
         .ignoresSafeArea()
