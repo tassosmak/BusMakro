@@ -1,4 +1,5 @@
 import BusMakroKit
+import CoreSpotlight
 import MapKit
 import SwiftUI
 
@@ -58,23 +59,11 @@ struct ContentView: View {
             }
         }
         .task {
-            #if os(iOS)
-            QuickActions.update(favourites: model.favourites)
-            #endif
             if let link = links.pending { links.pending = nil; Task { await model.follow(link) } }  // launched from a quick action
             await model.start()
             await model.loadStops(near: CLLocationCoordinate2D(latitude: 37.9755, longitude: 23.7348))  // until a fix arrives
         }
-        .onOpenURL { url in if let link = AppLink(url: url) { links.pending = link } }
-        .onChange(of: links.pending) {
-            guard let link = links.pending else { return }
-            links.pending = nil
-            menuOpen = false
-            Task { await model.follow(link) }
-        }
-        #if os(iOS)
-        .onChange(of: model.favourites) { QuickActions.update(favourites: model.favourites) }
-        #endif
+        .modifier(LinkHandling(model: model, links: links, menuOpen: $menuOpen))
         .onChange(of: model.variantID) {
             // a line opened: show its whole route, like the Mac app's fit on the stops
             // once per line: refreshes can re-pick the variant, and must not pull the map away from where you zoomed
@@ -318,5 +307,33 @@ struct StopPin: View {
         .shadow(color: .black.opacity(0.3), radius: 2, y: 1)
         .offset(y: -(size + (selected ? 8 : 5)) / 2)  // the stem's foot is on the stop
         .animation(.smooth(duration: 0.25), value: selected)
+    }
+}
+
+/// Links from outside (quick actions, Siri, Spotlight, busmakro:// URLs) followed in the model, and
+/// the quick actions and Spotlight kept in step with your stops. (A modifier of its own: in the main
+/// body it made the expression too big for the compiler.)
+struct LinkHandling: ViewModifier {
+    let model: Model
+    let links: Links
+    @Binding var menuOpen: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .onOpenURL { url in if let link = AppLink(url: url) { links.pending = link } }
+            .onContinueUserActivity(CSSearchableItemActionType) { a in if let link = SpotlightStops.link(a) { links.pending = link } }
+            .onChange(of: links.pending) {
+                guard let link = links.pending else { return }
+                links.pending = nil
+                menuOpen = false
+                Task { await model.follow(link) }
+            }
+            .onChange(of: model.favourites, initial: true) {
+                SpotlightStops.index(favourites: model.favourites, recents: model.recents)
+                #if os(iOS)
+                QuickActions.update(favourites: model.favourites)
+                #endif
+            }
+            .onChange(of: model.recents) { SpotlightStops.index(favourites: model.favourites, recents: model.recents) }
     }
 }

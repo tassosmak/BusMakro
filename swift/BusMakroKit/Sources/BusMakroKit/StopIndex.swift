@@ -17,6 +17,13 @@ public struct StopIndex: Sendable {
     }
     static let maxAge: TimeInterval = 24 * 3600
 
+    /// The last saved index, however old (for Siri and Shortcuts, which shouldn't download it all).
+    public static func cached() -> StopIndex? {
+        guard let data = try? Data(contentsOf: cacheURL),
+              let stops = try? JSONDecoder().decode([String: Entry].self, from: data) else { return nil }
+        return StopIndex(stops: stops)
+    }
+
     /// From the cache when it is fresh, else downloaded (one file per line, 8 at a time).
     public static func load(lines: [String], transit: TransitClient = TransitClient()) async throws -> StopIndex {
         if let attrs = try? FileManager.default.attributesOfItem(atPath: cacheURL.path),

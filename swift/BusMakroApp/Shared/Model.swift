@@ -371,7 +371,7 @@ final class Model: NSObject, CLLocationManagerDelegate {
     nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {}
 
     // MARK: Saved stops (same fields as the Mac app's favourites)
-    private static func loadStops(_ key: String) -> [Stop] {
+    static func loadStops(_ key: String) -> [Stop] {
         (UserDefaults.standard.array(forKey: key) as? [[String: Any]] ?? []).compactMap { d in
             guard let id = d["id"] as? String, let lat = d["lat"] as? Double, let lon = d["lon"] as? Double else { return nil }
             return Stop(id: id, name: d["name"] as? String ?? "", nameEnglish: d["name_en"] as? String ?? "",
