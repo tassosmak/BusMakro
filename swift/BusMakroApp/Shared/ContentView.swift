@@ -8,6 +8,8 @@ struct ContentView: View {
     @State private var model = Model()
     @State private var sheetHeight: CGFloat = 360
     @State private var fittedLine: String?
+    @State private var menuOpen = false
+    @State private var showMetro = false
     @State private var followedAt: CLLocationCoordinate2D?
     @State private var visibleRegion: MKCoordinateRegion?
     @AppStorage("mapStyle") private var mapStyle = "system"
@@ -25,7 +27,7 @@ struct ContentView: View {
                     // the top bar slides away as the panel goes down to the strip (the Mac app's map focus)
                     VStack(spacing: 8) {
                         TopBar(text: $model.searchText, onRefresh: { Task { await refresh() } },
-                               onSettings: { model.showSettings = true })
+                               onMenu: { menuOpen = true })
                         if model.screen == .home && !model.recents.isEmpty && model.searchText.isEmpty && showRecents {
                             RecentChips(stops: model.recents.map(\.title)) { i in model.open(model.recents[i]) }
                         }
@@ -52,6 +54,8 @@ struct ContentView: View {
                 .ignoresSafeArea(.container, edges: .bottom)  // measured from the screen edge, not the home indicator
             }
         }
+        .overlay { SideMenu(open: $menuOpen, onMetroMap: { showMetro = true }, onSettings: { model.showSettings = true }) }
+        .fullScreenCoverOrSheet(isPresented: $showMetro) { MetroMapView() }
         .ignoresSafeArea(.keyboard)
         .preferredColorScheme(mapStyle == "light" ? .light : mapStyle == "dark" ? .dark : nil)
         .sheet(isPresented: $model.showSettings) { SettingsView(model: model) }

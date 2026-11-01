@@ -5,7 +5,7 @@ import SwiftUI
 struct TopBar: View {
     @Binding var text: String
     var onRefresh: () -> Void
-    var onSettings: () -> Void = {}
+    var onMenu: () -> Void = {}
     @FocusState private var focused: Bool
     /// Searching: set when the field gets focus, cleared only by ✕ (or emptying it unfocused). Tapping ✕
     /// takes the focus first, so a state tied to focus removed the button before its tap landed.
@@ -16,7 +16,11 @@ struct TopBar: View {
     var body: some View {
         HStack(spacing: 8) {
             HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                // ☰ opens the side menu (where the magnifier was)
+                Button(action: onMenu) {
+                    Image(systemName: "line.3.horizontal").font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(.primary).frame(width: 28, height: Style.barHeight).contentShape(Rectangle())
+                }.buttonStyle(.plain)
                 TextField("Search stops or lines", text: $text)
                     .textFieldStyle(.plain)
                     .font(.system(size: 13))
@@ -24,7 +28,7 @@ struct TopBar: View {
                     .onSubmit { focused = false }
                     .onChange(of: focused) { if focused { searching = true } else if text.isEmpty { searching = false } }
             }
-            .padding(.horizontal, 14)
+            .padding(.leading, 8).padding(.trailing, 14)
             .frame(height: Style.barHeight)
             .glass(Capsule())
             if expanded {
@@ -34,8 +38,6 @@ struct TopBar: View {
                     .transition(.opacity.combined(with: .scale(scale: 0.6)))
             } else {
                 RoundButton(symbol: "arrow.clockwise", help: "Refresh", action: onRefresh)
-                    .transition(.opacity.combined(with: .scale(scale: 0.6)))
-                RoundButton(symbol: "gearshape", help: "Settings", action: onSettings)
                     .transition(.opacity.combined(with: .scale(scale: 0.6)))
             }
         }

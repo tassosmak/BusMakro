@@ -94,3 +94,7 @@
 "Couldn't reach the bus service. Tap to try again." = "Δεν ήταν δυνατή η σύνδεση με την υπηρεσία. Πατήστε για νέα προσπάθεια.";
 "No internet connection. Retrying when you're back online." = "Δεν υπάρχει σύνδεση. Νέα προσπάθεια μόλις επανέλθει.";
 "Close" = "Κλείσιμο";
+"Version %@" = "Έκδοση %@";
+"Athens buses, live" = "Τα λεωφορεία της Αθήνας, ζωντανά";
+"Metro Map" = "Χάρτης μετρό";
+"Data: OASA · athens-transit-rt. Unofficial app, not affiliated with OASA." = "Δεδομένα: ΟΑΣΑ · athens-transit-rt. Ανεπίσημη εφαρμογή, χωρίς σχέση με τον ΟΑΣΑ.";
