@@ -51,7 +51,7 @@ struct Sheet: View {
             }
             Menu {
                 ForEach(model.lines) { l in
-                    Button("\(l.id) — \(l.title)") { withAnimation { model.openLine(l.id, at: nil) } }
+                    Button("\(l.id) — \(l.shown)") { withAnimation { model.openLine(l.id, at: nil) } }
                 }
             } label: {
                 Text(menuTitle).font(.system(size: 12)).lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
@@ -71,9 +71,9 @@ struct Sheet: View {
 
     private var menuTitle: String {
         if case .line(let id, _) = model.screen {
-            return "\(id) — " + (model.lines.first { $0.id == id }?.title ?? "")
+            return "\(id) — " + (model.lines.first { $0.id == id }?.shown ?? "")
         }
-        return "Browse a line…"
+        return String(localized: "Browse a line…")
     }
 
     @ViewBuilder private var content: some View {
@@ -102,7 +102,7 @@ struct Sheet: View {
                 ForEach(Array(stops.enumerated()), id: \.element.stop.id) { i, r in
                     Button { model.searchText = ""; Task { await model.open(r.stop) } } label: {
                         StopCard(stop: r.stop, metres: model.distance(to: r.stop),
-                                 subtitle: "Lines " + r.lines.prefix(8).joined(separator: ", "))
+                                 subtitle: String(localized: "Lines \(r.lines.prefix(8).joined(separator: ", "))"))
                     }
                     .buttonStyle(.plain).appearing(lines.count + i)
                 }
@@ -127,11 +127,11 @@ struct Sheet: View {
             }
             .pickerStyle(.segmented).labelsHidden()
             list(model.homeTab == .nearby ? model.stops : model.favourites, empty: model.homeTab == .nearby
-                 ? "Finding stops near you…" : "No favourite stops yet. Tap ☆ on a stop to add it.")
+                 ? String(localized: "Finding stops near you…") : String(localized: "No favourite stops yet. Tap ☆ on a stop to add it."))
         case .line:
             LineContent(model: model)
         case .stop(let stop):
-            Text("\(stop.title.uppercased()) · STOP \(stop.id)")
+            Text(String(localized: "\(stop.title) · Stop \(stop.id)").uppercased())
                 .font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary)
             ScrollView {
                 LazyVStack(spacing: 6) {

@@ -7,6 +7,8 @@ import SwiftUI
 struct ContentView: View {
     @State private var model = Model()
     @State private var sheetHeight: CGFloat = 360
+    @AppStorage("mapStyle") private var mapStyle = "system"
+    @AppStorage("showRecents") private var showRecents = true
     @State private var camera: MapCameraPosition = .region(MKCoordinateRegion(
         center: CLLocationCoordinate2D(latitude: 37.9755, longitude: 23.7348),  // Syntagma
         span: MKCoordinateSpan(latitudeDelta: 0.012, longitudeDelta: 0.012)))
@@ -16,8 +18,9 @@ struct ContentView: View {
             ZStack(alignment: .bottom) {
                 map
                 VStack(spacing: 8) {
-                    TopBar(text: $model.searchText) { Task { await refresh() } }
-                    if model.screen == .home && !model.recents.isEmpty && model.searchText.isEmpty {
+                    TopBar(text: $model.searchText, onRefresh: { Task { await refresh() } },
+                           onSettings: { model.showSettings = true })
+                    if model.screen == .home && !model.recents.isEmpty && model.searchText.isEmpty && showRecents {
                         RecentChips(stops: model.recents.map(\.title)) { i in Task { await model.open(model.recents[i]) } }
                     }
                     Spacer()
@@ -35,6 +38,14 @@ struct ContentView: View {
                 .padding(.horizontal, 10)
                 .padding(.top, 34)
                 .padding(.bottom, 10)
+            }
+        }
+        .preferredColorScheme(mapStyle == "light" ? .light : mapStyle == "dark" ? .dark : nil)
+        .sheet(isPresented: $model.showSettings) { SettingsView(model: model) }
+        .fullScreenCoverOrSheet(isPresented: $model.showWelcome) {
+            WelcomeView {
+                UserDefaults.standard.set(true, forKey: "onboarded")
+                model.showWelcome = false
             }
         }
         .task {
@@ -142,5 +153,16 @@ struct BusMarker: View {
         }
         .opacity(faded ? 0.45 : 1)
         .animation(.easeInOut(duration: 1.5), value: bearing)
+    }
+}
+
+extension View {
+    /// Full-screen on iPhone, a sheet on Mac.
+    @ViewBuilder func fullScreenCoverOrSheet<C: View>(isPresented: Binding<Bool>, @ViewBuilder content: @escaping () -> C) -> some View {
+        #if os(iOS)
+        fullScreenCover(isPresented: isPresented, content: content)
+        #else
+        sheet(isPresented: isPresented, content: content)
+        #endif
     }
 }

@@ -5,6 +5,7 @@ import SwiftUI
 struct TopBar: View {
     @Binding var text: String
     var onRefresh: () -> Void
+    var onSettings: () -> Void = {}
     @FocusState private var focused: Bool
 
     private var expanded: Bool { focused || !text.isEmpty }
@@ -29,6 +30,8 @@ struct TopBar: View {
             .glass(Capsule())
             if !expanded {
                 RoundButton(symbol: "arrow.clockwise", help: "Refresh", action: onRefresh)
+                    .transition(.opacity.combined(with: .scale(scale: 0.6)))
+                RoundButton(symbol: "gearshape", help: "Settings", action: onSettings)
                     .transition(.opacity.combined(with: .scale(scale: 0.6)))
             }
         }

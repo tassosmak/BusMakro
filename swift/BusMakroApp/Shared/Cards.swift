@@ -13,7 +13,7 @@ struct StopCard: View {
         HStack(alignment: .center, spacing: 8) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(stop.title).font(.system(size: 13, weight: .semibold)).lineLimit(1)
-                Text(subtitle ?? ((stop.street.isEmpty ? "" : stop.street + " · ") + "Stop \(stop.id)"))
+                Text(subtitle ?? ((stop.street.isEmpty ? "" : stop.street + " · ") + String(localized: "Stop \(stop.id)")))
                     .font(.system(size: 12)).foregroundStyle(.secondary).lineLimit(1)
             }
             Spacer(minLength: 8)
@@ -40,7 +40,7 @@ struct LineCard: View {
         HStack(spacing: 12) {
             LineBadge(line: line.line)
             VStack(alignment: .leading, spacing: 3) {
-                Text(line.nameEnglish.isEmpty ? line.name : line.nameEnglish)
+                Text(Names.place(line.name, line.nameEnglish))
                     .font(.system(size: 13, weight: .semibold)).lineLimit(1)
                 Text(next).font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(1)
             }
@@ -61,7 +61,9 @@ struct LineCard: View {
 
     /// Live minutes, or (no bus on the road yet) the clock time the timetable says it gets here.
     private var eta: String {
-        if let m = line.arrivalsMinutes.first { return "\(m) min" }
+        if let m = line.arrivalsMinutes.first {
+            return String(localized: "\(History.shared.learnedMinutes(line: line.line, minutes: m) ?? m) min")
+        }
         if let s = line.scheduled { return Self.clock.string(from: s.arrive) }
         return "—"
     }
@@ -69,11 +71,20 @@ struct LineCard: View {
     private var next: String {
         if line.arrivalsMinutes.isEmpty, let s = line.scheduled {
             let mins = max(0, Int(s.arrive.timeIntervalSinceNow / 60))
-            return "Scheduled · leaves the terminus \(Self.clock.string(from: s.depart)) · in about \(mins) min"
+            return String(localized: "Scheduled · leaves the terminus \(Self.clock.string(from: s.depart)) · in about \(mins) min")
         }
-        if line.arrivalsMinutes.isEmpty { return "No more buses today" }
-        let rest = line.arrivalsMinutes.dropFirst().prefix(2).map { "\($0) min" }
-        return rest.isEmpty ? (line.arrivalsMinutes.isEmpty ? "No live bus" : "Live") : "then " + rest.joined(separator: ", ")
+        if line.arrivalsMinutes.isEmpty { return String(localized: "No more buses today") }
+        let rest = line.arrivalsMinutes.dropFirst().prefix(2).map { String(localized: "\($0) min") }
+        var hints: [String] = []
+        if let g = History.shared.ghostRate(line: line.line), g >= 0.25 {
+            hints.append(String(localized: "👻 \(Int(g * 100))% of buses vanish"))
+        }
+        if let b = History.bunching(line.arrivalsMinutes) { hints.append(b) }
+        if let m = line.arrivalsMinutes.first, History.shared.learnedMinutes(line: line.line, minutes: m) != nil {
+            hints.append(String(localized: "learned · OASA says \(m) min"))
+        }
+        hints.append(rest.isEmpty ? String(localized: "Live") : String(localized: "then \(rest.joined(separator: ", "))"))
+        return hints.joined(separator: " · ")
     }
 }
 
@@ -83,7 +94,7 @@ struct LineRow: View {
     var body: some View {
         HStack(spacing: 12) {
             LineBadge(line: line.id)
-            Text(line.title).font(.system(size: 13, weight: .semibold)).lineLimit(2)
+            Text(line.shown).font(.system(size: 13, weight: .semibold)).lineLimit(2)
             Spacer()
         }
         .padding(.horizontal, 12)
@@ -119,9 +130,10 @@ struct AlertCard: View {
 
     private var meta: String {
         let date = Self.day.string(from: alert.date)
-        if alert.strike { return "STRIKE · posted \(date) · tap to read" }
-        if alert.lines.isEmpty { return "\(date) · whole network · tap to read" }
+        if alert.strike { return String(localized: "STRIKE · posted \(date) · tap to read") }
+        if alert.lines.isEmpty { return String(localized: "\(date) · whole network · tap to read") }
         let ls = alert.lines.sorted()
-        return "\(date) · \(ls.count == 1 ? "Line" : "Lines") \(ls.prefix(6).joined(separator: ", ")) · tap to read"
+        let list = ls.prefix(6).joined(separator: ", ")
+        return ls.count == 1 ? String(localized: "\(date) · Line \(list) · tap to read") : String(localized: "\(date) · Lines \(list) · tap to read")
     }
 }

@@ -35,11 +35,11 @@ struct LineContent: View {
                     ForEach(model.alerts(for: [currentLine])) { AlertCard(alert: $0) }
                     let rows = model.approaching
                     if rows.isEmpty {
-                        Text(model.lineStop == nil ? "Choose a stop to see approaching buses." : "No bus is heading to this stop right now.")
+                        Text(model.lineStop == nil ? String(localized: "Choose a stop to see approaching buses.") : String(localized: "No bus is heading to this stop right now."))
                             .font(.system(size: 12)).foregroundStyle(.secondary).padding(.top, 20)
                     }
                     ForEach(Array(rows.enumerated()), id: \.element.id) { i, a in
-                        ArrivalCard(item: a).appearing(i)
+                        ArrivalCard(item: a, watching: model.watches[a.vehicle.id]?.stops) { model.watch(a.vehicle.id, stops: $0) }.appearing(i)
                     }
                 }
             }
@@ -54,7 +54,7 @@ struct LineContent: View {
                         ForEach(Array(v.stops.enumerated()), id: \.offset) { i, sid in
                             let buses = model.vehicles.filter { $0.variant == vid && $0.nextStopID == sid }
                             ForEach(buses) { b in RouteBusRow(id: b.id) }
-                            RouteStopRow(name: d.stops[sid]?.name ?? sid, id: sid, selected: sid == model.lineStop,
+                            RouteStopRow(name: Names.place(d.stops[sid]?.name ?? sid, ""), id: sid, selected: sid == model.lineStop,
                                          first: i == 0, last: i == v.stops.count - 1)
                                 .id(sid)
                                 .onTapGesture { model.lineStop = sid; Task { await model.refreshLine(currentLine) } }
@@ -104,12 +104,14 @@ struct LineContent: View {
 /// An approaching bus: time (rolling), stops away, bus number and trip, delay.
 struct ArrivalCard: View {
     let item: Approaching
+    var watching: Int? = nil
+    var onWatch: (Int?) -> Void = { _ in }
 
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(time).font(Style.rounded(20)).contentTransition(.numericText(countsDown: true))
-                Text(item.stopsAway == 0 ? "next stop" : item.stopsAway == 1 ? "1 stop away" : "\(item.stopsAway) stops away")
+                Text(item.stopsAway == 0 ? String(localized: "next stop") : item.stopsAway == 1 ? String(localized: "1 stop away") : String(localized: "\(item.stopsAway) stops away"))
                     .font(.system(size: 11)).foregroundStyle(.secondary)
             }
             .frame(width: 112, alignment: .leading)
@@ -118,8 +120,19 @@ struct ArrivalCard: View {
                     Text("Bus \(item.vehicle.id)").font(.system(size: 13, weight: .semibold))
                     Spacer()
                     Text(delay.0).font(.system(size: 12, weight: .semibold)).foregroundStyle(delay.1)
+                    // 🔔: notify me when this bus is N stops from my stop
+                    Menu {
+                        Text("Notify me when this bus is…")
+                        ForEach(Model.watchChoices, id: \.self) { n in
+                            Button(n == 1 ? String(localized: "1 stop away") : String(localized: "\(n) stops away")) { onWatch(n) }
+                        }
+                        if watching != nil { Button("Don't Notify Me", role: .destructive) { onWatch(nil) } }
+                    } label: {
+                        Image(systemName: watching != nil ? "bell.fill" : "bell")
+                            .foregroundStyle(watching != nil ? Color.orange : Color.secondary)
+                    }
                 }
-                Text(item.vehicle.tripLabel ?? "Trip unavailable").font(.system(size: 12)).foregroundStyle(.secondary).lineLimit(1)
+                Text(item.vehicle.tripLabel.map { Names.place($0, "") } ?? String(localized: "Trip unavailable")).font(.system(size: 12)).foregroundStyle(.secondary).lineLimit(1)
             }
         }
         .padding(.horizontal, 14)
@@ -129,12 +142,12 @@ struct ArrivalCard: View {
     }
 
     private var time: String {
-        item.seconds < 20 ? "Due" : "\(Int(item.seconds) / 60) min" + (item.official ? "" : " ~")
+        item.seconds < 20 ? String(localized: "Due") : String(localized: "\(Int(item.seconds) / 60) min") + (item.official ? "" : " ~")
     }
 
     private var delay: (String, Color) {
         guard let d = item.vehicle.delaySeconds else { return ("", .secondary) }
-        if abs(d) < 60 { return ("On time", .green) }
+        if abs(d) < 60 { return (String(localized: "On time"), .green) }
         return ("\(d > 0 ? "+" : "")\(d / 60) min", d > 0 ? .orange : .blue)
     }
 }
@@ -206,7 +219,7 @@ struct TimetableList: View {
                             }
                             ForEach(Array(tt.enumerated()), id: \.offset) { vi, v in
                                 let ends = v.name.components(separatedBy: " - ")
-                                if vi > 0 { header("Also: \(v.name)") }
+                                if vi > 0 { header(String(localized: "Also: \(Names.place(v.name, v.nameEnglish))")) }
                                 section(v.go, from: ends.first ?? v.name, key: "\(vi)g")
                                 section(v.come, from: ends.last ?? v.name, key: "\(vi)c")
                             }
@@ -230,7 +243,7 @@ struct TimetableList: View {
         if !times.isEmpty {
             let now = Date()
             let next = times.first { $0 >= now }
-            header("From \(place)  ·  \(times.filter { $0 >= now }.count) more today")
+            header(String(localized: "From \(Names.place(place, ""))  ·  \(times.filter { $0 >= now }.count) more today"))
             let rows = stride(from: 0, to: times.count, by: 5).map { Array(times[$0..<min($0 + 5, times.count)]) }
             ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
                 HStack(spacing: 0) {

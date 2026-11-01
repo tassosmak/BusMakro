@@ -38,6 +38,10 @@ final class Model: NSObject, CLLocationManagerDelegate {
     var timetable: (line: String, variants: [Timetable])?
     var stopIndex: StopIndex?
     var alerts: [ServiceAlert] = []
+    var watches: [String: BusWatch] = [:]
+    var showWelcome = !UserDefaults.standard.bool(forKey: "onboarded")
+    var showSettings = false
+    var watchTask: Task<Void, Never>?
     private var lineCodes: [String: [(code: String, name: String, nameEnglish: String)]]?
 
     private let oasa = OASAClient(), transit = TransitClient()
@@ -99,6 +103,7 @@ final class Model: NSObject, CLLocationManagerDelegate {
         Model.saveStops(recents, "recents")
         do {
             stopLines = try await oasa.stopLines(stopID: stop.id)
+            Task { [oasa, stopLines] in await oasa.observe(stop: stop.id, lines: stopLines ?? []) }  // learn (History)
             await addSchedules(stop: stop.id)
         } catch {
             self.error = error.localizedDescription
@@ -146,7 +151,10 @@ final class Model: NSObject, CLLocationManagerDelegate {
     }
 
     func refreshLine(_ id: String) async {
-        if let live = try? await transit.live(line: id) { vehicles = live.vehicles }
+        if let live = try? await transit.live(line: id) {
+            vehicles = live.vehicles
+            checkWatches(line: id, vehicles: live.vehicles)
+        }
         if let s = lineStop { official = await oasa.predictions(stopID: s) }
     }
 
@@ -210,6 +218,11 @@ final class Model: NSObject, CLLocationManagerDelegate {
         return LineMath.approaching(s, detail: d, live: vehicles, official: official)
     }
 
+    func clearRecents() {
+        recents = []
+        Model.saveStops([], "recents")
+    }
+
     func isFavourite(_ s: Stop) -> Bool { favourites.contains { $0.id == s.id } }
 
     func toggleFavourite(_ s: Stop) {
@@ -234,13 +247,28 @@ final class Model: NSObject, CLLocationManagerDelegate {
         }
     }
 
-    private static func saveStops(_ stops: [Stop], _ key: String) {
+    static func saveStops(_ stops: [Stop], _ key: String) {
         UserDefaults.standard.set(stops.map { ["id": $0.id, "name": $0.name, "name_en": $0.nameEnglish,
                                                "street": $0.street, "lat": $0.latitude, "lon": $0.longitude] }, forKey: key)
     }
 }
 
 extension Stop {
-    /// English name when there is one (the Mac app also transliterates; that comes later).
-    var title: String { nameEnglish.isEmpty ? name : nameEnglish }
+    var title: String { Names.place(name, nameEnglish) }
+}
+
+/// Place and line names in the app's language: Greek as-is, or OASA's English name, else a
+/// standard (ELOT 743) transliteration (as the Mac app's i18n.name).
+enum Names {
+    static var greek: Bool { Bundle.main.preferredLocalizations.first == "el" }
+
+    static func place(_ greekName: String, _ english: String?) -> String {
+        if greek { return greekName.isEmpty ? (english ?? "") : greekName }
+        let e = (english ?? "").trimmingCharacters(in: .whitespaces)
+        return e.isEmpty ? Translit.latin(greekName) : e
+    }
+}
+
+extension LineSummary {
+    var shown: String { Names.place(name, nameEnglish) }
 }
