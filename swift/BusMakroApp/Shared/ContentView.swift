@@ -6,6 +6,7 @@ import SwiftUI
 /// recent-stop chips at the top, round map buttons on the right, and the glass panel at the bottom.
 struct ContentView: View {
     @State private var model = Model()
+    @State private var links = Links.shared
     @State private var sheetHeight: CGFloat = 360
     @State private var fittedLine: String?
     @State private var menuOpen = false
@@ -57,9 +58,23 @@ struct ContentView: View {
             }
         }
         .task {
+            #if os(iOS)
+            QuickActions.update(favourites: model.favourites)
+            #endif
+            if let link = links.pending { links.pending = nil; Task { await model.follow(link) } }  // launched from a quick action
             await model.start()
             await model.loadStops(near: CLLocationCoordinate2D(latitude: 37.9755, longitude: 23.7348))  // until a fix arrives
         }
+        .onOpenURL { url in if let link = AppLink(url: url) { links.pending = link } }
+        .onChange(of: links.pending) {
+            guard let link = links.pending else { return }
+            links.pending = nil
+            menuOpen = false
+            Task { await model.follow(link) }
+        }
+        #if os(iOS)
+        .onChange(of: model.favourites) { QuickActions.update(favourites: model.favourites) }
+        #endif
         .onChange(of: model.variantID) {
             // a line opened: show its whole route, like the Mac app's fit on the stops
             // once per line: refreshes can re-pick the variant, and must not pull the map away from where you zoomed
@@ -166,6 +181,8 @@ struct ContentView: View {
                                 .frame(width: sel ? 15 : 10, height: sel ? 15 : 10)
                                 .overlay(Circle().stroke(.white, lineWidth: sel ? 3 : 2))
                                 .onTapGesture { model.lineStop = sid }
+                                .accessibilityLabel(st.name)
+                                .accessibilityAddTraits(sel ? [.isButton, .isSelected] : .isButton)
                         }
                     }
                 }
@@ -174,6 +191,9 @@ struct ContentView: View {
                         BusMarker(bearing: b.bearing, faded: (b.positionAt.map { Date().timeIntervalSince($0) > 120 } ?? false),
                                   pinned: model.pinned == b.id, fix: b.positionAt)
                             .onTapGesture { model.pinned = model.pinned == b.id ? nil : b.id }
+                            .accessibilityLabel(Text("Bus \(b.id)"))
+                            .accessibilityHint(model.pinned == b.id ? Text("Stop following") : Text("Follow this bus"))
+                            .accessibilityAddTraits(.isButton)
                     }
                 }
             }
@@ -183,6 +203,8 @@ struct ContentView: View {
                     Annotation("", coordinate: model.drawn[b.vehicle.id] ?? CLLocationCoordinate2D(latitude: b.vehicle.latitude, longitude: b.vehicle.longitude)) {
                         BusMarker(bearing: b.vehicle.bearing, label: b.line, fix: b.vehicle.positionAt)
                             .onTapGesture { model.pendingPin = b.vehicle.id; model.openLine(b.line, at: stop) }
+                            .accessibilityLabel(Text("Line \(b.line) bus"))
+                            .accessibilityAddTraits(.isButton)
                     }
                 }
             }
@@ -190,6 +212,8 @@ struct ContentView: View {
                 Annotation("", coordinate: CLLocationCoordinate2D(latitude: stop.latitude, longitude: stop.longitude)) {
                     let selected = model.screen == .stop(stop)
                     StopPin(selected: selected).onTapGesture { model.open(stop) }
+                        .accessibilityLabel(Text("Stop \(stop.title)"))
+                        .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
                 }
             }
         }
@@ -234,6 +258,7 @@ struct BusMarker: View {
     /// The GPS fix time: a new one sends a ring rippling out (the Mac app's ping).
     var fix: Date? = nil
     @State private var ripple = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         ZStack {
@@ -259,6 +284,7 @@ struct BusMarker: View {
         .animation(.easeInOut(duration: 1.5), value: bearing)
         .onChange(of: fix) {
             ripple = false
+            guard !reduceMotion else { return }
             withAnimation(.easeOut(duration: 1.2)) { ripple = true }
         }
     }

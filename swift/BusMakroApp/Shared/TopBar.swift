@@ -20,14 +20,14 @@ struct TopBar: View {
                 Button(action: onMenu) {
                     Image(systemName: "line.3.horizontal").font(.system(size: 16, weight: .medium))
                         .foregroundStyle(.primary).frame(width: 28, height: Style.barHeight).contentShape(Rectangle())
-                }.buttonStyle(.plain)
+                }.buttonStyle(.plain).accessibilityLabel("Menu")
                 TextField("Search stops or lines", text: $text)
                     .textFieldStyle(.plain)
                     .font(.system(size: 13))
                     .focused($focused)
                     .onSubmit { focused = false }
                     .onChange(of: focused) { if focused { searching = true } else if text.isEmpty { searching = false } }
-                    .onChange(of: searching) { if !searching { focused = false } }  // a result was chosen: close the keyboard
+                    .onChange(of: searching) { focused = searching }  // a result was chosen: close the keyboard; a Search link: open it
             }
             .padding(.leading, 8).padding(.trailing, 14)
             .frame(height: Style.barHeight)

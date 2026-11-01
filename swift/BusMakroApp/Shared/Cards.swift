@@ -150,6 +150,7 @@ struct AlertCard: View {
 struct PulseDot: View {
     var fast = false
     @State private var on = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         ZStack {
@@ -159,7 +160,9 @@ struct PulseDot: View {
                 .overlay(Circle().stroke(.white, lineWidth: 1.5))
         }
         .frame(width: 10, height: 10)
+        .accessibilityHidden(true)
         .onAppear {
+            guard !reduceMotion else { return }  // Reduce Motion: a still dot
             withAnimation(.easeOut(duration: fast ? 1.1 : 2).repeatCount(fast ? 10_000 : 3, autoreverses: false)) { on = true }
         }
     }

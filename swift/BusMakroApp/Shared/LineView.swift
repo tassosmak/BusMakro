@@ -77,6 +77,7 @@ struct LineContent: View {
                                          first: i == 0, last: i == v.stops.count - 1)
                                 .id(sid)
                                 .onTapGesture { model.lineStop = sid; Task { await model.refreshLine(currentLine) } }
+                                .accessibilityAddTraits(.isButton)
                         }
                     }
                 }

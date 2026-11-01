@@ -21,6 +21,9 @@ targets:
         CFBundleAllowMixedLocalizations: true
         NSLocationWhenInUseUsageDescription: BusMakro uses your location to show the bus stops near you.
         UILaunchScreen: {}
+        CFBundleURLTypes:  # busmakro://stop/ID, busmakro://line/ID (quick actions, Siri, Spotlight, Live Activity)
+          - CFBundleURLName: com.tassosmak.busmakro
+            CFBundleURLSchemes: [busmakro]
         UISupportedInterfaceOrientations~iphone: [UIInterfaceOrientationPortrait]  # portrait only on iPhone
     settings:
       base:

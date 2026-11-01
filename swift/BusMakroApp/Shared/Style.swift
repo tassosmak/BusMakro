@@ -64,7 +64,7 @@ extension View {
 /// A round glass button with an SF Symbol (float_button in widgets.py).
 struct RoundButton: View {
     let symbol: String
-    var help = ""
+    var help: LocalizedStringKey = ""
     let action: () -> Void
 
     var body: some View {
@@ -77,6 +77,7 @@ struct RoundButton: View {
         .buttonStyle(.plain)
         .glass(Circle())
         .help(help)
+        .accessibilityLabel(help)  // VoiceOver reads the name, not the symbol
     }
 }
 

@@ -99,3 +99,9 @@
 "Metro Map" = "Χάρτης μετρό";
 "Data: OASA · athens-transit-rt. Unofficial app, not affiliated with OASA or STASY." = "Δεδομένα: ΟΑΣΑ · athens-transit-rt. Ανεπίσημη εφαρμογή, χωρίς σχέση με τον ΟΑΣΑ ή τη ΣΤΑΣΥ.";
 "Map: STASY S.A." = "Χάρτης: ΣΤΑΣΥ Α.Ε.";
+"Search" = "Αναζήτηση";
+"Menu" = "Μενού";
+"Bus %@" = "Λεωφορείο %@";
+"Stop following" = "Διακοπή παρακολούθησης";
+"Follow this bus" = "Παρακολούθηση αυτού του λεωφορείου";
+"Line %@ bus" = "Λεωφορείο της γραμμής %@";
