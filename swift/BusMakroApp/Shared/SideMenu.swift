@@ -6,6 +6,7 @@ struct SideMenu: View {
     @Binding var open: Bool
     var onMetroMap: () -> Void
     var onSettings: () -> Void
+    var onDebug: () -> Void = {}
     @State private var dragX: CGFloat = 0
     private let width: CGFloat = 290
 
@@ -35,6 +36,9 @@ struct SideMenu: View {
                 VStack(spacing: 4) {
                     row("tram.fill", "Metro Map") { close(); onMetroMap() }
                     row("gearshape.fill", "Settings") { close(); onSettings() }
+                    #if DEBUG
+                    row("ladybug.fill", "Debug") { close(); onDebug() }
+                    #endif
                 }
                 .padding(.top, 14)
                 Spacer()
