@@ -8,7 +8,7 @@ import Network
 /// The app's state, mirroring the Mac app: home (nearby stops / favourites) → a stop's lines.
 @MainActor @Observable
 final class Model: NSObject, CLLocationManagerDelegate {
-    enum Screen: Equatable { case home, stop(Stop), line(String, Stop?) }
+    enum Screen: Equatable { case home, stop(Stop), line(String, Stop?), station(String) }
     enum LineTab: Hashable { case arrivals, route, nearby, timetable }
     enum HomeTab: Hashable { case nearby, favourites }
 
@@ -87,6 +87,7 @@ final class Model: NSObject, CLLocationManagerDelegate {
             if homeTab == .favourites { await loadFavourites() }
         case .stop(let s): await loadStopLines(s)
         case .line(let id, _): await refreshLine(id)
+        case .station: break  // timetable only, nothing to fetch
         }
     }
 

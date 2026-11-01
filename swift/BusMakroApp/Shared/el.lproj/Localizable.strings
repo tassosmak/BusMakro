@@ -120,3 +120,10 @@
 "Search Stops and Lines" = "Αναζήτηση στάσεων και γραμμών";
 "Next Buses" = "Επόμενα λεωφορεία";
 "Bus stop %@" = "Στάση λεωφορείου %@";
+"METRO AND TRAM" = "ΜΕΤΡΟ ΚΑΙ ΤΡΑΜ";
+"Metro and Tram" = "Μετρό και τραμ";
+"No more trains today." = "Δεν υπάρχουν άλλα δρομολόγια σήμερα.";
+"Scheduled times from STASY's timetable: trains have no live data." = "Προγραμματισμένες ώρες από τα δρομολόγια της ΣΤΑΣΥ: για τους συρμούς δεν υπάρχουν ζωντανά δεδομένα.";
+"Station %@" = "Σταθμός %@";
+"→ %@" = "→ %@";
+"Now" = "Τώρα";

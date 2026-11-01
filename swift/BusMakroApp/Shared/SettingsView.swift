@@ -7,6 +7,7 @@ struct SettingsView: View {
     @AppStorage("mapStyle") private var mapStyle = "system"
     @AppStorage("showRecents") private var showRecents = true
     @AppStorage("map3D") private var map3D = false
+    @AppStorage("showRail") private var showRail = true
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
 
@@ -28,6 +29,7 @@ struct SettingsView: View {
                         Text("Dark").tag("dark")
                     }
                     Toggle("3D Buildings", isOn: $map3D)
+                    Toggle("Metro and Tram", isOn: $showRail)
                 }
                 Section {
                     Button("Show Welcome") { dismiss(); model.showWelcome = true }

@@ -80,6 +80,9 @@ struct Sheet: View {
             if case .stop = model.screen {
                 Button { withAnimation { model.screen = .home } } label: { Label("Back", systemImage: "chevron.left") }
             }
+            if case .station = model.screen {
+                Button { withAnimation { model.screen = .home } } label: { Label("Back", systemImage: "chevron.left") }
+            }
             if case .line = model.screen {
                 Button { withAnimation { model.closeLine() } } label: { Label("Back", systemImage: "chevron.left") }
             }
@@ -130,6 +133,8 @@ struct Sheet: View {
                  ? String(localized: "Finding stops near you…") : String(localized: "No favourite stops yet. Tap ☆ on a stop to add it."))
         case .line:
             LineContent(model: model)
+        case .station(let id):
+            StationContent(model: model, id: id)
         case .stop(let stop):
             Text(String(localized: "\(stop.title) · Stop \(stop.id)").uppercased())
                 .font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary)

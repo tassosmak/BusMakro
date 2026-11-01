@@ -15,6 +15,21 @@ struct SearchResults: View {
                     Button { close(); withAnimation { model.openLine(l.id, at: nil) } } label: { LineRow(line: l) }
                         .buttonStyle(.plain).appearing(i)
                 }
+                let stations = model.stationResults
+                if !stations.isEmpty { sectionTitle("METRO AND TRAM") }
+                ForEach(Array(stations.enumerated()), id: \.element.id) { i, r in
+                    Button { close(); withAnimation { model.openStation(r.id) } } label: {
+                        HStack(spacing: 10) {
+                            StationPin(station: r.station)
+                            Text(r.station.shown).font(.system(size: 13, weight: .semibold))
+                            Spacer()
+                            ForEach(r.station.lines, id: \.self) { RailBadge(line: $0, small: true) }
+                        }
+                        .padding(10)
+                        .background(.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: Style.cardRadius))
+                    }
+                    .buttonStyle(.plain).appearing(lines.count + i)
+                }
                 if model.stopIndex == nil {
                     Text("Preparing stop search…").font(.system(size: 12)).foregroundStyle(.secondary).padding(.top, 12)
                 } else if !stops.isEmpty {
@@ -27,7 +42,7 @@ struct SearchResults: View {
                     }
                     .buttonStyle(.plain).appearing(lines.count + i)
                 }
-                if lines.isEmpty && stops.isEmpty && model.stopIndex != nil {
+                if lines.isEmpty && stops.isEmpty && stations.isEmpty && model.stopIndex != nil {
                     Text("No results for \"\(model.searchText)\"").font(.system(size: 12)).foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity).padding(.vertical, 20)
                 }

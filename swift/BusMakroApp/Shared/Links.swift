@@ -10,7 +10,7 @@ import UIKit
 /// the Live Activity, and busmakro:// links. Each becomes an `AppLink`, which ContentView hands
 /// to the model once it is ready.
 enum AppLink: Equatable {
-    case stop(String), line(String), search, favourites, nearby
+    case stop(String), line(String), station(String), search, favourites, nearby
 
     /// busmakro://stop/400022 · busmakro://line/040 · busmakro://search · busmakro://favourites
     init?(url: URL) {
@@ -19,6 +19,7 @@ enum AppLink: Equatable {
         switch host {
         case "stop" where !arg.isEmpty: self = .stop(arg)
         case "line" where !arg.isEmpty: self = .line(arg)
+        case "station" where !arg.isEmpty: self = .station(arg)
         case "search": self = .search
         case "favourites": self = .favourites
         case "nearby": self = .nearby
@@ -30,6 +31,7 @@ enum AppLink: Equatable {
         switch self {
         case .stop(let id): URL(string: "busmakro://stop/\(id)")!
         case .line(let id): URL(string: "busmakro://line/\(id)")!
+        case .station(let id): URL(string: "busmakro://station/\(id)")!
         case .search: URL(string: "busmakro://search")!
         case .favourites: URL(string: "busmakro://favourites")!
         case .nearby: URL(string: "busmakro://nearby")!
@@ -64,6 +66,8 @@ extension Model {
         case .line(let id):
             searchActive = false
             openLine(id, at: nil)
+        case .station(let id):
+            openStation(id)
         case .search:
             screen = .home
             searchActive = true

@@ -18,6 +18,7 @@ struct ContentView: View {
     @AppStorage("mapStyle") private var mapStyle = "system"
     @AppStorage("showRecents") private var showRecents = true
     @AppStorage("map3D") private var map3D = false
+    @AppStorage("showRail") private var showRail = true
     @State private var camera: MapCameraPosition = .region(MKCoordinateRegion(
         center: CLLocationCoordinate2D(latitude: 37.9755, longitude: 23.7348),  // Syntagma
         span: MKCoordinateSpan(latitudeDelta: 0.012, longitudeDelta: 0.012)))
@@ -197,6 +198,13 @@ struct ContentView: View {
                     }
                 }
             }
+            if let rail = Rail.shared, showRail || isStation {
+                switch model.screen {
+                case .home, .station:
+                    RailMapLayer(rail: rail, selected: selectedStation) { id in withAnimation { model.openStation(id) } }
+                default: EmptyMapContent()
+                }
+            }
             ForEach(shownStops) { stop in
                 Annotation("", coordinate: CLLocationCoordinate2D(latitude: stop.latitude, longitude: stop.longitude)) {
                     let selected = model.screen == .stop(stop)
@@ -218,11 +226,14 @@ struct ContentView: View {
         .ignoresSafeArea()
     }
 
+    private var isStation: Bool { if case .station = model.screen { true } else { false } }
+    private var selectedStation: String? { if case .station(let id) = model.screen { id } else { nil } }
+
     private var shownStops: [Stop] {
         switch model.screen {
         case .home: return model.homeTab == .nearby ? model.stops : model.favourites
         case .stop(let s): return [s]
-        case .line: return []
+        case .line, .station: return []
         }
     }
 
