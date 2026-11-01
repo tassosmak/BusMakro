@@ -23,7 +23,7 @@ struct Sheet: View {
         .frame(maxWidth: 480)
         // what doesn't fit stays inside the panel (dragged small, the tabs and list were drawn below it)
         .clipShape(RoundedRectangle(cornerRadius: Style.sheetRadius))
-        .glass(RoundedRectangle(cornerRadius: Style.sheetRadius))
+        .panelGlass(RoundedRectangle(cornerRadius: Style.sheetRadius))
     }
 
     // Drag the handle to resize; it snaps to the nearest of strip / normal / full.

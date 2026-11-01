@@ -25,6 +25,17 @@ struct CardBackground: ViewModifier {
     }
 }
 
+/// The panel's glass: a material (it animates smoothly while the panel resizes; Liquid Glass
+/// flashed dark on every frame of the minimize animation).
+struct PanelGlass<S: Shape>: ViewModifier {
+    let shape: S
+    func body(content: Content) -> some View {
+        content
+            .background(.ultraThinMaterial, in: shape)
+            .overlay(shape.stroke(.separator, lineWidth: 0.5))
+    }
+}
+
 /// The app's glass (glass() in widgets.py): thin material, rounded, with a separator-coloured hairline.
 struct Glass<S: Shape>: ViewModifier {
     let shape: S
@@ -43,6 +54,7 @@ struct Glass<S: Shape>: ViewModifier {
 extension View {
     func card() -> some View { modifier(CardBackground()) }
     func glass<S: Shape>(_ shape: S) -> some View { modifier(Glass(shape: shape)) }
+    func panelGlass<S: Shape>(_ shape: S) -> some View { modifier(PanelGlass(shape: shape)) }
 }
 
 /// A round glass button with an SF Symbol (float_button in widgets.py).

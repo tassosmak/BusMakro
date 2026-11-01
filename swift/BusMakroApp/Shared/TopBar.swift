@@ -23,16 +23,16 @@ struct TopBar: View {
                     .focused($focused)
                     .onSubmit { focused = false }
                     .onChange(of: focused) { if focused { searching = true } else if text.isEmpty { searching = false } }
-                if expanded {  // ✕ ends the search (clears it and closes the keyboard)
-                    Button { text = ""; focused = false; searching = false } label: {
-                        Image(systemName: "xmark.circle.fill").foregroundStyle(.tertiary)
-                    }.buttonStyle(.plain)
-                }
             }
             .padding(.horizontal, 14)
             .frame(height: Style.barHeight)
             .glass(Capsule())
-            if !expanded {
+            if expanded {
+                // ✕ ends the search: a full round button beside the field (a small ✕ inside the field
+                // lost its taps to the text field)
+                RoundButton(symbol: "xmark", help: "Close") { text = ""; focused = false; searching = false }
+                    .transition(.opacity.combined(with: .scale(scale: 0.6)))
+            } else {
                 RoundButton(symbol: "arrow.clockwise", help: "Refresh", action: onRefresh)
                     .transition(.opacity.combined(with: .scale(scale: 0.6)))
                 RoundButton(symbol: "gearshape", help: "Settings", action: onSettings)
