@@ -7,6 +7,7 @@ import SwiftUI
 struct ContentView: View {
     @State private var model = Model()
     @State private var sheetHeight: CGFloat = 360
+    @State private var fittedLine: String?
     @AppStorage("mapStyle") private var mapStyle = "system"
     @AppStorage("showRecents") private var showRecents = true
     @State private var camera: MapCameraPosition = .region(MKCoordinateRegion(
@@ -21,7 +22,7 @@ struct ContentView: View {
                     TopBar(text: $model.searchText, onRefresh: { Task { await refresh() } },
                            onSettings: { model.showSettings = true })
                     if model.screen == .home && !model.recents.isEmpty && model.searchText.isEmpty && showRecents {
-                        RecentChips(stops: model.recents.map(\.title)) { i in Task { await model.open(model.recents[i]) } }
+                        RecentChips(stops: model.recents.map(\.title)) { i in model.open(model.recents[i]) }
                     }
                     Spacer()
                     HStack {
@@ -55,8 +56,10 @@ struct ContentView: View {
         }
         .onChange(of: model.variantID) {
             // a line opened: show its whole route, like the Mac app's fit on the stops
-            guard case .line = model.screen, let d = model.lineDetail, let vid = model.variantID,
-                  let shape = d.variants[vid]?.shape, !shape.isEmpty else { return }
+            // once per line: refreshes can re-pick the variant, and must not pull the map away from where you zoomed
+            guard case .line(let lineID, _) = model.screen, fittedLine != lineID, let d = model.lineDetail,
+                  let vid = model.variantID, let shape = d.variants[vid]?.shape, !shape.isEmpty else { return }
+            fittedLine = lineID
             let lats = shape.map { $0[0] }, lons = shape.map { $0[1] }
             let center = CLLocationCoordinate2D(latitude: (lats.min()! + lats.max()!) / 2, longitude: (lons.min()! + lons.max()!) / 2)
             // extra room south for the panel, which covers the lower part of the map
@@ -65,10 +68,11 @@ struct ContentView: View {
                 center: CLLocationCoordinate2D(latitude: center.latitude - span.latitudeDelta * 0.2, longitude: center.longitude), span: span)) }
         }
         .onChange(of: model.userLocation?.latitude) {
-            // first fix: centre on you and list the stops around you (the map's own move reloads them too)
-            guard let c = model.userLocation, model.screen == .home else { return }
+            // first fix only: centre on you and list the stops around you (later fixes don't move the map)
+            guard let c = model.userLocation, model.screen == .home, !model.centredOnUser else { return }
+            model.centredOnUser = true
             withAnimation { camera = .region(MKCoordinateRegion(center: c, span: MKCoordinateSpan(latitudeDelta: 0.008, longitudeDelta: 0.008))) }
-            Task { await model.loadStops(near: c) }
+            Task { await model.loadStops(near: c, force: true) }
         }
     }
 
@@ -105,14 +109,14 @@ struct ContentView: View {
                         .frame(width: selected ? 15 : 12, height: selected ? 15 : 12)
                         .overlay(Circle().stroke(.white, lineWidth: selected ? 3 : 2))
                         .shadow(color: .black.opacity(0.3), radius: 2, y: 1)
-                        .onTapGesture { Task { await model.open(stop) } }
+                        .onTapGesture { model.open(stop) }
                 }
             }
         }
         .mapStyle(.standard(pointsOfInterest: .excludingAll))
         .mapControls { }  // no zoom or compass buttons, like the Mac app
         .onMapCameraChange(frequency: .onEnd) { ctx in
-            if model.screen == .home { Task { await model.loadStops(near: ctx.region.center) } }
+            if model.screen == .home { fittedLine = nil; Task { await model.loadStops(near: ctx.region.center) } }
         }
         .ignoresSafeArea()
     }
@@ -131,7 +135,7 @@ struct ContentView: View {
     }
 
     private func refresh() async {
-        if case .stop(let s) = model.screen { await model.open(s) }
+        if case .stop(let s) = model.screen { await model.loadStopLines(s) }
     }
 }
 

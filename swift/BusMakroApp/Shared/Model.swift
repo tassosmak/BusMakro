@@ -21,6 +21,8 @@ final class Model: NSObject, CLLocationManagerDelegate {
     var userLocation: CLLocationCoordinate2D?
     var error: String?
     var searchText = ""
+    private var stopsOrigin: CLLocationCoordinate2D?
+    var centredOnUser = false
     // line view
     var lineTab: LineTab = .arrivals
     var lineDetail: LineDetail?
@@ -82,9 +84,18 @@ final class Model: NSObject, CLLocationManagerDelegate {
     }
 
     // MARK: Stops
-    func loadStops(near c: CLLocationCoordinate2D) async {
+    /// Stops near a point. Like the Mac app: only after the map moved at least 400 m (so the list
+    /// doesn't change under your finger), nearest first, and left alone when nothing changed.
+    func loadStops(near c: CLLocationCoordinate2D, force: Bool = false) async {
+        if !force, let o = stopsOrigin, Geo.distance(o.latitude, o.longitude, c.latitude, c.longitude) < 400 { return }
+        stopsOrigin = c
         do {
-            stops = try await oasa.closestStops(latitude: c.latitude, longitude: c.longitude)
+            let found = try await oasa.closestStops(latitude: c.latitude, longitude: c.longitude)
+            let ref = userLocation ?? c
+            let sorted = found.sorted {
+                Geo.distance(ref.latitude, ref.longitude, $0.latitude, $0.longitude) < Geo.distance(ref.latitude, ref.longitude, $1.latitude, $1.longitude)
+            }
+            if sorted.map(\.id) != stops.map(\.id) { stops = sorted }
             error = nil
         } catch { self.error = error.localizedDescription }
     }
@@ -94,12 +105,17 @@ final class Model: NSObject, CLLocationManagerDelegate {
         userLocation.map { Geo.distance($0.latitude, $0.longitude, s.latitude, s.longitude) }
     }
 
-    func open(_ stop: Stop) async {
+    /// Show a stop at once (the tap must feel instant), then load its lines.
+    func open(_ stop: Stop) {
         screen = .stop(stop)
         stopLines = nil
         recents = [stop] + recents.filter { $0.id != stop.id }
         recents = Array(recents.prefix(6))
         Model.saveStops(recents, "recents")
+        Task { await loadStopLines(stop) }
+    }
+
+    func loadStopLines(_ stop: Stop) async {
         do {
             stopLines = try await oasa.stopLines(stopID: stop.id)
             Task { [oasa, stopLines] in await oasa.observe(stop: stop.id, lines: stopLines ?? []) }  // learn (History)

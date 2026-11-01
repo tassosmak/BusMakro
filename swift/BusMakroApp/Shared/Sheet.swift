@@ -100,7 +100,7 @@ struct Sheet: View {
                     sectionTitle("STOPS")
                 }
                 ForEach(Array(stops.enumerated()), id: \.element.stop.id) { i, r in
-                    Button { model.searchText = ""; Task { await model.open(r.stop) } } label: {
+                    Button { model.searchText = ""; model.open(r.stop) } label: {
                         StopCard(stop: r.stop, metres: model.distance(to: r.stop),
                                  subtitle: String(localized: "Lines \(r.lines.prefix(8).joined(separator: ", "))"))
                     }
@@ -162,8 +162,8 @@ struct Sheet: View {
                     Text(empty).font(.system(size: 12)).foregroundStyle(.secondary).padding(.top, 20)
                 }
                 ForEach(Array(stops.enumerated()), id: \.element.id) { i, stop in
-                    Button { Task { await model.open(stop) } } label: {
-                        StopCard(stop: stop, metres: model.distance(to: stop), closest: i == 0 && model.userLocation != nil)
+                    Button { model.open(stop) } label: {
+                        StopCard(stop: stop, metres: model.distance(to: stop), closest: i == 0 && (model.distance(to: stop) ?? .infinity) < 500)  // only when the list is around you
                     }
                     .buttonStyle(.plain)
                     .appearing(i)
