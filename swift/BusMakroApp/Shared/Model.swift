@@ -22,6 +22,8 @@ final class Model: NSObject, CLLocationManagerDelegate {
     var userLocation: CLLocationCoordinate2D?
     var error: String?
     var searchText = ""
+    /// The search field is open (focused or holding text): results drop down under it, the panel hides.
+    var searchActive = false
     private var stopsOrigin: CLLocationCoordinate2D?
     var centredOnUser = false
     // line view

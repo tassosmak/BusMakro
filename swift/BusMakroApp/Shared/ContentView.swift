@@ -24,29 +24,15 @@ struct ContentView: View {
             ZStack(alignment: .bottom) {
                 map
                 VStack(spacing: 8) {
-                    // the top bar slides away as the panel goes down to the strip (the Mac app's map focus)
-                    VStack(spacing: 8) {
-                        TopBar(text: $model.searchText, onRefresh: { Task { await refresh() } },
-                               onMenu: { menuOpen = true })
-                        if model.screen == .home && !model.recents.isEmpty && model.searchText.isEmpty && showRecents {
-                            RecentChips(stops: model.recents.map(\.title)) { i in model.open(model.recents[i]) }
-                        }
-                    }
-                    .opacity(barShown)
-                    .offset(y: (barShown - 1) * 40)
-                    .allowsHitTesting(barShown > 0.5)
+                    topArea
                     Spacer()
-                    HStack {
-                        Spacer()
-                        VStack(spacing: 10) {
-                            RoundButton(symbol: sheetHeight <= 66 ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right",
-                                        help: "Expand the map") {
-                                withAnimation(.spring(response: 0.36, dampingFraction: 1)) { sheetHeight = sheetHeight <= 66 ? 360 : 66 }
-                            }
-                            RoundButton(symbol: "location", help: "Locate Me") { locate() }
-                        }
-                    }
+                    mapButtons
                     Sheet(model: model, height: $sheetHeight, range: 66...(geo.size.height - 120))
+                        // while searching the panel (and the map buttons) step aside for the keyboard and results
+                        .offset(y: model.searchActive ? sheetHeight + 40 : 0)
+                        .opacity(model.searchActive ? 0 : 1)
+                        .allowsHitTesting(!model.searchActive)
+                        .animation(.spring(response: 0.36, dampingFraction: 1), value: model.searchActive)
                 }
                 .padding(.horizontal, Style.panelInset)
                 .padding(.top, 4)                  // right under the status bar
@@ -110,6 +96,49 @@ struct ContentView: View {
             model.centredOnUser = true
             withAnimation { camera = .region(MKCoordinateRegion(center: c, span: MKCoordinateSpan(latitudeDelta: 0.008, longitudeDelta: 0.008))) }
             Task { await model.loadStops(near: c, force: true) }
+        }
+    }
+
+    /// The search bar, the results that drop down from it, and the recent-stop chips. The bar slides
+    /// away as the panel goes down to the strip (the Mac app's map focus); while searching it stays.
+    private var topArea: some View {
+        VStack(spacing: 8) {
+            TopBar(text: $model.searchText, searching: $model.searchActive, onRefresh: { Task { await refresh() } },
+                   onMenu: { menuOpen = true })
+            if showResults {
+                SearchResults(model: model)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+            if showChips {
+                RecentChips(stops: model.recents.map(\.title)) { i in model.open(model.recents[i]) }
+            }
+        }
+        .animation(.spring(response: 0.32, dampingFraction: 1), value: showResults)
+        .opacity(model.searchActive ? 1 : barShown)
+        .offset(y: model.searchActive ? 0 : (barShown - 1) * 40)
+        .allowsHitTesting(model.searchActive || barShown > 0.5)
+    }
+
+    private var showResults: Bool {
+        model.searchActive && !model.searchText.trimmingCharacters(in: .whitespaces).isEmpty
+    }
+
+    private var showChips: Bool {
+        model.screen == .home && !model.recents.isEmpty && model.searchText.isEmpty && showRecents && !model.searchActive
+    }
+
+    /// Expand the map and Locate Me, on the right above the panel (hidden while searching).
+    private var mapButtons: some View {
+        HStack {
+            Spacer()
+            VStack(spacing: 10) {
+                RoundButton(symbol: sheetHeight <= 66 ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right",
+                            help: "Expand the map") {
+                    withAnimation(.spring(response: 0.36, dampingFraction: 1)) { sheetHeight = sheetHeight <= 66 ? 360 : 66 }
+                }
+                RoundButton(symbol: "location", help: "Locate Me") { locate() }
+            }
+            .opacity(model.searchActive ? 0 : 1)
         }
     }
 

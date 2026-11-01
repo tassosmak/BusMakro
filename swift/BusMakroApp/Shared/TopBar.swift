@@ -4,12 +4,12 @@ import SwiftUI
 /// over the buttons; cleared, it gives them back (layout_bar in core.py).
 struct TopBar: View {
     @Binding var text: String
+    @Binding var searching: Bool
     var onRefresh: () -> Void
     var onMenu: () -> Void = {}
     @FocusState private var focused: Bool
     /// Searching: set when the field gets focus, cleared only by ✕ (or emptying it unfocused). Tapping ✕
     /// takes the focus first, so a state tied to focus removed the button before its tap landed.
-    @State private var searching = false
 
     private var expanded: Bool { searching || !text.isEmpty }
 
@@ -27,6 +27,7 @@ struct TopBar: View {
                     .focused($focused)
                     .onSubmit { focused = false }
                     .onChange(of: focused) { if focused { searching = true } else if text.isEmpty { searching = false } }
+                    .onChange(of: searching) { if !searching { focused = false } }  // a result was chosen: close the keyboard
             }
             .padding(.leading, 8).padding(.trailing, 14)
             .frame(height: Style.barHeight)
