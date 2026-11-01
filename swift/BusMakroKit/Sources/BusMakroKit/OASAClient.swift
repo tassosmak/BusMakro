@@ -61,6 +61,7 @@ public struct OASAClient: Sendable {
                                            lineCode: Self.str(r["LineCode"]), routeCodes: [], arrivalsMinutes: [], vehicles: [])
             if !ln.routeCodes.contains(code) {  // OASA repeats routes
                 ln.routeCodes.append(code)
+                ln.routeTypes[code] = Self.str(r["RouteType"]).isEmpty ? "1" : Self.str(r["RouteType"])
                 for a in arrivals where a.route == code {
                     ln.arrivalsMinutes.append(a.minutes)
                     if !a.vehicle.isEmpty { ln.vehicles.append(a.vehicle) }

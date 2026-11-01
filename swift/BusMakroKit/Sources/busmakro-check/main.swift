@@ -53,3 +53,8 @@ print("stop index: \(index.stops.count) stops in \(String(format: "%.1f", Date()
 for q in ["syntagma", "ΣΥΝΤΑΓΜΑ", "evangel"] {
     print("  \(q): " + index.search(q, limit: 3).map { "\($0.entry.name) [\($0.id)] lines \($0.entry.lines.prefix(4).joined(separator: ","))" }.joined(separator: "; "))
 }
+
+// Alerts
+let alerts = await Alerts.fetch(known: Set(all.map(\.id)))
+print("alerts: \(alerts.count); network: \(alerts.filter { $0.lines.isEmpty }.count)")
+for a in alerts.prefix(3) { print("  \(a.strike ? "STRIKE " : "")\(a.lines.sorted().joined(separator: ",")): \(a.title.prefix(70))") }

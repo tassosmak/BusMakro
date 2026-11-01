@@ -32,6 +32,7 @@ struct LineContent: View {
             Text("APPROACHING BUSES").font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary)
             ScrollView {
                 LazyVStack(spacing: 6) {
+                    ForEach(model.alerts(for: [currentLine])) { AlertCard(alert: $0) }
                     let rows = model.approaching
                     if rows.isEmpty {
                         Text(model.lineStop == nil ? "Choose a stop to see approaching buses." : "No bus is heading to this stop right now.")

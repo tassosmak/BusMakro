@@ -2,6 +2,7 @@ import BusMakroKit
 import CoreLocation
 import Foundation
 import Observation
+import SwiftUI
 
 /// The app's state, mirroring the Mac app: home (nearby stops / favourites) → a stop's lines.
 @MainActor @Observable
@@ -23,12 +24,20 @@ final class Model: NSObject, CLLocationManagerDelegate {
     // line view
     var lineTab: LineTab = .arrivals
     var lineDetail: LineDetail?
-    var vehicles: [Vehicle] = []
+    var vehicles: [Vehicle] = [] {
+        didSet { renewRoutes() }
+    }
+    /// Where each bus is drawn now (moved along its road once a second, see Movement).
+    var drawn: [String: CLLocationCoordinate2D] = [:]
+    private var routes: [String: Movement.Route] = [:]
+    private var holds: [String: Double] = [:]
+    private var moveTask: Task<Void, Never>?
     var official: [String: Int] = [:]
     var lineStop: String?          // the stop the line was opened at (selected)
     private var lineTask: Task<Void, Never>?
     var timetable: (line: String, variants: [Timetable])?
     var stopIndex: StopIndex?
+    var alerts: [ServiceAlert] = []
     private var lineCodes: [String: [(code: String, name: String, nameEnglish: String)]]?
 
     private let oasa = OASAClient(), transit = TransitClient()
@@ -43,8 +52,14 @@ final class Model: NSObject, CLLocationManagerDelegate {
         location.requestWhenInUseAuthorization()
         location.requestLocation()
         lines = (try? await transit.lines()) ?? []
-        stopIndex = try? await StopIndex.load(lines: lines.map(\.id))  // for search; cached for a day
+        async let index = StopIndex.load(lines: lines.map(\.id))  // for search; cached for a day
+        alerts = await Alerts.fetch(known: Set(lines.map(\.id)))
+        stopIndex = try? await index
     }
+
+    /// Strikes and whole-network notices (strikes first), and the alerts that name any of `lines`.
+    var networkAlerts: [ServiceAlert] { alerts.filter { $0.lines.isEmpty }.sorted { $0.strike && !$1.strike } }
+    func alerts(for lines: [String]) -> [ServiceAlert] { alerts.filter { !$0.lines.isDisjoint(with: lines) } }
 
     // MARK: Search (the bar at the top): lines by number or name, then stops by name
     var lineResults: [LineSummary] {
@@ -82,10 +97,34 @@ final class Model: NSObject, CLLocationManagerDelegate {
         recents = [stop] + recents.filter { $0.id != stop.id }
         recents = Array(recents.prefix(6))
         Model.saveStops(recents, "recents")
-        do { stopLines = try await oasa.stopLines(stopID: stop.id) } catch {
+        do {
+            stopLines = try await oasa.stopLines(stopID: stop.id)
+            await addSchedules(stop: stop.id)
+        } catch {
             self.error = error.localizedDescription
             stopLines = []  // don't stay on "Loading…"
         }
+    }
+
+    /// Lines with no bus on the road get the timetable's next arrival (fetched side by side).
+    private func addSchedules(stop: String) async {
+        guard let lines = stopLines else { return }
+        let idle = lines.filter { $0.arrivalsMinutes.isEmpty && !$0.lineCode.isEmpty }
+        let found = await withTaskGroup(of: (String, Scheduled?).self) { group in
+            for l in idle {
+                group.addTask { [oasa] in (l.line, await oasa.scheduledArrival(lineCode: l.lineCode, routeTypes: l.routeTypes, stopID: stop)) }
+            }
+            var out: [String: Scheduled] = [:]
+            for await (id, s) in group { if let s { out[id] = s } }
+            return out
+        }
+        guard case .stop(let s) = screen, s.id == stop else { return }
+        stopLines = lines.map { var l = $0; l.scheduled = found[l.line]; return l }
+            .sorted { a, b in
+                let ta = a.arrivalsMinutes.first.map { Double($0) * 60 } ?? a.scheduled.map { $0.arrive.timeIntervalSinceNow } ?? .infinity
+                let tb = b.arrivalsMinutes.first.map { Double($0) * 60 } ?? b.scheduled.map { $0.arrive.timeIntervalSinceNow } ?? .infinity
+                return ta < tb
+            }
     }
 
     // MARK: Line view
@@ -129,6 +168,36 @@ final class Model: NSObject, CLLocationManagerDelegate {
     func closeLine() {
         lineTask?.cancel()
         if case .line(_, let stop?) = screen { screen = .stop(stop) } else { screen = .home }
+    }
+
+    /// A fresh fix: new road to drive, and hold the marker if the bus fell a little behind it.
+    private func renewRoutes() {
+        var r: [String: Movement.Route] = [:], h: [String: Double] = [:]
+        for v in vehicles {
+            let route = Movement.route(for: v)
+            r[v.id] = route
+            if let d = drawn[v.id] { h[v.id] = Movement.hold(drawn: (d.latitude, d.longitude), on: route) }
+        }
+        routes = r; holds = h
+        drawn = drawn.filter { id, _ in vehicles.contains { $0.id == id } }
+        if moveTask == nil {
+            moveTask = Task { [weak self] in
+                while !Task.isCancelled {
+                    self?.tickBuses()
+                    try? await Task.sleep(for: .seconds(1))
+                }
+            }
+        }
+    }
+
+    private func tickBuses() {
+        let now = Date()
+        var next: [String: CLLocationCoordinate2D] = [:]
+        for v in vehicles {
+            let p = Movement.position(v, route: routes[v.id], hold: holds[v.id] ?? 0, now: now)
+            next[v.id] = CLLocationCoordinate2D(latitude: p.0, longitude: p.1)
+        }
+        withAnimation(.linear(duration: 1)) { drawn = next }  // glide between the once-a-second positions
     }
 
     /// The route variant on screen: the one serving the selected stop with the most buses.

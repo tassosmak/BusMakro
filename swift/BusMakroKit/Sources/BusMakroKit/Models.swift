@@ -42,9 +42,11 @@ public struct Vehicle: Identifiable, Hashable, Sendable, Decodable {
     public let tripLabel: String?
     /// The road ahead to the next stop, as [latitude, longitude] pairs.
     public let path: [[Double]]?
+    /// Typical speed (m/s) per 200 m ahead; a nil step means unknown.
+    public let pathSpeeds: [Double?]?
 
     enum CodingKeys: String, CodingKey {
-        case id, lat, lon, bearing, variant, speed, path
+        case id, lat, lon, bearing, variant, speed, path, pathSpeeds = "path_speeds"
         case positionAt = "position_at", nextStopID = "next_stop_id", delaySeconds = "delay_s", tripLabel = "trip_label"
     }
 
@@ -61,6 +63,7 @@ public struct Vehicle: Identifiable, Hashable, Sendable, Decodable {
         speed = try c.decodeIfPresent(Double.self, forKey: .speed)
         tripLabel = try c.decodeIfPresent(String.self, forKey: .tripLabel)
         path = try c.decodeIfPresent([[Double]].self, forKey: .path)
+        pathSpeeds = try c.decodeIfPresent([Double?].self, forKey: .pathSpeeds)
     }
 }
 
@@ -81,4 +84,14 @@ public struct StopLine: Identifiable, Hashable, Sendable {
     public var arrivalsMinutes: [Int]
     /// The buses on their way here (vehicle codes).
     public var vehicles: [String]
+    /// Route code → "1" (outbound) or "2" (return), for timetable estimates.
+    public var routeTypes: [String: String] = [:]
+    /// No bus on the road: the timetable's next arrival here (a rough estimate).
+    public var scheduled: Scheduled?
+}
+
+/// A timetable-based arrival: departure from the terminus and about when it gets here.
+public struct Scheduled: Hashable, Sendable {
+    public let depart: Date
+    public let arrive: Date
 }

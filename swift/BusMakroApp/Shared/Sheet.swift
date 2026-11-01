@@ -135,6 +135,8 @@ struct Sheet: View {
                 .font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary)
             ScrollView {
                 LazyVStack(spacing: 6) {
+                    ForEach(model.networkAlerts.prefix(2)) { AlertCard(alert: $0) }
+                    ForEach(model.alerts(for: (model.stopLines ?? []).map(\.line))) { AlertCard(alert: $0) }
                     if let lines = model.stopLines, lines.isEmpty {
                         Text(model.error == nil ? "No lines stop here." : "Couldn't reach the bus service. Tap ↻ to try again.")
                             .font(.system(size: 12)).foregroundStyle(.secondary).padding(.top, 20)
@@ -155,6 +157,7 @@ struct Sheet: View {
     private func list(_ stops: [Stop], empty: String) -> some View {
         ScrollView {
             LazyVStack(spacing: 6) {
+                ForEach(model.networkAlerts.prefix(2)) { AlertCard(alert: $0) }
                 if stops.isEmpty {
                     Text(empty).font(.system(size: 12)).foregroundStyle(.secondary).padding(.top, 20)
                 }

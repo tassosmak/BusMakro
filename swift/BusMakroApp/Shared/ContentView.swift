@@ -81,7 +81,7 @@ struct ContentView: View {
                     }
                 }
                 ForEach(model.vehicles) { b in
-                    Annotation("", coordinate: CLLocationCoordinate2D(latitude: b.latitude, longitude: b.longitude)) {
+                    Annotation("", coordinate: model.drawn[b.id] ?? CLLocationCoordinate2D(latitude: b.latitude, longitude: b.longitude)) {
                         BusMarker(bearing: b.bearing, faded: (b.positionAt.map { Date().timeIntervalSince($0) > 120 } ?? false))
                     }
                 }

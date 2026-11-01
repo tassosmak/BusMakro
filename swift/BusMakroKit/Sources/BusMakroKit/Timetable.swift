@@ -52,3 +52,37 @@ extension OASAClient {
         return out.sorted { $0.go.count + $0.come.count > $1.go.count + $1.come.count }
     }
 }
+
+extension OASAClient {
+    static let pace = 3.2            // m/s: real average bus pace incl. stops and lights (measured on line 810)
+    static let departedSlack = 180.0 // a departure this late, with no bus live yet, is still "about to leave"
+
+    /// A route's stops in order: (stop code, latitude, longitude).
+    public func routeStops(routeCode: String) async throws -> [(String, Double, Double)] {
+        let rows = (try await call("webGetStops", [routeCode])) as? [[String: Any]] ?? []
+        return rows.sorted { Int("\($0["RouteStopOrder"] ?? 0)") ?? 0 < Int("\($1["RouteStopOrder"] ?? 0)") ?? 0 }
+            .compactMap { r in
+                guard let lat = Double("\(r["StopLat"] ?? "")"), let lon = Double("\(r["StopLng"] ?? "")") else { return nil }
+                return ("\(r["StopCode"] ?? "")", lat, lon)
+            }
+    }
+
+    /// The next timetabled arrival of a line at a stop: next departure from its start + the distance
+    /// along the route at a realistic pace (as oasa/schedule.py). Nil when nothing more runs today.
+    public func scheduledArrival(lineCode: String, routeTypes: [String: String], stopID: String, now: Date = Date()) async -> Scheduled? {
+        guard let sched = try? await dailySchedule(code: lineCode, day: now) else { return nil }
+        var best: Scheduled?
+        for (code, type) in routeTypes {
+            guard let stops = try? await routeStops(routeCode: code), let i = stops.firstIndex(where: { $0.0 == stopID }) else { continue }
+            var metres = 0.0
+            for k in 0..<i { metres += Geo.distance(stops[k].1, stops[k].2, stops[k + 1].1, stops[k + 1].2) }
+            let travel = metres / Self.pace
+            for dep in (type == "2" ? sched.come : sched.go) where dep >= now.addingTimeInterval(-Self.departedSlack) {
+                let arrive = max(dep.addingTimeInterval(travel), now)
+                if best == nil || arrive < best!.arrive { best = Scheduled(depart: dep, arrive: arrive) }
+                break
+            }
+        }
+        return best
+    }
+}
