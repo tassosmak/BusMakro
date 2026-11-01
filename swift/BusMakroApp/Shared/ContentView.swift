@@ -39,7 +39,7 @@ struct ContentView: View {
                         VStack(spacing: 10) {
                             RoundButton(symbol: sheetHeight <= 66 ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right",
                                         help: "Expand the map") {
-                                withAnimation(.spring(response: 0.38, dampingFraction: 0.88)) { sheetHeight = sheetHeight <= 66 ? 360 : 66 }
+                                withAnimation(.spring(response: 0.36, dampingFraction: 1)) { sheetHeight = sheetHeight <= 66 ? 360 : 66 }
                             }
                             RoundButton(symbol: "location", help: "Locate Me") { locate() }
                         }
@@ -158,7 +158,9 @@ struct ContentView: View {
         }
         .mapStyle(.standard(elevation: map3D ? .realistic : .flat, pointsOfInterest: .excludingAll))
         .mapControls { }  // no zoom or compass buttons, like the Mac app
-        .safeAreaPadding(.bottom, sheetHeight + 8)  // the Maps logo and Legal sit just above the panel
+        // a fixed inset (the slim strip's height), not the panel's: changing the map's safe area on every
+        // animation frame made Apple Maps re-centre continuously, so the whole map jiggled
+        .safeAreaPadding(.bottom, 66 + Style.panelInset * 2)
         .onMapCameraChange(frequency: .onEnd) { ctx in
             visibleRegion = ctx.region
             if model.screen == .home { fittedLine = nil; Task { await model.loadStops(near: ctx.region.center) } }

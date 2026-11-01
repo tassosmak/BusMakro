@@ -166,6 +166,8 @@ final class Model: NSObject, CLLocationManagerDelegate {
 
     /// A request failed: offline (no connection) or the service (it didn't answer properly).
     func failed(_ e: Error) {
+        // a request cancelled because you moved on is not a failure (it showed a false "couldn't reach" banner)
+        if e is CancellationError || (e as? URLError)?.code == .cancelled { return }
         error = e.localizedDescription
         if (e as? URLError)?.code != .notConnectedToInternet { serviceDown = true }
     }

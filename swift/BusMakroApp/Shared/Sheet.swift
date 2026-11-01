@@ -41,7 +41,7 @@ struct Sheet: View {
                 .onEnded { _ in
                     dragStart = nil
                     let stops = [range.lowerBound, (range.lowerBound + range.upperBound) / 2, range.upperBound]
-                    withAnimation(.spring(response: 0.38, dampingFraction: 0.88)) {
+                    withAnimation(.spring(response: 0.36, dampingFraction: 1)) {
                         height = stops.min { abs($0 - height) < abs($1 - height) }!
                     }
                 })
