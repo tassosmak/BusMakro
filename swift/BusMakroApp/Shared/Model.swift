@@ -203,8 +203,7 @@ final class Model: NSObject, CLLocationManagerDelegate {
         }
         if case .stop = screen {
             stopBuses = out
-            for b in out where routes[b.vehicle.id] == nil { routes[b.vehicle.id] = Movement.route(for: b.vehicle) }
-            if moveTask == nil { renewRoutes() }
+            renewRoutes()  // every refresh: the new fixes' roads (old ones pulled buses back to their old road)
         }
     }
 
@@ -291,7 +290,11 @@ final class Model: NSObject, CLLocationManagerDelegate {
             r[v.id] = route
             if let d = drawn[v.id] { h[v.id] = Movement.hold(drawn: (d.latitude, d.longitude), on: route) }
         }
-        for b in stopBuses { r[b.vehicle.id] = Movement.route(for: b.vehicle) }
+        for b in stopBuses {
+            let route = Movement.route(for: b.vehicle)
+            r[b.vehicle.id] = route
+            if let d = drawn[b.vehicle.id] { h[b.vehicle.id] = Movement.hold(drawn: (d.latitude, d.longitude), on: route) }
+        }
         routes = r; holds = h
         drawn = drawn.filter { id, _ in vehicles.contains { $0.id == id } || stopBuses.contains { $0.vehicle.id == id } }
         if moveTask == nil {

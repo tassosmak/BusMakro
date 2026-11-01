@@ -59,17 +59,11 @@ let alerts = await Alerts.fetch(known: Set(all.map(\.id)))
 print("alerts: \(alerts.count); network: \(alerts.filter { $0.lines.isEmpty }.count)")
 for a in alerts.prefix(3) { print("  \(a.strike ? "STRIKE " : "")\(a.lines.sorted().joined(separator: ",")): \(a.title.prefix(70))") }
 
-// Movement: where a moving bus is drawn over the next seconds (should advance along its road)
+// Movement: where each moving bus is drawn now and over the next 10 s (from the real live feed)
 let l550 = try await transit.live(line: "550")
-if let v = l550.vehicles.filter({ ($0.speed ?? 0) > 0 && ($0.path?.count ?? 0) >= 2 }).max(by: { (Movement.route(for: $0)?.total ?? 0) < (Movement.route(for: $1)?.total ?? 0) }) {
+let now = Date()
+for v in l550.vehicles where (v.speed ?? 0) > 0 {
     let r = Movement.route(for: v)
-    let base = v.positionAt ?? Date()
-    var prev = (v.latitude, v.longitude)
-    var line = "bus \(v.id) speed \(v.speed!) m/s, road ahead \(Int(r?.total ?? 0)) m:"
-    for t in [0.0, 5, 10, 20, 40, 90, 120] {
-        let p = Movement.position(v, route: r, hold: 0, now: base.addingTimeInterval(t))
-        line += " t+\(Int(t))s→\(Int(Geo.distance(prev.0, prev.1, p.0, p.1)))m"
-        prev = p
-    }
-    print(line)
+    let a = Movement.position(v, route: r, hold: 0, now: now), b = Movement.position(v, route: r, hold: 0, now: now.addingTimeInterval(10))
+    print("bus \(v.id): fix \(Int(now.timeIntervalSince(v.positionAt ?? now)))s old, road \(Int(r?.total ?? 0)) m, moves \(Int(Geo.distance(a.0, a.1, b.0, b.1))) m in the next 10 s")
 }

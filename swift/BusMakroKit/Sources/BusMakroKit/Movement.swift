@@ -5,7 +5,7 @@ import Foundation
 /// most 90 s, and only when it's moving; a new fix that lands up to 150 m behind the drawn marker
 /// holds the marker there instead of sliding it back.
 public enum Movement {
-    public static let maxDeadReckoning: TimeInterval = 90
+    public static let maxDeadReckoning: TimeInterval = 240  // the feed's fixes are often 60-120 s old; 90 s froze them
     public static let holdMetres = 150.0
 
     /// A route as (latitude, longitude) points with cumulative metres.
@@ -18,8 +18,11 @@ public enum Movement {
     }
 
     public static func route(for v: Vehicle) -> Route? {
-        guard let path = v.path, path.count >= 2 else { return nil }
-        let pts = path.map { ($0[0], $0[1]) }
+        // the road to the next stop, then on past it: GPS fixes arrive 30-50 s old, so a bus driven
+        // only to its next stop had usually already reached it and sat still until the next fix
+        let joined = (v.path ?? []) + (v.pathBeyond ?? []).dropFirst((v.path?.isEmpty ?? true) ? 0 : 1)
+        guard joined.count >= 2 else { return nil }
+        let pts = joined.map { ($0[0], $0[1]) }
         var cum = [0.0]
         for i in 1..<pts.count { cum.append(cum[i - 1] + Geo.distance(pts[i - 1].0, pts[i - 1].1, pts[i].0, pts[i].1)) }
         let moving = (v.speed ?? 0) > 0

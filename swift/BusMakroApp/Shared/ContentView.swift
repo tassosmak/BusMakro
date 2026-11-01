@@ -185,8 +185,10 @@ struct ContentView: View {
         withAnimation { camera = .region(MKCoordinateRegion(center: c, span: MKCoordinateSpan(latitudeDelta: 0.008, longitudeDelta: 0.008))) }
     }
 
+    /// ↻ fetches whatever is on screen again: nearby stops, a stop's lines, or a line's buses (it only
+    /// handled the stop screen before, so on home and line views it did nothing).
     private func refresh() async {
-        if case .stop(let s) = model.screen { await model.loadStopLines(s) }
+        await model.retry()
     }
 }
 
