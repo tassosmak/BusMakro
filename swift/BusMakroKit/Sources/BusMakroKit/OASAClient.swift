@@ -17,7 +17,9 @@ public struct OASAClient: Sendable {
         req.httpMethod = "POST"
         let (data, resp) = try await session.data(for: req)
         guard (resp as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
-        return try JSONSerialization.jsonObject(with: data.isEmpty ? Data("[]".utf8) : data)
+        // OASA answers `null` (or nothing) when it has no rows, e.g. lines at a terminus: that's an empty list
+        let any = try JSONSerialization.jsonObject(with: data.isEmpty ? Data("[]".utf8) : data, options: .fragmentsAllowed)
+        return any is NSNull ? [Any]() : any
     }
 
     private static func rows(_ any: Any) -> [[String: Any]] { any as? [[String: Any]] ?? [] }

@@ -46,10 +46,15 @@ struct Sheet: View {
             if case .stop = model.screen {
                 Button { withAnimation { model.screen = .home } } label: { Label("Back", systemImage: "chevron.left") }
             }
+            if case .line = model.screen {
+                Button { withAnimation { model.closeLine() } } label: { Label("Back", systemImage: "chevron.left") }
+            }
             Menu {
-                ForEach(model.lines) { Text("\($0.id) — \($0.title)") }
+                ForEach(model.lines) { l in
+                    Button("\(l.id) — \(l.title)") { withAnimation { model.openLine(l.id, at: nil) } }
+                }
             } label: {
-                Text("Browse a line…").font(.system(size: 12)).frame(maxWidth: .infinity, alignment: .leading)
+                Text(menuTitle).font(.system(size: 12)).lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
             }
             .buttonStyle(.plain)  // works on both iPhone and Mac (.borderlessButton is Mac-only)
             .padding(.horizontal, 10)
@@ -64,6 +69,13 @@ struct Sheet: View {
         }
     }
 
+    private var menuTitle: String {
+        if case .line(let id, _) = model.screen {
+            return "\(id) — " + (model.lines.first { $0.id == id }?.title ?? "")
+        }
+        return "Browse a line…"
+    }
+
     @ViewBuilder private var content: some View {
         switch model.screen {
         case .home:
@@ -74,14 +86,21 @@ struct Sheet: View {
             .pickerStyle(.segmented).labelsHidden()
             list(model.homeTab == .nearby ? model.stops : model.favourites, empty: model.homeTab == .nearby
                  ? "Finding stops near you…" : "No favourite stops yet. Tap ☆ on a stop to add it.")
+        case .line:
+            LineContent(model: model)
         case .stop(let stop):
             Text("\(stop.title.uppercased()) · STOP \(stop.id)")
                 .font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary)
             ScrollView {
                 LazyVStack(spacing: 6) {
-                    if let lines = model.stopLines {
+                    if let lines = model.stopLines, lines.isEmpty {
+                        Text(model.error == nil ? "No lines stop here." : "Couldn't reach the bus service. Tap ↻ to try again.")
+                            .font(.system(size: 12)).foregroundStyle(.secondary).padding(.top, 20)
+                    } else if let lines = model.stopLines {
                         ForEach(Array(lines.enumerated()), id: \.element.id) { i, line in
-                            LineCard(line: line).appearing(i)
+                            Button { withAnimation { model.openLine(line.line, at: stop) } } label: { LineCard(line: line) }
+                                .buttonStyle(.plain)
+                                .appearing(i)
                         }
                     } else {
                         Text("Loading the lines at this stop…").font(.system(size: 12)).foregroundStyle(.secondary).padding(.top, 20)

@@ -41,6 +41,17 @@ struct ContentView: View {
             await model.start()
             await model.loadStops(near: CLLocationCoordinate2D(latitude: 37.9755, longitude: 23.7348))  // until a fix arrives
         }
+        .onChange(of: model.variantID) {
+            // a line opened: show its whole route, like the Mac app's fit on the stops
+            guard case .line = model.screen, let d = model.lineDetail, let vid = model.variantID,
+                  let shape = d.variants[vid]?.shape, !shape.isEmpty else { return }
+            let lats = shape.map { $0[0] }, lons = shape.map { $0[1] }
+            let center = CLLocationCoordinate2D(latitude: (lats.min()! + lats.max()!) / 2, longitude: (lons.min()! + lons.max()!) / 2)
+            // extra room south for the panel, which covers the lower part of the map
+            let span = MKCoordinateSpan(latitudeDelta: (lats.max()! - lats.min()!) * 2.2, longitudeDelta: (lons.max()! - lons.min()!) * 1.3)
+            withAnimation { camera = .region(MKCoordinateRegion(
+                center: CLLocationCoordinate2D(latitude: center.latitude - span.latitudeDelta * 0.2, longitude: center.longitude), span: span)) }
+        }
         .onChange(of: model.userLocation?.latitude) {
             // first fix: centre on you and list the stops around you (the map's own move reloads them too)
             guard let c = model.userLocation, model.screen == .home else { return }
@@ -52,6 +63,29 @@ struct ContentView: View {
     private var map: some View {
         Map(position: $camera) {
             UserAnnotation()
+            if case .line = model.screen, let d = model.lineDetail, let vid = model.variantID, let v = d.variants[vid] {
+                // the route on the roads, with a white casing (map.html's route-casing + route-line)
+                let coords = v.shape.map { CLLocationCoordinate2D(latitude: $0[0], longitude: $0[1]) }
+                MapPolyline(coordinates: coords).stroke(.white, style: StrokeStyle(lineWidth: 9, lineCap: .round, lineJoin: .round))
+                MapPolyline(coordinates: coords).stroke(Color(red: 0.09, green: 0.47, blue: 1.0),
+                                                        style: StrokeStyle(lineWidth: 5, lineCap: .round, lineJoin: .round))
+                ForEach(v.stops, id: \.self) { sid in
+                    if let st = d.stops[sid] {
+                        Annotation("", coordinate: CLLocationCoordinate2D(latitude: st.lat, longitude: st.lon)) {
+                            let sel = sid == model.lineStop
+                            Circle().fill(sel ? Color.orange : Color(red: 0.09, green: 0.47, blue: 1.0))
+                                .frame(width: sel ? 15 : 10, height: sel ? 15 : 10)
+                                .overlay(Circle().stroke(.white, lineWidth: sel ? 3 : 2))
+                                .onTapGesture { model.lineStop = sid }
+                        }
+                    }
+                }
+                ForEach(model.vehicles) { b in
+                    Annotation("", coordinate: CLLocationCoordinate2D(latitude: b.latitude, longitude: b.longitude)) {
+                        BusMarker(bearing: b.bearing, faded: (b.positionAt.map { Date().timeIntervalSince($0) > 120 } ?? false))
+                    }
+                }
+            }
             ForEach(shownStops) { stop in
                 Annotation("", coordinate: CLLocationCoordinate2D(latitude: stop.latitude, longitude: stop.longitude)) {
                     let selected = model.screen == .stop(stop)
@@ -75,6 +109,7 @@ struct ContentView: View {
         switch model.screen {
         case .home: return model.homeTab == .nearby ? model.stops : model.favourites
         case .stop(let s): return [s]
+        case .line: return []
         }
     }
 
@@ -85,5 +120,27 @@ struct ContentView: View {
 
     private func refresh() async {
         if case .stop(let s) = model.screen { await model.open(s) }
+    }
+}
+
+/// A live bus: green dot with a white ring and a heading arrow; faded when its fix is old.
+struct BusMarker: View {
+    let bearing: Double?
+    var faded = false
+
+    var body: some View {
+        ZStack {
+            if let b = bearing {
+                Image(systemName: "arrowtriangle.up.fill").font(.system(size: 10)).foregroundStyle(Color(red: 0.10, green: 0.53, blue: 0.33))
+                    .offset(y: -18).rotationEffect(.degrees(b))
+            }
+            Image(systemName: "bus.fill").font(.system(size: 12)).foregroundStyle(.white)
+                .frame(width: 27, height: 27)
+                .background(Color(red: 0.10, green: 0.53, blue: 0.33), in: Circle())  // #198754
+                .overlay(Circle().stroke(.white, lineWidth: 2))
+                .shadow(color: .black.opacity(0.3), radius: 3, y: 1)
+        }
+        .opacity(faded ? 0.45 : 1)
+        .animation(.easeInOut(duration: 1.5), value: bearing)
     }
 }

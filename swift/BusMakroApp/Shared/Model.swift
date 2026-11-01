@@ -6,7 +6,8 @@ import Observation
 /// The app's state, mirroring the Mac app: home (nearby stops / favourites) → a stop's lines.
 @MainActor @Observable
 final class Model: NSObject, CLLocationManagerDelegate {
-    enum Screen: Equatable { case home, stop(Stop) }
+    enum Screen: Equatable { case home, stop(Stop), line(String, Stop?) }
+    enum LineTab: Hashable { case arrivals, route }
     enum HomeTab: Hashable { case nearby, favourites }
 
     var screen: Screen = .home
@@ -19,6 +20,13 @@ final class Model: NSObject, CLLocationManagerDelegate {
     var userLocation: CLLocationCoordinate2D?
     var error: String?
     var searchText = ""
+    // line view
+    var lineTab: LineTab = .arrivals
+    var lineDetail: LineDetail?
+    var vehicles: [Vehicle] = []
+    var official: [String: Int] = [:]
+    var lineStop: String?          // the stop the line was opened at (selected)
+    private var lineTask: Task<Void, Never>?
 
     private let oasa = OASAClient(), transit = TransitClient()
     private let location = CLLocationManager()
@@ -53,7 +61,48 @@ final class Model: NSObject, CLLocationManagerDelegate {
         recents = [stop] + recents.filter { $0.id != stop.id }
         recents = Array(recents.prefix(6))
         Model.saveStops(recents, "recents")
-        do { stopLines = try await oasa.stopLines(stopID: stop.id) } catch { self.error = error.localizedDescription }
+        do { stopLines = try await oasa.stopLines(stopID: stop.id) } catch {
+            self.error = error.localizedDescription
+            stopLines = []  // don't stay on "Loading…"
+        }
+    }
+
+    // MARK: Line view
+    /// Open a line, with `stop` selected (from the stop screen). Its buses refresh every 15 s.
+    func openLine(_ id: String, at stop: Stop?) {
+        screen = .line(id, stop)
+        lineStop = stop?.id
+        lineDetail = nil; vehicles = []; official = [:]
+        lineTab = .arrivals
+        lineTask?.cancel()
+        lineTask = Task { [weak self] in
+            guard let self else { return }
+            self.lineDetail = try? await self.transit.detail(line: id)
+            while !Task.isCancelled, case .line(id, _) = self.screen {
+                await self.refreshLine(id)
+                try? await Task.sleep(for: .seconds(15))
+            }
+        }
+    }
+
+    func refreshLine(_ id: String) async {
+        if let live = try? await transit.live(line: id) { vehicles = live.vehicles }
+        if let s = lineStop { official = await oasa.predictions(stopID: s) }
+    }
+
+    func closeLine() {
+        lineTask?.cancel()
+        if case .line(_, let stop?) = screen { screen = .stop(stop) } else { screen = .home }
+    }
+
+    /// The route variant on screen: the one serving the selected stop with the most buses.
+    var variantID: String? {
+        lineDetail.flatMap { LineMath.variant(for: $0, stop: lineStop, live: vehicles) }
+    }
+
+    var approaching: [Approaching] {
+        guard let d = lineDetail, let s = lineStop else { return [] }
+        return LineMath.approaching(s, detail: d, live: vehicles, official: official)
     }
 
     func isFavourite(_ s: Stop) -> Bool { favourites.contains { $0.id == s.id } }
