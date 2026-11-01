@@ -6,6 +6,7 @@ struct SettingsView: View {
     @Bindable var model: Model
     @AppStorage("mapStyle") private var mapStyle = "system"
     @AppStorage("showRecents") private var showRecents = true
+    @AppStorage("map3D") private var map3D = false
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
 
@@ -26,6 +27,7 @@ struct SettingsView: View {
                         Text("Light").tag("light")
                         Text("Dark").tag("dark")
                     }
+                    Toggle("3D Buildings", isOn: $map3D)
                 }
                 Section {
                     Button("Show Welcome") { dismiss(); model.showWelcome = true }

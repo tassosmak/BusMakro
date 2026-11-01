@@ -13,6 +13,7 @@ struct Sheet: View {
         VStack(alignment: .leading, spacing: 12) {
             handle
             header
+            if !model.online || model.serviceDown { offline }
             content.opacity(height > 140 ? 1 : 0)  // the slim strip shows just the handle and the menu
         }
         .padding(.horizontal, Style.gap)
@@ -41,6 +42,22 @@ struct Sheet: View {
                         height = stops.min { abs($0 - height) < abs($1 - height) }!
                     }
                 })
+    }
+
+    /// No connection, or the bus service didn't answer: say so; it retries by itself, or tap.
+    private var offline: some View {
+        Button { Task { await model.retry() } } label: {
+            HStack(spacing: 10) {
+                Image(systemName: model.online ? "exclamationmark.icloud" : "wifi.slash").foregroundStyle(.orange)
+                Text(model.online ? "Couldn't reach the bus service. Tap to try again."
+                                  : "No internet connection. Retrying when you're back online.")
+                    .font(.system(size: 12, weight: .semibold)).multilineTextAlignment(.leading)
+                Spacer(minLength: 0)
+            }
+            .padding(10)
+            .background(Color.orange.opacity(0.14), in: RoundedRectangle(cornerRadius: Style.cardRadius))
+        }
+        .buttonStyle(.plain)
     }
 
     @ViewBuilder private var header: some View {
@@ -165,7 +182,8 @@ struct Sheet: View {
                 }
                 ForEach(Array(stops.enumerated()), id: \.element.id) { i, stop in
                     Button { model.open(stop) } label: {
-                        StopCard(stop: stop, metres: model.distance(to: stop), closest: i == 0 && (model.distance(to: stop) ?? .infinity) < 500)  // only when the list is around you
+                        StopCard(stop: stop, metres: model.distance(to: stop), closest: i == 0 && (model.distance(to: stop) ?? .infinity) < 500,  // only when the list is around you
+                                 subtitle: model.homeTab == .favourites ? favouriteSubtitle(model.favLines[stop.id]) : nil)
                     }
                     .buttonStyle(.plain)
                     .appearing(i)

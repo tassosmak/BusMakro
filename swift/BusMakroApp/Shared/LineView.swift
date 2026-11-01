@@ -39,7 +39,10 @@ struct LineContent: View {
                             .font(.system(size: 12)).foregroundStyle(.secondary).padding(.top, 20)
                     }
                     ForEach(Array(rows.enumerated()), id: \.element.id) { i, a in
-                        ArrivalCard(item: a, watching: model.watches[a.vehicle.id]?.stops) { model.watch(a.vehicle.id, stops: $0) }.appearing(i)
+                        ArrivalCard(item: a, watching: model.watches[a.vehicle.id]?.stops, onWatch: { model.watch(a.vehicle.id, stops: $0) },
+                                    following: model.pinned == a.vehicle.id,
+                                    onFollow: { model.pinned = model.pinned == a.vehicle.id ? nil : a.vehicle.id })
+                            .appearing(i)
                     }
                 }
             }
@@ -47,6 +50,22 @@ struct LineContent: View {
     }
 
     private var route: some View {
+        VStack(spacing: 8) {
+            if let d = model.lineDetail, d.variants.count > 1 {
+                // lines with several routes: pick which one (the Mac app's variant menu)
+                Picker("", selection: Binding(get: { model.variantID ?? "" }, set: { model.chosenVariant = $0 })) {
+                    ForEach(d.variants.keys.sorted(), id: \.self) { k in
+                        Text(Names.place(d.variants[k]!.headsign, "")).tag(k)
+                    }
+                }
+                .pickerStyle(.menu).labelsHidden()
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            routeList
+        }
+    }
+
+    private var routeList: some View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(spacing: 0) {
@@ -106,11 +125,16 @@ struct ArrivalCard: View {
     let item: Approaching
     var watching: Int? = nil
     var onWatch: (Int?) -> Void = { _ in }
+    var following = false
+    var onFollow: () -> Void = {}
 
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
-                Text(time).font(Style.rounded(20)).contentTransition(.numericText(countsDown: true))
+                HStack(spacing: 6) {
+                    Text(time).font(Style.rounded(20)).contentTransition(.numericText(countsDown: true))
+                    if item.official { PulseDot(fast: item.seconds < 90) }
+                }
                 Text(item.stopsAway == 0 ? String(localized: "next stop") : item.stopsAway == 1 ? String(localized: "1 stop away") : String(localized: "\(item.stopsAway) stops away"))
                     .font(.system(size: 11)).foregroundStyle(.secondary)
             }
@@ -131,6 +155,11 @@ struct ArrivalCard: View {
                         Image(systemName: watching != nil ? "bell.fill" : "bell")
                             .foregroundStyle(watching != nil ? Color.orange : Color.secondary)
                     }
+                    // ⌖: follow this bus on the map
+                    Button(action: onFollow) {
+                        Image(systemName: following ? "location.fill" : "scope")
+                            .foregroundStyle(following ? Color.orange : Color.secondary)
+                    }.buttonStyle(.plain)
                 }
                 Text(item.vehicle.tripLabel.map { Names.place($0, "") } ?? String(localized: "Trip unavailable")).font(.system(size: 12)).foregroundStyle(.secondary).lineLimit(1)
             }
@@ -139,6 +168,7 @@ struct ArrivalCard: View {
         .frame(height: 72)
         .card()
         .background(item.seconds < 90 ? Color.green.opacity(0.16) : .clear, in: RoundedRectangle(cornerRadius: Style.cardRadius))
+        .overlay(RoundedRectangle(cornerRadius: Style.cardRadius).stroke(following ? Color.orange : .clear, lineWidth: 1.5))
     }
 
     private var time: String {

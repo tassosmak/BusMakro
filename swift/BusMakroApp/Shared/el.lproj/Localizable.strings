@@ -89,3 +89,7 @@
 "2 buses together" = "2 λεωφορεία μαζί";
 "👻 %lld%% of buses vanish" = "👻 το %lld%% των λεωφορείων χάνεται";
 "learned · OASA says %lld min" = "από ιστορικό · ΟΑΣΑ: %lld λεπ.";
+"No live buses" = "Κανένα λεωφορείο";
+"3D Buildings" = "Κτίρια 3D";
+"Couldn't reach the bus service. Tap to try again." = "Δεν ήταν δυνατή η σύνδεση με την υπηρεσία. Πατήστε για νέα προσπάθεια.";
+"No internet connection. Retrying when you're back online." = "Δεν υπάρχει σύνδεση. Νέα προσπάθεια μόλις επανέλθει.";

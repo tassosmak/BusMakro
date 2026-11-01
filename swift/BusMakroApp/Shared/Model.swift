@@ -3,6 +3,7 @@ import CoreLocation
 import Foundation
 import Observation
 import SwiftUI
+import Network
 
 /// The app's state, mirroring the Mac app: home (nearby stops / favourites) → a stop's lines.
 @MainActor @Observable
@@ -45,6 +46,17 @@ final class Model: NSObject, CLLocationManagerDelegate {
     var showSettings = false
     var watchTask: Task<Void, Never>?
     private var lineCodes: [String: [(code: String, name: String, nameEnglish: String)]]?
+    // follow a bus (the map keeps it centred), buses heading to the open stop, favourites' live times
+    var pinned: String?
+    var pendingPin: String?
+    var stopBuses: [(vehicle: Vehicle, line: String)] = []
+    var favLines: [String: [StopLine]] = [:]
+    var chosenVariant: String?
+    private var stopTask: Task<Void, Never>?
+    // offline: no connection at all, or the bus service didn't answer
+    var online = true
+    var serviceDown = false
+    private let pathMonitor = NWPathMonitor()
 
     private let oasa = OASAClient(), transit = TransitClient()
     private let location = CLLocationManager()
@@ -52,6 +64,36 @@ final class Model: NSObject, CLLocationManagerDelegate {
     override init() {
         super.init()
         location.delegate = self
+        pathMonitor.pathUpdateHandler = { [weak self] path in
+            Task { @MainActor in
+                guard let self else { return }
+                let was = self.online
+                self.online = path.status == .satisfied
+                if self.online && !was { await self.retry() }  // back online: catch up at once
+            }
+        }
+        pathMonitor.start(queue: DispatchQueue(label: "net"))
+    }
+
+    /// Whatever is on screen, fetched again (after an error, or the network coming back).
+    func retry() async {
+        serviceDown = false
+        if lines.isEmpty { lines = (try? await transit.lines()) ?? [] }
+        switch screen {
+        case .home:
+            if let c = userLocation ?? stopsOrigin { await loadStops(near: c, force: true) }
+            if homeTab == .favourites { await loadFavourites() }
+        case .stop(let s): await loadStopLines(s)
+        case .line(let id, _): await refreshLine(id)
+        }
+    }
+
+    /// The next live arrivals at every favourite stop (no timetable lookups: kept light).
+    func loadFavourites() async {
+        await withTaskGroup(of: (String, [StopLine]?).self) { group in
+            for f in favourites { group.addTask { [oasa] in (f.id, try? await oasa.stopLines(stopID: f.id)) } }
+            for await (id, l) in group { if let l { favLines[id] = l } }
+        }
     }
 
     func start() async {
@@ -96,8 +138,8 @@ final class Model: NSObject, CLLocationManagerDelegate {
                 Geo.distance(ref.latitude, ref.longitude, $0.latitude, $0.longitude) < Geo.distance(ref.latitude, ref.longitude, $1.latitude, $1.longitude)
             }
             if sorted.map(\.id) != stops.map(\.id) { stops = sorted }
-            error = nil
-        } catch { self.error = error.localizedDescription }
+            error = nil; serviceDown = false
+        } catch { failed(error) }
     }
 
     /// Metres from you (or nil without a fix).
@@ -112,17 +154,55 @@ final class Model: NSObject, CLLocationManagerDelegate {
         recents = [stop] + recents.filter { $0.id != stop.id }
         recents = Array(recents.prefix(6))
         Model.saveStops(recents, "recents")
-        Task { await loadStopLines(stop) }
+        stopBuses = []
+        stopTask?.cancel()
+        stopTask = Task { [weak self] in  // refresh every 15 s while the stop is open, like the Mac app
+            while let self, !Task.isCancelled, case .stop(let s) = self.screen, s.id == stop.id {
+                await self.loadStopLines(stop)
+                try? await Task.sleep(for: .seconds(15))
+            }
+        }
+    }
+
+    /// A request failed: offline (no connection) or the service (it didn't answer properly).
+    func failed(_ e: Error) {
+        error = e.localizedDescription
+        if (e as? URLError)?.code != .notConnectedToInternet { serviceDown = true }
     }
 
     func loadStopLines(_ stop: Stop) async {
         do {
-            stopLines = try await oasa.stopLines(stopID: stop.id)
-            Task { [oasa, stopLines] in await oasa.observe(stop: stop.id, lines: stopLines ?? []) }  // learn (History)
-            await addSchedules(stop: stop.id)
+            let fresh = try await oasa.stopLines(stopID: stop.id)
+            guard case .stop(let s) = screen, s.id == stop.id else { return }
+            // keep the timetable estimates already found (they don't change every 15 s)
+            let known = Dictionary((stopLines ?? []).compactMap { l in l.scheduled.map { (l.line, $0) } }, uniquingKeysWith: { a, _ in a })
+            stopLines = fresh.map { var l = $0; if l.arrivalsMinutes.isEmpty { l.scheduled = known[l.line] }; return l }
+            serviceDown = false
+            Task { [oasa] in await oasa.observe(stop: stop.id, lines: fresh) }  // learn (History)
+            await loadStopBuses(fresh)
+            if known.isEmpty { await addSchedules(stop: stop.id) }
         } catch {
-            self.error = error.localizedDescription
-            stopLines = []  // don't stay on "Loading…"
+            failed(error)
+            if stopLines == nil { stopLines = [] }  // don't stay on "Loading…"
+        }
+    }
+
+    /// The buses heading to the open stop, with their line (shown on the map, labelled).
+    private func loadStopBuses(_ lines: [StopLine]) async {
+        var out: [(vehicle: Vehicle, line: String)] = []
+        await withTaskGroup(of: [(vehicle: Vehicle, line: String)].self) { group in
+            for l in lines where !l.vehicles.isEmpty {
+                group.addTask { [transit] in
+                    let live = (try? await transit.live(line: l.line))?.vehicles ?? []
+                    return live.filter { l.vehicles.contains($0.id) }.map { ($0, l.line) }
+                }
+            }
+            for await found in group { out += found }
+        }
+        if case .stop = screen {
+            stopBuses = out
+            for b in out where routes[b.vehicle.id] == nil { routes[b.vehicle.id] = Movement.route(for: b.vehicle) }
+            if moveTask == nil { renewRoutes() }
         }
     }
 
@@ -151,7 +231,10 @@ final class Model: NSObject, CLLocationManagerDelegate {
     /// Open a line, with `stop` selected (from the stop screen). Its buses refresh every 15 s.
     func openLine(_ id: String, at stop: Stop?) {
         screen = .line(id, stop)
+        stopTask?.cancel()
         lineStop = stop?.id
+        chosenVariant = nil
+        pinned = nil
         lineDetail = nil; vehicles = []; official = [:]
         lineTab = .arrivals
         lineTask?.cancel()
@@ -166,10 +249,14 @@ final class Model: NSObject, CLLocationManagerDelegate {
     }
 
     func refreshLine(_ id: String) async {
-        if let live = try? await transit.live(line: id) {
+        do {
+            let live = try await transit.live(line: id)
             vehicles = live.vehicles
+            serviceDown = false
             checkWatches(line: id, vehicles: live.vehicles)
-        }
+            if let p = pendingPin, live.vehicles.contains(where: { $0.id == p }) { pinned = p; pendingPin = nil }
+            if let p = pinned, !live.vehicles.contains(where: { $0.id == p }) { pinned = nil }  // gone
+        } catch { failed(error) }
         if let s = lineStop { official = await oasa.predictions(stopID: s) }
     }
 
@@ -190,7 +277,8 @@ final class Model: NSObject, CLLocationManagerDelegate {
 
     func closeLine() {
         lineTask?.cancel()
-        if case .line(_, let stop?) = screen { screen = .stop(stop) } else { screen = .home }
+        pinned = nil
+        if case .line(_, let stop?) = screen { open(stop) } else { screen = .home }
     }
 
     /// A fresh fix: new road to drive, and hold the marker if the bus fell a little behind it.
@@ -201,8 +289,9 @@ final class Model: NSObject, CLLocationManagerDelegate {
             r[v.id] = route
             if let d = drawn[v.id] { h[v.id] = Movement.hold(drawn: (d.latitude, d.longitude), on: route) }
         }
+        for b in stopBuses { r[b.vehicle.id] = Movement.route(for: b.vehicle) }
         routes = r; holds = h
-        drawn = drawn.filter { id, _ in vehicles.contains { $0.id == id } }
+        drawn = drawn.filter { id, _ in vehicles.contains { $0.id == id } || stopBuses.contains { $0.vehicle.id == id } }
         if moveTask == nil {
             moveTask = Task { [weak self] in
                 while !Task.isCancelled {
@@ -213,19 +302,25 @@ final class Model: NSObject, CLLocationManagerDelegate {
         }
     }
 
+    /// Counts the once-a-second moves (the map follows a pinned bus on each).
+    var tick = 0
+    var pinnedPosition: CLLocationCoordinate2D? { pinned.flatMap { drawn[$0] } }
+
     private func tickBuses() {
         let now = Date()
         var next: [String: CLLocationCoordinate2D] = [:]
-        for v in vehicles {
+        for v in vehicles + stopBuses.map(\.vehicle) {
             let p = Movement.position(v, route: routes[v.id], hold: holds[v.id] ?? 0, now: now)
             next[v.id] = CLLocationCoordinate2D(latitude: p.0, longitude: p.1)
         }
         withAnimation(.linear(duration: 1)) { drawn = next }  // glide between the once-a-second positions
+        tick += 1
     }
 
     /// The route variant on screen: the one serving the selected stop with the most buses.
     var variantID: String? {
-        lineDetail.flatMap { LineMath.variant(for: $0, stop: lineStop, live: vehicles) }
+        if let c = chosenVariant, lineDetail?.variants[c] != nil { return c }  // picked in the Route tab
+        return lineDetail.flatMap { LineMath.variant(for: $0, stop: lineStop, live: vehicles) }
     }
 
     var approaching: [Approaching] {

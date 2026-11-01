@@ -10,6 +10,7 @@ struct ContentView: View {
     @State private var fittedLine: String?
     @AppStorage("mapStyle") private var mapStyle = "system"
     @AppStorage("showRecents") private var showRecents = true
+    @AppStorage("map3D") private var map3D = false
     @State private var camera: MapCameraPosition = .region(MKCoordinateRegion(
         center: CLLocationCoordinate2D(latitude: 37.9755, longitude: 23.7348),  // Syntagma
         span: MKCoordinateSpan(latitudeDelta: 0.012, longitudeDelta: 0.012)))
@@ -74,6 +75,13 @@ struct ContentView: View {
             withAnimation { camera = .region(MKCoordinateRegion(
                 center: CLLocationCoordinate2D(latitude: center.latitude - span.latitudeDelta * 0.2, longitude: center.longitude), span: span)) }
         }
+        .onChange(of: model.tick) {
+            guard let p = model.pinnedPosition else { return }
+            withAnimation(.linear(duration: 1)) {
+                camera = .camera(MapCamera(centerCoordinate: p, distance: 1400, pitch: map3D ? 45 : 0))
+            }
+        }
+        .onChange(of: model.homeTab) { if model.homeTab == .favourites { Task { await model.loadFavourites() } } }
         .onChange(of: model.userLocation?.latitude) {
             // first fix only: centre on you and list the stops around you (later fixes don't move the map)
             guard let c = model.userLocation, model.screen == .home, !model.centredOnUser else { return }
@@ -108,7 +116,18 @@ struct ContentView: View {
                 }
                 ForEach(model.vehicles) { b in
                     Annotation("", coordinate: model.drawn[b.id] ?? CLLocationCoordinate2D(latitude: b.latitude, longitude: b.longitude)) {
-                        BusMarker(bearing: b.bearing, faded: (b.positionAt.map { Date().timeIntervalSince($0) > 120 } ?? false))
+                        BusMarker(bearing: b.bearing, faded: (b.positionAt.map { Date().timeIntervalSince($0) > 120 } ?? false),
+                                  pinned: model.pinned == b.id, fix: b.positionAt)
+                            .onTapGesture { model.pinned = model.pinned == b.id ? nil : b.id }
+                    }
+                }
+            }
+            if case .stop(let stop) = model.screen {
+                // the buses on their way to this stop, labelled with their line; tap opens it, following the bus
+                ForEach(model.stopBuses, id: \.vehicle.id) { b in
+                    Annotation("", coordinate: model.drawn[b.vehicle.id] ?? CLLocationCoordinate2D(latitude: b.vehicle.latitude, longitude: b.vehicle.longitude)) {
+                        BusMarker(bearing: b.vehicle.bearing, label: b.line, fix: b.vehicle.positionAt)
+                            .onTapGesture { model.pendingPin = b.vehicle.id; model.openLine(b.line, at: stop) }
                     }
                 }
             }
@@ -123,7 +142,7 @@ struct ContentView: View {
                 }
             }
         }
-        .mapStyle(.standard(pointsOfInterest: .excludingAll))
+        .mapStyle(.standard(elevation: map3D ? .realistic : .flat, pointsOfInterest: .excludingAll))
         .mapControls { }  // no zoom or compass buttons, like the Mac app
         .onMapCameraChange(frequency: .onEnd) { ctx in
             if model.screen == .home { fittedLine = nil; Task { await model.loadStops(near: ctx.region.center) } }
@@ -153,21 +172,38 @@ struct ContentView: View {
 struct BusMarker: View {
     let bearing: Double?
     var faded = false
+    var label: String? = nil
+    var pinned = false
+    /// The GPS fix time: a new one sends a ring rippling out (the Mac app's ping).
+    var fix: Date? = nil
+    @State private var ripple = false
 
     var body: some View {
         ZStack {
+            Circle().stroke(Color(red: 0.10, green: 0.53, blue: 0.33), lineWidth: 2)
+                .frame(width: 27, height: 27)
+                .scaleEffect(ripple ? 2.4 : 1).opacity(ripple ? 0 : 0.8)
             if let b = bearing {
                 Image(systemName: "arrowtriangle.up.fill").font(.system(size: 10)).foregroundStyle(Color(red: 0.10, green: 0.53, blue: 0.33))
                     .offset(y: -18).rotationEffect(.degrees(b))
             }
-            Image(systemName: "bus.fill").font(.system(size: 12)).foregroundStyle(.white)
-                .frame(width: 27, height: 27)
-                .background(Color(red: 0.10, green: 0.53, blue: 0.33), in: Circle())  // #198754
-                .overlay(Circle().stroke(.white, lineWidth: 2))
-                .shadow(color: .black.opacity(0.3), radius: 3, y: 1)
+            Group {
+                if let label { Text(label).font(.system(size: 10, weight: .bold)).minimumScaleFactor(0.6) }
+                else { Image(systemName: "bus.fill").font(.system(size: 12)) }
+            }
+            .foregroundStyle(.white)
+            .frame(width: 27, height: 27)
+            .background(Color(red: 0.10, green: 0.53, blue: 0.33), in: Circle())  // #198754
+            .overlay(Circle().stroke(pinned ? Color.orange : .white, lineWidth: 2))
+            .background(Circle().fill(Color.orange.opacity(pinned ? 0.4 : 0)).frame(width: 37, height: 37))
+            .shadow(color: .black.opacity(0.3), radius: 3, y: 1)
         }
         .opacity(faded ? 0.45 : 1)
         .animation(.easeInOut(duration: 1.5), value: bearing)
+        .onChange(of: fix) {
+            ripple = false
+            withAnimation(.easeOut(duration: 1.2)) { ripple = true }
+        }
     }
 }
 

@@ -39,6 +39,9 @@ struct LineCard: View {
     var body: some View {
         HStack(spacing: 12) {
             LineBadge(line: line.line)
+                .overlay(alignment: .topTrailing) {
+                    if !line.arrivalsMinutes.isEmpty { PulseDot(fast: due).offset(x: 4, y: -4) }  // official live time
+                }
             VStack(alignment: .leading, spacing: 3) {
                 Text(Names.place(line.name, line.nameEnglish))
                     .font(.system(size: 13, weight: .semibold)).lineLimit(1)
@@ -53,7 +56,11 @@ struct LineCard: View {
         .padding(.horizontal, 12)
         .frame(height: 58)
         .card()
+        .background(due ? Color.green.opacity(0.16) : .clear, in: RoundedRectangle(cornerRadius: Style.cardRadius))
     }
+
+    /// Arriving now: the card glows green and its dot pulses faster.
+    private var due: Bool { (line.arrivalsMinutes.first ?? 99) <= 1 }
 
     private static let clock: DateFormatter = {
         let f = DateFormatter(); f.dateFormat = "HH:mm"; f.timeZone = OASAClient.athens; return f
@@ -136,4 +143,32 @@ struct AlertCard: View {
         let list = ls.prefix(6).joined(separator: ", ")
         return ls.count == 1 ? String(localized: "\(date) · Line \(list) · tap to read") : String(localized: "\(date) · Lines \(list) · tap to read")
     }
+}
+
+/// A small green dot with a ring breathing out of it: "this is live" (the Mac app's pulse_dot).
+/// Live: a few breaths then still; due now: keeps going, faster.
+struct PulseDot: View {
+    var fast = false
+    @State private var on = false
+
+    var body: some View {
+        ZStack {
+            Circle().fill(.green).frame(width: 8, height: 8)
+                .scaleEffect(on ? 2.6 : 1).opacity(on ? 0 : 0.55)
+            Circle().fill(.green).frame(width: 8, height: 8)
+                .overlay(Circle().stroke(.white, lineWidth: 1.5))
+        }
+        .frame(width: 10, height: 10)
+        .onAppear {
+            withAnimation(.easeOut(duration: fast ? 1.1 : 2).repeatCount(fast ? 10_000 : 3, autoreverses: false)) { on = true }
+        }
+    }
+}
+
+/// Favourite stop subtitle: its next live arrivals ("046 4 min · 040 9 min").
+func favouriteSubtitle(_ lines: [StopLine]?) -> String? {
+    guard let lines else { return nil }
+    let live = lines.filter { !$0.arrivalsMinutes.isEmpty }.sorted { $0.arrivalsMinutes[0] < $1.arrivalsMinutes[0] }.prefix(3)
+    if live.isEmpty { return String(localized: "No live buses") }
+    return live.map { "\($0.line) " + String(localized: "\($0.arrivalsMinutes[0]) min") }.joined(separator: " · ")
 }
