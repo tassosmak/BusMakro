@@ -158,15 +158,39 @@ struct ArrivalCard: View {
         .overlay(RoundedRectangle(cornerRadius: Style.cardRadius).stroke(following ? Color.orange : .clear, lineWidth: 1.5))
         // the details live a long press away: bus number, delay, trip
         .contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: Style.cardRadius))
-        .contextMenu {
-            Section {
-                Text("Bus \(item.vehicle.id)")
-                if !delay.0.isEmpty { Text(delay.0) }
-                Text(item.vehicle.tripLabel.map { Names.place($0, "") } ?? String(localized: "Trip unavailable"))
+        .contextMenu {} preview: { details }  // just the explained details, wide (the buttons are on the card)
+    }
+
+    /// Long press: the bus number, how late or early it runs, and its trip, each with what it means.
+    private var details: some View {
+        let trip = item.vehicle.tripLabel.map { Names.place($0, "") }
+        // "13:55 SCHISTO → SCHISTO": the time it set off, then the route
+        let parts = trip?.split(separator: " ", maxSplits: 1).map(String.init) ?? []
+        let started = parts.count == 2 && parts[0].contains(":") ? parts[0] : nil
+        let route = started != nil ? parts[1] : trip
+        return VStack(alignment: .leading, spacing: 14) {
+            detail("bus.fill", "Bus number", item.vehicle.id, "The number painted on the bus, to spot it.")
+            if let d = item.vehicle.delaySeconds {
+                detail("clock", "Schedule", abs(d) < 60 ? String(localized: "On time")
+                       : d > 0 ? String(localized: "\(d / 60) min late") : String(localized: "\(-d / 60) min early"),
+                       "Compared with the timetable, by OASA.")
             }
-            Menu { watchMenu } label: { Label("Notify Me", systemImage: "bell") }
-            Button(action: onFollow) {
-                Label(following ? "Stop Following" : "Follow on Map", systemImage: following ? "location.slash" : "scope")
+            if let route {
+                detail("arrow.triangle.turn.up.right.diamond", "Trip", route,
+                       started.map { String(localized: "Set off at \($0).") } ?? String(localized: "Where this bus is going."))
+            }
+        }
+        .padding(20)
+        .frame(width: 340, alignment: .leading)
+    }
+
+    private func detail(_ symbol: String, _ title: LocalizedStringKey, _ value: String, _ note: String) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: symbol).font(.system(size: 15)).foregroundStyle(.secondary).frame(width: 22)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary).textCase(.uppercase)
+                Text(value).font(.system(size: 16, weight: .semibold))
+                Text(note).font(.system(size: 12)).foregroundStyle(.secondary)
             }
         }
     }

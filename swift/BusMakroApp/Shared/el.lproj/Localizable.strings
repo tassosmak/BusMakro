@@ -183,3 +183,12 @@
 "Notify Me" = "Ειδοποίησέ με";
 "Follow on Map" = "Παρακολούθηση στον χάρτη";
 "Stop Following" = "Διακοπή παρακολούθησης";
+"Bus number" = "Αριθμός λεωφορείου";
+"Schedule" = "Ωράριο";
+"Trip" = "Διαδρομή";
+"%lld min late" = "%lld λεπ. καθυστέρηση";
+"%lld min early" = "%lld λεπ. νωρίτερα";
+"The number painted on the bus, to spot it." = "Ο αριθμός πάνω στο λεωφορείο, για να το αναγνωρίσεις.";
+"Compared with the timetable, by OASA." = "Σε σχέση με το πρόγραμμα, κατά τον ΟΑΣΑ.";
+"Set off at %@." = "Ξεκίνησε στις %@.";
+"Where this bus is going." = "Πού πηγαίνει αυτό το λεωφορείο.";
