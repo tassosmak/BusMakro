@@ -45,13 +45,35 @@ public enum LineMath {
         }
     }
 
+    /// The stop a bus drives to next, from its position: the end of the stretch between two stops
+    /// it is nearest (within 300 m of the road between them).
+    static func nextStop(_ v: Vehicle, on route: [String], detail: LineDetail) -> Int? {
+        let k = cos(v.latitude * .pi / 180)
+        var best: (i: Int, off: Double)?
+        for i in 1..<max(1, route.count) {
+            guard let a = detail.stops[route[i - 1]], let b = detail.stops[route[i]] else { continue }
+            let bx = (b.lon - a.lon) * k, by = b.lat - a.lat, px = (v.longitude - a.lon) * k, py = v.latitude - a.lat
+            let L = bx * bx + by * by
+            let f = L > 0 ? max(0, min(1, (px * bx + py * by) / L)) : 0
+            let off = hypot(px - bx * f, py - by * f) * 111_320
+            if off < (best?.off ?? 300) { best = (i, off) }
+        }
+        return best?.i
+    }
+
     /// The buses still heading to `stop`, nearest first. `official` maps vehicle code → minutes (OASA).
     public static func approaching(_ stop: String, detail: LineDetail, live: [Vehicle],
                                    official: [String: Int], now: Date = Date()) -> [Approaching] {
         live.compactMap { v in
-            guard let vid = v.variant, let route = detail.variants[vid]?.stops,
-                  let si = route.firstIndex(of: stop), let next = v.nextStopID,
-                  let ni = route.firstIndex(of: next), ni <= si else { return nil }
+            // its route (or, without one, a route of the line through this stop)
+            guard let route = (v.variant.flatMap { detail.variants[$0]?.stops })
+                    ?? detail.variants.values.map(\.stops).first(where: { $0.contains(stop) }),
+                  // its next stop: from the feed, or worked out from where it is (some lines' feeds
+                  // send none, and then every bus was dropped: "no bus is heading to this stop")
+                  let ni = v.nextStopID.flatMap({ route.firstIndex(of: $0) }) ?? nextStop(v, on: route, detail: detail),
+                  // this stop at or after it (a loop line passes its first stop again at the end)
+                  let si = route[ni...].firstIndex(of: stop) else { return nil }
+            let next = route[ni]
             // along the route: bus → its next stop → … → this stop
             var m = 0.0
             if let a = detail.stops[next] { m = Geo.distance(v.latitude, v.longitude, a.lat, a.lon) }

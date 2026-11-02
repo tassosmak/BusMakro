@@ -4,6 +4,17 @@ import BusMakroKit
 import Foundation
 
 // `swift run busmakro-check plan path/to/Rail.json`: a few trips across Athens (downloads every line)
+if CommandLine.arguments.dropFirst().first == "approach", CommandLine.arguments.count > 2 {
+    // busmakro-check approach 814: buses heading to each stop of the line
+    let line = CommandLine.arguments[2], t = TransitClient()
+    let detail = try await t.detail(line: line), live = try await t.live(line: line)
+    print("\(live.vehicles.count) buses, \(live.vehicles.filter { $0.nextStopID == nil }.count) without a next stop")
+    for vid in detail.variants.keys.sorted() {
+        let counts = detail.variants[vid]!.stops.map { LineMath.approaching($0, detail: detail, live: live.vehicles, official: [:]).count }
+        print(vid, counts.map(String.init).joined(separator: " "))
+    }
+    exit(0)
+}
 if CommandLine.arguments.dropFirst().first == "plan" {
     let lines = try await TransitClient().lines()
     let index = try await StopIndex.load(lines: lines.map(\.id))
