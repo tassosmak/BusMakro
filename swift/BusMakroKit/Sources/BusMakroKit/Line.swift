@@ -9,16 +9,23 @@ public struct LineDetail: Sendable, Decodable {
         public let shape: [[Double]]
         /// Stop ids in order.
         public let stops: [String]
+        public init(headsign: String, shape: [[Double]], stops: [String]) {
+            self.headsign = headsign; self.shape = shape; self.stops = stops
+        }
     }
     public struct StopInfo: Sendable, Decodable, Hashable {
         public let name: String
         public let lat: Double
         public let lon: Double
+        public init(name: String, lat: Double, lon: Double) { self.name = name; self.lat = lat; self.lon = lon }
     }
 
     public let id: String
     public let variants: [String: Variant]
     public let stops: [String: StopInfo]
+    public init(id: String, variants: [String: Variant], stops: [String: StopInfo]) {
+        self.id = id; self.variants = variants; self.stops = stops
+    }
 }
 
 /// A bus on its way to a stop.
@@ -129,11 +136,18 @@ public enum LineMath {
 
 extension TransitClient {
     /// A line's route variants and stops.
+    /// From athens-transit-rt's static data, or OASA's own when that fails or lacks the line (Χ25).
     public func detail(line: String) async throws -> LineDetail {
-        let url = Self.staticBase.appendingPathComponent("lines").appendingPathComponent("\(line).json")
-        let (data, resp) = try await URLSession.shared.data(from: url)
-        guard (resp as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
-        return try JSONDecoder().decode(LineDetail.self, from: data)
+        do {
+            let url = Self.staticBase.appendingPathComponent("lines").appendingPathComponent("\(line).json")
+            let (data, resp) = try await session.data(for: URLRequest(url: url, timeoutInterval: Self.patience))
+            guard (resp as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
+            return try JSONDecoder().decode(LineDetail.self, from: data)
+        } catch {
+            if error is CancellationError || (error as? URLError)?.code == .cancelled { throw error }
+            await OASABackup.shared.used(line)
+            return try await OASAClient().lineDetail(line: line)
+        }
     }
 }
 

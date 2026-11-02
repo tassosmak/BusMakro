@@ -25,6 +25,18 @@ if CommandLine.arguments.dropFirst().first == "approach", CommandLine.arguments.
     }
     exit(0)
 }
+if CommandLine.arguments.dropFirst().first == "oasa", CommandLine.arguments.count > 2 {
+    // busmakro-check oasa Χ25: a line and its buses from OASA alone (the backup)
+    let line = CommandLine.arguments[2], o = OASAClient()
+    let d = try await o.lineDetail(line: line), buses = try await o.buses(line: line)
+    for (k, v) in d.variants { print(k, v.headsign, v.stops.count, "stops", v.shape.count, "shape points") }
+    for b in buses { print(b.id, b.latitude, b.longitude, b.bearing ?? -1, b.positionAt.map { Int(Date().timeIntervalSince($0)) } ?? -1, "s old", b.variant ?? "") }
+    if let s = d.variants.values.first?.stops.last {
+        for a in LineMath.approaching(s, detail: d, live: buses, official: [:]) { print("→", s, a.vehicle.id, a.stopsAway, "stops", Int(a.seconds / 60), "min") }
+    }
+    print((try await TransitClient().lines()).filter { Translit.lineKey($0.id) == Translit.lineKey("x25") }.map(\.id))
+    exit(0)
+}
 if CommandLine.arguments.dropFirst().first == "plan" {
     let lines = try await TransitClient().lines()
     let index = try await StopIndex.load(lines: lines.map(\.id))

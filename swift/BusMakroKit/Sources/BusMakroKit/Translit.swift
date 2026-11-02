@@ -46,4 +46,13 @@ public enum Translit {
             .replacingOccurrences(of: "[^a-z0-9]+", with: " ", options: .regularExpression)
             .trimmingCharacters(in: .whitespaces)
     }
+
+    /// A line number to compare by how it looks: OASA writes Χ95, Β2, Α15 with Greek letters, while
+    /// people type X95, B2, A15 (as Greek, Χ became "ch" and Β "v", so "x95" found nothing).
+    public static func lineKey(_ text: String) -> String {
+        let looks: [Character: Character] = ["Α": "A", "Β": "B", "Ε": "E", "Ζ": "Z", "Η": "H", "Ι": "I", "Κ": "K", "Μ": "M",
+                                             "Ν": "N", "Ο": "O", "Ρ": "P", "Τ": "T", "Υ": "Y", "Χ": "X"]
+        return String(text.uppercased().map { looks[$0] ?? $0 }).lowercased()
+            .replacingOccurrences(of: "[^a-z0-9]+", with: "", options: .regularExpression)
+    }
 }

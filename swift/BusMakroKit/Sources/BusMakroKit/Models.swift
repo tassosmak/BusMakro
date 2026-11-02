@@ -56,6 +56,13 @@ public struct Vehicle: Identifiable, Hashable, Sendable, Decodable {
         case positionAt = "position_at", nextStopID = "next_stop_id", delaySeconds = "delay_s", tripLabel = "trip_label"
     }
 
+    /// A bus from OASA's own feed (the backup): a position and heading, nothing about the road ahead.
+    public init(id: String, latitude: Double, longitude: Double, bearing: Double?, positionAt: Date?, variant: String?) {
+        self.id = id; self.latitude = latitude; self.longitude = longitude; self.bearing = bearing
+        self.positionAt = positionAt; self.variant = variant
+        nextStopID = nil; delaySeconds = nil; speed = nil; tripLabel = nil; path = nil; pathBeyond = nil; pathSpeeds = nil
+    }
+
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decode(String.self, forKey: .id)
@@ -78,6 +85,7 @@ public struct Vehicle: Identifiable, Hashable, Sendable, Decodable {
 public struct LineLive: Sendable, Decodable {
     public let line: String
     public let vehicles: [Vehicle]
+    public init(line: String, vehicles: [Vehicle]) { self.line = line; self.vehicles = vehicles }
 }
 
 /// A line serving a stop, with OASA's next predictions (minutes), soonest first.

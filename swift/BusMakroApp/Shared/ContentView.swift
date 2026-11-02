@@ -211,7 +211,9 @@ struct ContentView: View {
                 .frame(width: Style.roundButton, height: Style.roundButton)
                 .contentShape(Circle())
         }
+        #if os(iOS)
         .menuActionDismissBehavior(.disabled)  // flip several at once
+        #endif
         .buttonStyle(.plain)
         .glass(Circle())
         .accessibilityLabel("Map Layers")

@@ -125,12 +125,12 @@ final class Model: NSObject, CLLocationManagerDelegate {
 
     // MARK: Search (the bar at the top): lines by number or name, then stops by name
     var lineResults: [LineSummary] {
-        let q = Translit.normalize(searchText)
+        let q = Translit.normalize(searchText), k = Translit.lineKey(searchText)
         guard !q.isEmpty else { return [] }
         let hits = lines.filter {
-            Translit.normalize($0.id).hasPrefix(q) || (q.count > 2 && Translit.normalize($0.name).contains(q))
+            (!k.isEmpty && Translit.lineKey($0.id).hasPrefix(k)) || (q.count > 2 && Translit.normalize($0.name).contains(q))
         }
-        return Array(hits.sorted { (Translit.normalize($0.id) == q ? 0 : 1) < (Translit.normalize($1.id) == q ? 0 : 1) }.prefix(8))
+        return Array(hits.sorted { (Translit.lineKey($0.id) == k ? 0 : 1) < (Translit.lineKey($1.id) == k ? 0 : 1) }.prefix(8))
     }
 
     var stopResults: [(stop: Stop, lines: [String])] {
@@ -262,6 +262,8 @@ final class Model: NSObject, CLLocationManagerDelegate {
     // MARK: Line view
     /// Open a line, with `stop` selected (from the stop screen). Its buses refresh every 15 s.
     func openLine(_ id: String, at stop: Stop?) {
+        // "X95" from a link or Siri is the line filed as "Χ95"
+        let id = lines.first { Translit.lineKey($0.id) == Translit.lineKey(id) }?.id ?? id
         screen = .line(id, stop)
         stopTask?.cancel()
         lineStop = stop?.id

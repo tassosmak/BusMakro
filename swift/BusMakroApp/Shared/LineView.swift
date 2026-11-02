@@ -158,8 +158,6 @@ struct ArrivalCard: View {
         .card()
         .background(item.seconds < 90 ? Color.green.opacity(0.16) : .clear, in: RoundedRectangle(cornerRadius: Style.cardRadius))
         .overlay(RoundedRectangle(cornerRadius: Style.cardRadius).stroke(following ? Color.orange : .clear, lineWidth: 1.5))
-        // the details live a long press away: bus number, delay, trip
-        .contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: Style.cardRadius))
         // long press: just the explained details, in a wide popover (the buttons stay on the card;
         // a context menu with no items never opens)
         .simultaneousGesture(LongPressGesture(minimumDuration: 0.4).onEnded { _ in showDetails = true })

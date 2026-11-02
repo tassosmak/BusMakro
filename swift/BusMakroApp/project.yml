@@ -35,6 +35,7 @@ targets:
         DEVELOPMENT_TEAM: LXL43GG782  # personal team (free Apple ID): device builds
         CODE_SIGN_STYLE: Automatic
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        TARGETED_DEVICE_FAMILY: "1"  # iPhone only for now (on iPad it runs in iPhone mode); a real iPad layout later
         MARKETING_VERSION: "0.1.0"
         CURRENT_PROJECT_VERSION: 1
   BusMakroWidgets:
