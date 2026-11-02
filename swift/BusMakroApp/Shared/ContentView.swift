@@ -276,9 +276,9 @@ struct ContentView: View {
         .animation(.easeInOut(duration: 0.25), value: zoomHint)
     }
 
-    /// Faint hint when the map is zoomed too far out for stop pins and there's no fix to show yours.
+    /// Faint hint when the map is zoomed too far out for stop pins.
     private var zoomHint: Bool {
-        model.screen == .home && model.homeTab != .favourites && showStops && !model.searchActive && model.userLocation == nil
+        model.screen == .home && model.homeTab != .favourites && showStops && !model.searchActive
             && (visibleRegion?.span.latitudeDelta ?? 0) > Model.stopsMaxSpan
     }
 
@@ -290,12 +290,8 @@ struct ContentView: View {
         case .home:
             if model.homeTab == .favourites { return model.favourites }
             guard showStops else { return [] }
-            // zoomed far out the pins would cover the city: just the ones around you (none without a fix)
-            guard (visibleRegion?.span.latitudeDelta ?? 0) <= Model.stopsMaxSpan else {
-                guard let u = model.userLocation else { return [] }
-                let near = model.stops(in: MKCoordinateRegion(center: u, span: MKCoordinateSpan(latitudeDelta: 0.008, longitudeDelta: 0.008)))
-                return near.filter { !model.isFavourite($0) } + model.favourites
-            }
+            // zoomed far out the pins would cover the city: only your favourites until you zoom in
+            guard (visibleRegion?.span.latitudeDelta ?? 0) <= Model.stopsMaxSpan else { return model.favourites }
             // every stop on screen, plus the nearby list's (OASA's, with street names) where they're missing
             let ids = Set(regionStops.map(\.id))
             let all = regionStops + model.stops.filter { !ids.contains($0.id) }
