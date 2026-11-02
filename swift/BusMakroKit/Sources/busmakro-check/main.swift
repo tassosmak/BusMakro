@@ -18,7 +18,9 @@ if CommandLine.arguments.dropFirst().first == "approach", CommandLine.arguments.
         let stop = stops[stops.count - 5]
         let official = await OASAClient().predictions(stopID: stop)
         for a in LineMath.approaching(stop, detail: detail, live: live.vehicles, official: official) {
-            print(stop, a.vehicle.id, Int(a.metres), "m", Int(a.seconds / 60), "min", a.official ? "OASA" : "est")
+            let age = a.vehicle.positionAt.map { Int(Date().timeIntervalSince($0)) } ?? -1
+            print(stop, a.vehicle.id, a.stopsAway, "stops", Int(a.metres), "m", Int(a.seconds / 60), "min", a.official ? "OASA" : "est", a.waiting ? "WAITING" : "",
+                  "speed", a.vehicle.speed ?? -1, "fix", age, "s old", "next", a.vehicle.nextStopID ?? "-", "var", a.vehicle.variant ?? "-")
         }
     }
     exit(0)

@@ -30,10 +30,15 @@ public struct Approaching: Identifiable, Hashable, Sendable {
     /// Seconds to the stop: OASA's official prediction when there is one, else our own estimate.
     public var seconds: Double
     public let official: Bool
+    /// Standing still while OASA's time is far beyond its distance: parked at a terminus until its
+    /// scheduled departure (so a bus fewer stops away can come later than one further back).
+    public var waiting: Bool {
+        official && (vehicle.speed ?? 0) <= 0.5 && seconds > metres / LineMath.defaultSpeed * 1.5 + 600
+    }
 }
 
 public enum LineMath {
-    static let defaultSpeed = 4.5  // m/s, a typical Athens bus pace incl. stops and lights
+    public static let defaultSpeed = 4.5  // m/s, a typical Athens bus pace incl. stops and lights
 
     /// The variant to show for a stop: the one that serves it and has the most buses on it.
     public static func variant(for detail: LineDetail, stop: String?, live: [Vehicle]) -> String? {

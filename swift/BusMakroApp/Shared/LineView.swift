@@ -138,7 +138,8 @@ struct ArrivalCard: View {
                     Text(time).font(Style.rounded(20)).contentTransition(.numericText(countsDown: true))
                     if item.official { PulseDot(fast: item.seconds < 90) }
                 }
-                Text(item.stopsAway == 0 ? String(localized: "next stop") : item.stopsAway == 1 ? String(localized: "1 stop away") : String(localized: "\(item.stopsAway) stops away"))
+                Text((item.stopsAway == 0 ? String(localized: "next stop") : item.stopsAway == 1 ? String(localized: "1 stop away") : String(localized: "\(item.stopsAway) stops away"))
+                     + (item.waiting ? " · " + String(localized: "waiting to set off") : ""))
                     .font(.system(size: 11)).foregroundStyle(.secondary)
             }
             Spacer(minLength: 0)
