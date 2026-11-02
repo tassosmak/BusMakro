@@ -189,10 +189,17 @@ struct Sheet: View {
     }
 
     /// Long-press a favourite: give it a nickname, take it back, or remove the favourite.
-    @ViewBuilder private func favouriteMenu(_ key: String, name: String, remove: @escaping () -> Void) -> some View {
+    @ViewBuilder private func favouriteMenu(_ key: String, name: String, index: Int, count: Int, remove: @escaping () -> Void) -> some View {
         Button { nickname = model.nicknames[key] ?? ""; renaming = key } label: { Label("Rename…", systemImage: "pencil") }
         if model.nicknames[key] != nil {
             Button { model.setNickname("", for: key) } label: { Label("Remove Nickname", systemImage: "arrow.uturn.backward") }
+        }
+        if index > 0 {
+            Button { withAnimation { model.moveFavourite(key, by: -index) } } label: { Label("Move to Top", systemImage: "arrow.up.to.line") }
+            Button { withAnimation { model.moveFavourite(key, by: -1) } } label: { Label("Move Up", systemImage: "arrow.up") }
+        }
+        if index < count - 1 {
+            Button { withAnimation { model.moveFavourite(key, by: 1) } } label: { Label("Move Down", systemImage: "arrow.down") }
         }
         Button(role: .destructive, action: remove) { Label("Remove from Favourites", systemImage: "star.slash") }
     }
@@ -221,7 +228,8 @@ struct Sheet: View {
                                  subtitle: model.homeTab == .favourites ? favouriteSubtitle(model.favLines[stop.id]) : nil)
                     }
                     .buttonStyle(.plain)
-                    .contextMenu { if model.homeTab == .favourites { favouriteMenu("stop:\(stop.id)", name: stop.title) { model.toggleFavourite(stop) } } }
+                    .contextMenu { if model.homeTab == .favourites { favouriteMenu("stop:\(stop.id)", name: stop.title, index: i, count: stops.count) { model.toggleFavourite(stop) } } }
+                    .modifier(Reorderable(key: "stop:\(stop.id)", on: model.homeTab == .favourites, model: model))
                     .appearing(i)
                 }
                 ForEach(Array(lines.enumerated()), id: \.element) { i, id in
@@ -229,11 +237,28 @@ struct Sheet: View {
                         LineRow(line: model.lines.first { $0.id == id } ?? LineSummary(id: id), nickname: model.nicknames["line:\(id)"])
                     }
                     .buttonStyle(.plain)
-                    .contextMenu { favouriteMenu("line:\(id)", name: model.nicknames["line:\(id)"] ?? id) { model.toggleFavouriteLine(id) } }
+                    .contextMenu { favouriteMenu("line:\(id)", name: model.nicknames["line:\(id)"] ?? id, index: i, count: lines.count) { model.toggleFavouriteLine(id) } }
+                    .modifier(Reorderable(key: "line:\(id)", on: true, model: model))
                     .appearing(stops.count + i)
                 }
             }
         }
+    }
+}
+
+/// Drag a favourite onto another of the same kind to put it there.
+struct Reorderable: ViewModifier {
+    let key: String, on: Bool, model: Model
+    func body(content: Content) -> some View {
+        if on {
+            content
+                .draggable(key)
+                .dropDestination(for: String.self) { items, _ in
+                    guard let k = items.first, k != key else { return false }
+                    withAnimation { model.moveFavourite(k, to: key) }
+                    return true
+                }
+        } else { content }
     }
 }
 

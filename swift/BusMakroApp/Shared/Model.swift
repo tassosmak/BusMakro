@@ -421,6 +421,24 @@ final class Model: NSObject, CLLocationManagerDelegate {
         UserDefaults.standard.set(favouriteLines, forKey: "favoriteLines")
     }
 
+    /// Reorder favourites: put `key` ("stop:ID" or "line:ID") where `target` is, or move it by `by` places.
+    func moveFavourite(_ key: String, to target: String? = nil, by: Int = 0) {
+        func move<T>(_ a: inout [T], _ id: (T) -> String, _ k: String, _ t: String?) {
+            guard let from = a.firstIndex(where: { id($0) == k }) else { return }
+            let to = t.flatMap { t in a.firstIndex { id($0) == t } } ?? min(max(from + by, 0), a.count - 1)
+            guard to != from else { return }
+            a.insert(a.remove(at: from), at: to)
+        }
+        let id = String(key.drop { $0 != ":" }.dropFirst()), t = target.map { String($0.drop { $0 != ":" }.dropFirst()) }
+        if key.hasPrefix("stop:") {
+            guard target == nil || target!.hasPrefix("stop:") else { return }
+            move(&favourites, \.id, id, t); Model.saveStops(favourites, "favorites")
+        } else {
+            guard target == nil || target!.hasPrefix("line:") else { return }
+            move(&favouriteLines, { $0 }, id, t); UserDefaults.standard.set(favouriteLines, forKey: "favoriteLines")
+        }
+    }
+
     func isFavourite(_ s: Stop) -> Bool { favourites.contains { $0.id == s.id } }
 
     func toggleFavourite(_ s: Stop) {

@@ -174,3 +174,6 @@
 "Shown instead of its name. Leave empty to use the name again." = "Εμφανίζεται αντί για το όνομα. Αφήστε το κενό για να ξαναδείχνει το όνομα.";
 "Favourite Stops" = "Αγαπημένες στάσεις";
 "Zoom in to see bus stops" = "Μεγεθύνετε για να δείτε στάσεις";
+"Move to Top" = "Μετακίνηση στην κορυφή";
+"Move Up" = "Μετακίνηση πάνω";
+"Move Down" = "Μετακίνηση κάτω";
