@@ -258,6 +258,25 @@ struct ContentView: View {
             if model.screen == .home { fittedLine = nil; Task { await model.loadStops(near: ctx.region.center) } }
         }
         .ignoresSafeArea()
+        .overlay(alignment: .top) {
+            if zoomHint {
+                Text("Zoom in to see bus stops")
+                    .font(.footnote.weight(.medium))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 12).padding(.vertical, 6)
+                    .background(.thinMaterial.opacity(0.7), in: Capsule())
+                    .padding(.top, 120)
+                    .allowsHitTesting(false)
+                    .transition(.opacity)
+            }
+        }
+        .animation(.easeInOut(duration: 0.25), value: zoomHint)
+    }
+
+    /// Faint hint when the map is zoomed too far out for stop pins.
+    private var zoomHint: Bool {
+        model.screen == .home && model.homeTab != .favourites && showStops && !model.searchActive
+            && (visibleRegion?.span.latitudeDelta ?? 0) > Model.stopsMaxSpan
     }
 
     private var isStation: Bool { if case .station = model.screen { true } else { false } }
