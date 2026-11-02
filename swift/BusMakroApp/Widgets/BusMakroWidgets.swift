@@ -39,7 +39,7 @@ struct BusLiveActivity: Widget {
                 }
             } compactTrailing: {
                 Countdown(state: ctx.state).font(.system(size: 14, weight: .semibold, design: .rounded))
-                    .frame(maxWidth: 52)
+                    .frame(maxWidth: 64)
             } minimal: {
                 Image(systemName: "bus.fill").foregroundStyle(Self.green)
             }
@@ -74,8 +74,16 @@ private struct Countdown: View {
         if state.arrived || state.arrival <= .now {
             Text("Now").foregroundStyle(.orange)
         } else {
-            Text(timerInterval: Date.now...state.arrival, countsDown: true, showsHours: false)
-                .monospacedDigit().multilineTextAlignment(.trailing)
+            // whole minutes ("10'"): the times are estimates, seconds only looked precise
+            if #available(iOS 18, *) {
+                // counts down by itself, minute by minute, even while the app is suspended
+                // ("2 min": the only way iOS counts minutes live; +59 s so 2:30 left reads 3, not 2)
+                Text(.now, format: .timer(countingDownIn: Date.now..<state.arrival.addingTimeInterval(59), showsHours: false,
+                                          maxFieldCount: 1, maxPrecision: .seconds(60)))
+                    .monospacedDigit().multilineTextAlignment(.trailing).lineLimit(1).minimumScaleFactor(0.7)
+            } else {
+                Text("\(max(1, Int((state.arrival.timeIntervalSinceNow / 60).rounded(.up)))) min").monospacedDigit()
+            }
         }
     }
 }
