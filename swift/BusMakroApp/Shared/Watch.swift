@@ -115,7 +115,7 @@ enum LiveBus {
     static func update(_ bus: String, watch w: BusWatch, stopsAway: Int, seconds: Double) {
         #if os(iOS)
         let state = BusActivityAttributes.ContentState(stopsAway: stopsAway, arrival: Date().addingTimeInterval(max(0, seconds)))
-        let content = ActivityContent(state: state, staleDate: Date().addingTimeInterval(180))
+        let content = ActivityContent(state: state, staleDate: Date().addingTimeInterval(60))  // the minutes go out of date after a minute
         if let a = activities[bus] {
             Task { await a.update(content) }
         } else if ActivityAuthorizationInfo().areActivitiesEnabled {

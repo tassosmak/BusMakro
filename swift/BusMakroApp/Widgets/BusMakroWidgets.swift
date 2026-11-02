@@ -23,7 +23,7 @@ struct BusLiveActivity: Widget {
                     LineBadge(line: ctx.attributes.line).padding(.leading, 4)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    Countdown(state: ctx.state).font(.system(size: 22, weight: .bold, design: .rounded))
+                    Countdown(state: ctx.state, stale: ctx.isStale).font(.system(size: 22, weight: .bold, design: .rounded))
                         .padding(.trailing, 4)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
@@ -38,7 +38,7 @@ struct BusLiveActivity: Widget {
                     Text(ctx.attributes.line).font(.system(size: 14, weight: .bold, design: .rounded))
                 }
             } compactTrailing: {
-                Countdown(state: ctx.state).font(.system(size: 14, weight: .semibold, design: .rounded))
+                Countdown(state: ctx.state, stale: ctx.isStale).font(.system(size: 14, weight: .semibold, design: .rounded))
                     .frame(maxWidth: 64)
             } minimal: {
                 Image(systemName: "bus.fill").foregroundStyle(Self.green)
@@ -59,7 +59,7 @@ private struct LockScreenView: View {
                     Text("Bus \(ctx.attributes.bus)").font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
-                Countdown(state: ctx.state).font(.system(size: 26, weight: .bold, design: .rounded))
+                Countdown(state: ctx.state, stale: ctx.isStale).font(.system(size: 26, weight: .bold, design: .rounded))
             }
             StopsBar(state: ctx.state, alertAt: ctx.attributes.alertAt)
         }
@@ -68,22 +68,18 @@ private struct LockScreenView: View {
 }
 
 /// "4 min" counting down by itself between updates, then "Now".
+/// Minutes to the stop, short: "3'". Set by the app on each reading; if no fresh reading came for a
+/// minute (iOS paused the app), the minutes would be stale, so it shows the arrival time ("17:42").
 private struct Countdown: View {
     let state: BusActivityAttributes.ContentState
+    var stale = false
     var body: some View {
         if state.arrived || state.arrival <= .now {
             Text("Now").foregroundStyle(.orange)
+        } else if stale {
+            Text(state.arrival, style: .time).monospacedDigit()
         } else {
-            // whole minutes ("10'"): the times are estimates, seconds only looked precise
-            if #available(iOS 18, *) {
-                // counts down by itself, minute by minute, even while the app is suspended
-                // ("2 min": the only way iOS counts minutes live; +59 s so 2:30 left reads 3, not 2)
-                Text(.now, format: .timer(countingDownIn: Date.now..<state.arrival.addingTimeInterval(59), showsHours: false,
-                                          maxFieldCount: 1, maxPrecision: .seconds(60)))
-                    .monospacedDigit().multilineTextAlignment(.trailing).lineLimit(1).minimumScaleFactor(0.7)
-            } else {
-                Text("\(max(1, Int((state.arrival.timeIntervalSinceNow / 60).rounded(.up)))) min").monospacedDigit()
-            }
+            Text("\(max(1, Int((state.arrival.timeIntervalSinceNow / 60).rounded(.up))))'").monospacedDigit()
         }
     }
 }
