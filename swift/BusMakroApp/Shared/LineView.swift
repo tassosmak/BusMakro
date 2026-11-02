@@ -121,7 +121,8 @@ struct LineContent: View {
     }
 }
 
-/// An approaching bus: time (rolling), stops away, bus number and trip, delay.
+/// An approaching bus: time (rolling), stops away, and the alert and follow buttons; long-press
+/// for the bus number, delay and trip.
 struct ArrivalCard: View {
     let item: Approaching
     var watching: Int? = nil
@@ -130,7 +131,7 @@ struct ArrivalCard: View {
     var onFollow: () -> Void = {}
 
     var body: some View {
-        HStack(alignment: .center, spacing: 12) {
+        HStack(alignment: .center, spacing: 10) {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
                     Text(time).font(Style.rounded(20)).contentTransition(.numericText(countsDown: true))
@@ -139,37 +140,53 @@ struct ArrivalCard: View {
                 Text(item.stopsAway == 0 ? String(localized: "next stop") : item.stopsAway == 1 ? String(localized: "1 stop away") : String(localized: "\(item.stopsAway) stops away"))
                     .font(.system(size: 11)).foregroundStyle(.secondary)
             }
-            .frame(width: 112, alignment: .leading)
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                    Text("Bus \(item.vehicle.id)").font(.system(size: 13, weight: .semibold)).lineLimit(1).minimumScaleFactor(0.8)
-                    Spacer()
-                    Text(delay.0).font(.system(size: 12, weight: .semibold)).foregroundStyle(delay.1)
-                    // 🔔: notify me when this bus is N stops from my stop
-                    Menu {
-                        Text("Notify me when this bus is…")
-                        ForEach(Model.watchChoices, id: \.self) { n in
-                            Button(n == 1 ? String(localized: "1 stop away") : String(localized: "\(n) stops away")) { onWatch(n) }
-                        }
-                        if watching != nil { Button("Don't Notify Me", role: .destructive) { onWatch(nil) } }
-                    } label: {
-                        Image(systemName: watching != nil ? "bell.fill" : "bell")
-                            .foregroundStyle(watching != nil ? Color.orange : Color.secondary)
-                    }
-                    // ⌖: follow this bus on the map
-                    Button(action: onFollow) {
-                        Image(systemName: following ? "location.fill" : "scope")
-                            .foregroundStyle(following ? Color.orange : Color.secondary)
-                    }.buttonStyle(.plain)
-                }
-                Text(item.vehicle.tripLabel.map { Names.place($0, "") } ?? String(localized: "Trip unavailable")).font(.system(size: 12)).foregroundStyle(.secondary).lineLimit(1)
+            Spacer(minLength: 0)
+            // 🔔: notify me when this bus is N stops from my stop
+            Menu { watchMenu } label: {
+                circle(watching != nil ? "bell.fill" : "bell", on: watching != nil)
             }
+            .accessibilityLabel(Text("Notify Me"))
+            // ⌖: follow this bus on the map
+            Button(action: onFollow) { circle(following ? "location.fill" : "scope", on: following) }
+                .buttonStyle(.plain)
+                .accessibilityLabel(Text("Follow on Map"))
         }
         .padding(.horizontal, 14)
         .frame(height: 72)
         .card()
         .background(item.seconds < 90 ? Color.green.opacity(0.16) : .clear, in: RoundedRectangle(cornerRadius: Style.cardRadius))
         .overlay(RoundedRectangle(cornerRadius: Style.cardRadius).stroke(following ? Color.orange : .clear, lineWidth: 1.5))
+        // the details live a long press away: bus number, delay, trip
+        .contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: Style.cardRadius))
+        .contextMenu {
+            Section {
+                Text("Bus \(item.vehicle.id)")
+                if !delay.0.isEmpty { Text(delay.0) }
+                Text(item.vehicle.tripLabel.map { Names.place($0, "") } ?? String(localized: "Trip unavailable"))
+            }
+            Menu { watchMenu } label: { Label("Notify Me", systemImage: "bell") }
+            Button(action: onFollow) {
+                Label(following ? "Stop Following" : "Follow on Map", systemImage: following ? "location.slash" : "scope")
+            }
+        }
+    }
+
+    @ViewBuilder private var watchMenu: some View {
+        Text("Notify me when this bus is…")
+        ForEach(Model.watchChoices, id: \.self) { n in
+            Button(n == 1 ? String(localized: "1 stop away") : String(localized: "\(n) stops away")) { onWatch(n) }
+        }
+        if watching != nil { Button("Don't Notify Me", role: .destructive) { onWatch(nil) } }
+    }
+
+    /// A round, finger-sized button face (44 pt), tinted orange while on.
+    private func circle(_ symbol: String, on: Bool) -> some View {
+        Image(systemName: symbol)
+            .font(.system(size: 16, weight: .medium))
+            .foregroundStyle(on ? Color.orange : Color.primary.opacity(0.7))
+            .frame(width: 40, height: 40)
+            .background(on ? Color.orange.opacity(0.16) : Color.primary.opacity(0.06), in: Circle())
+            .contentShape(Circle())
     }
 
     private var time: String {
