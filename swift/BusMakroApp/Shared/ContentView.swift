@@ -63,7 +63,7 @@ struct ContentView: View {
                 .ignoresSafeArea(.container, edges: .bottom)  // measured from the screen edge, not the home indicator
             }
         }
-        .overlay { SideMenu(open: $menuOpen, onMetroMap: { showMetroMap = true }, onSettings: { model.showSettings = true }, onTrip: { model.showTrip = true }, onHome: { model.takeMeHome() }, onDebug: { showDebug = true }) }
+        .overlay { SideMenu(open: $menuOpen, onMetroMap: { showMetroMap = true }, onSettings: { model.showSettings = true }, onTrip: { model.showTrip = true }, onPlace: { model.takeMe(to: $0) }, onDebug: { showDebug = true }) }
         .fullScreenCoverOrSheet(isPresented: $showMetroMap) { MetroMapView() }
         .ignoresSafeArea(.keyboard)
         .preferredColorScheme(mapStyle == "light" ? .light : mapStyle == "dark" ? .dark : nil)
@@ -73,7 +73,7 @@ struct ContentView: View {
         .sheet(isPresented: $showDebug) { DebugView(model: model) }
         #endif
         .fullScreenCoverOrSheet(isPresented: $model.showWelcome) {
-            WelcomeView {
+            Onboarding(model: model) {
                 UserDefaults.standard.set(true, forKey: "onboarded")
                 model.showWelcome = false
                 model.askLocation()
@@ -444,12 +444,17 @@ struct LinkHandling: ViewModifier {
             .onChange(of: model.favourites, initial: true) {
                 SpotlightStops.index(favourites: model.favourites, recents: model.recents)
                 #if os(iOS)
-                QuickActions.update(favourites: model.favourites)
+                QuickActions.update(favourites: model.favourites, places: SavedPlace.allCases.filter { model[place: $0] != nil })
                 WidgetFavourites.save(model.favourites.map { .init(id: $0.id, title: $0.title) })
                 WidgetCenter.shared.reloadTimelines(ofKind: "NextBuses")
                 #endif
             }
             .onChange(of: model.recents) { SpotlightStops.index(favourites: model.favourites, recents: model.recents) }
+            #if os(iOS)
+            .onChange(of: [model.home?.name, model.work?.name]) {
+                QuickActions.update(favourites: model.favourites, places: SavedPlace.allCases.filter { model[place: $0] != nil })
+            }
+            #endif
             #if os(iOS)
             .onChange(of: model.nicknames) {  // a renamed favourite shows its new name on the widget
                 WidgetFavourites.save(model.favourites.map { .init(id: $0.id, title: $0.title) })

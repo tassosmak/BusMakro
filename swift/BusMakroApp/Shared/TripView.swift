@@ -82,9 +82,9 @@ struct TripView: View {
                 ends.padding(Style.gap)
                 Divider()
                 if let editing {
-                    PlaceSearch(model: model, allowHere: !model.pickingHome) { choice in
-                        // setting Home first ("Take Me Home" with no Home yet): keep it, then go there
-                        if model.pickingHome, case .place(let p) = choice { model.home = p; model.pickingHome = false; from = .here }
+                    PlaceSearch(model: model, allowHere: model.pickingPlace == nil) { choice in
+                        // setting Home or Work first ("Take Me Home" with none yet): keep it, then go there
+                        if let k = model.pickingPlace, case .place(let p) = choice { model[place: k] = p; model.pickingPlace = nil; from = .here }
                         if editing == .from { from = choice } else { to = choice }
                         self.editing = nil
                         Task { await plan() }
@@ -105,7 +105,7 @@ struct TripView: View {
             if let t = model.tripTo { from = .here; to = .place(t); model.tripTo = nil; Task { await plan() } }
             else if to == nil { editing = .to }
         }
-        .onDisappear { model.pickingHome = false }
+        .onDisappear { model.pickingPlace = nil }
     }
 
     private var ends: some View {
@@ -117,7 +117,7 @@ struct TripView: View {
             }
             VStack(spacing: 8) {
                 endButton(from.title, placeholder: "From", field: .from)
-                endButton(to?.title, placeholder: model.pickingHome ? "Where is Home?" : "To", field: .to)
+                endButton(to?.title, placeholder: model.pickingPlace?.question ?? "To", field: .to)
             }
             Button {
                 guard let t = to else { return }
@@ -324,8 +324,10 @@ struct PlaceSearch: View {
                 if allowHere && text.isEmpty {
                     row("location.fill", String(localized: "My Location"), nil, tint: .blue) { onPick(.here) }
                 }
-                if text.isEmpty, let h = model.home, !model.pickingHome {
-                    row("house.fill", String(localized: "Home"), h.name, tint: .orange) { onPick(.place(h)) }
+                if text.isEmpty, model.pickingPlace == nil {
+                    ForEach(SavedPlace.allCases) { k in
+                        if let p = model[place: k] { row(k.icon, k.title, p.name, tint: .orange) { onPick(.place(p)) } }
+                    }
                 }
                 if text.isEmpty {
                     ForEach(model.favourites + model.recents.filter { r in !model.favourites.contains { $0.id == r.id } }) { s in

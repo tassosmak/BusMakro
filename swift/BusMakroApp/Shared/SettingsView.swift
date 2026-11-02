@@ -13,7 +13,7 @@ struct SettingsView: View {
     @AppStorage("showMetro") private var showMetro = true
     @AppStorage("showTram") private var showTram = true
     @Environment(\.dismiss) private var dismiss
-    @State private var pickingHome = false
+    @State private var picking: SavedPlace?
     @Environment(\.openURL) private var openURL
 
     var body: some View {
@@ -30,11 +30,14 @@ struct SettingsView: View {
                         .disabled(model.recents.isEmpty)
                 }
                 Section("Trips") {
-                    Button { pickingHome = true } label: {
-                        LabeledContent("Home", value: model.home?.name ?? String(localized: "Not set"))
+                    ForEach(SavedPlace.allCases) { k in
+                        Button { picking = k } label: {
+                            LabeledContent(k.title, value: model[place: k]?.name ?? String(localized: "Not set"))
+                        }
+                        .foregroundStyle(.primary)
+                        .swipeActions { if model[place: k] != nil { Button("Remove", role: .destructive) { model[place: k] = nil } } }
+                        .contextMenu { if model[place: k] != nil { Button("Remove", role: .destructive) { model[place: k] = nil } } }
                     }
-                    .foregroundStyle(.primary)
-                    if model.home != nil { Button("Remove Home", role: .destructive) { model.home = nil } }
                 }
                 Section("Map") {
                     Picker("Map Style", selection: $mapStyle) {
@@ -56,17 +59,17 @@ struct SettingsView: View {
                     Button("Show Welcome") { dismiss(); model.showWelcome = true }
                 }
             }
-            .sheet(isPresented: $pickingHome) {
+            .sheet(item: $picking) { k in
                 NavigationStack {
                     PlaceSearch(model: model, allowHere: false) { choice in
-                        if case .place(let p) = choice { model.home = p }
-                        pickingHome = false
+                        if case .place(let p) = choice { model[place: k] = p }
+                        picking = nil
                     }
-                    .navigationTitle("Home")
+                    .navigationTitle(k.title)
                     #if os(iOS)
                     .navigationBarTitleDisplayMode(.inline)
                     #endif
-                    .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { pickingHome = false } } }
+                    .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { picking = nil } } }
                 }
             }
             .navigationTitle("Settings")

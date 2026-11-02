@@ -7,7 +7,7 @@ struct SideMenu: View {
     var onMetroMap: () -> Void
     var onSettings: () -> Void
     var onTrip: () -> Void = {}
-    var onHome: () -> Void = {}
+    var onPlace: (SavedPlace) -> Void = { _ in }
     var onDebug: () -> Void = {}
     @Environment(\.openURL) private var openURL
     @State private var dragX: CGFloat = 0
@@ -37,7 +37,7 @@ struct SideMenu: View {
                 .padding(.top, 70).padding(.bottom, 26)
                 Divider()
                 VStack(spacing: 4) {
-                    row("house.fill", "Take Me Home") { close(); onHome() }
+                    ForEach(SavedPlace.allCases) { k in row(k.icon, k.action) { close(); onPlace(k) } }
                     row("arrow.triangle.turn.up.right.diamond.fill", "Plan a Trip") { close(); onTrip() }
                     row("tram.fill", "Metro Map") { close(); onMetroMap() }
                     row("gearshape.fill", "Settings") { close(); onSettings() }

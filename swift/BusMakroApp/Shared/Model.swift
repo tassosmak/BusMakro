@@ -51,16 +51,13 @@ final class Model: NSObject, CLLocationManagerDelegate {
     var showWelcome = !UserDefaults.standard.bool(forKey: "onboarded")
     var showSettings = false
     var showTrip = false
-    /// Your saved Home, for "Take Me Home"; set in Settings or the first time you ask to go home.
-    var home: TripPlanner.Place? = Model.loadHome() {
-        didSet {
-            if let h = home { UserDefaults.standard.set(["name": h.name, "lat": h.lat, "lon": h.lon, "id": h.id], forKey: "home") }
-            else { UserDefaults.standard.removeObject(forKey: "home") }
-        }
-    }
-    /// Where the trip planner should go when it opens (Take Me Home), and whether it should first ask for Home.
+    /// Your saved Home and Work, for "Take Me Home" / "Take Me to Work"; asked once after the welcome,
+    /// set in Settings, or the first time you ask to go there.
+    var home: TripPlanner.Place? = Model.loadPlace(.home) { didSet { Model.savePlace(home, .home) } }
+    var work: TripPlanner.Place? = Model.loadPlace(.work) { didSet { Model.savePlace(work, .work) } }
+    /// Where the trip planner should go when it opens, and which saved place it should first ask for.
     var tripTo: TripPlanner.Place?
-    var pickingHome = false
+    var pickingPlace: SavedPlace?
     @ObservationIgnored var cachedPlanner: TripPlanner?
     var watchTask: Task<Void, Never>?
     private var lineCodes: [String: [(code: String, name: String, nameEnglish: String)]]?
@@ -486,16 +483,26 @@ final class Model: NSObject, CLLocationManagerDelegate {
     nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {}
 
     // MARK: Saved stops (same fields as the Mac app's favourites)
-    static func loadHome() -> TripPlanner.Place? {
-        guard let d = UserDefaults.standard.dictionary(forKey: "home"), let lat = d["lat"] as? Double, let lon = d["lon"] as? Double
+    static func loadPlace(_ k: SavedPlace) -> TripPlanner.Place? {
+        guard let d = UserDefaults.standard.dictionary(forKey: k.rawValue), let lat = d["lat"] as? Double, let lon = d["lon"] as? Double
         else { return nil }
         return TripPlanner.Place(id: d["id"] as? String ?? "", name: d["name"] as? String ?? "", lat: lat, lon: lon)
     }
 
-    /// From where you are to your Home; without one, the planner first asks where Home is.
-    func takeMeHome() {
+    static func savePlace(_ p: TripPlanner.Place?, _ k: SavedPlace) {
+        if let p { UserDefaults.standard.set(["name": p.name, "lat": p.lat, "lon": p.lon, "id": p.id], forKey: k.rawValue) }
+        else { UserDefaults.standard.removeObject(forKey: k.rawValue) }
+    }
+
+    subscript(place k: SavedPlace) -> TripPlanner.Place? {
+        get { k == .home ? home : work }
+        set { if k == .home { home = newValue } else { work = newValue } }
+    }
+
+    /// From where you are to Home or Work; without one saved, the planner first asks where it is.
+    func takeMe(to k: SavedPlace) {
         searchActive = false
-        if let home { tripTo = home } else { pickingHome = true }
+        if let p = self[place: k] { tripTo = p } else { pickingPlace = k }
         showTrip = true
     }
 
@@ -539,4 +546,14 @@ enum Names {
 
 extension LineSummary {
     var shown: String { Names.place(name, nameEnglish) }
+}
+
+/// The places you can save for one-tap trips.
+enum SavedPlace: String, CaseIterable, Identifiable {
+    case home, work
+    var id: String { rawValue }
+    var title: String { self == .home ? String(localized: "Home") : String(localized: "Work") }
+    var icon: String { self == .home ? "house.fill" : "briefcase.fill" }
+    var question: LocalizedStringKey { self == .home ? "Where is Home?" : "Where is Work?" }
+    var action: LocalizedStringKey { self == .home ? "Take Me Home" : "Take Me to Work" }
 }

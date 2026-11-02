@@ -1,3 +1,4 @@
+import BusMakroKit
 import SwiftUI
 import UserNotifications
 
@@ -77,5 +78,53 @@ struct WelcomeView: View {
 
     @MainActor private func refreshNotifications() async {
         notifications = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
+    }
+}
+
+/// First launch: the welcome, then one question each for Home and Work (both skippable, asked once;
+/// they can be set later in Settings → Trips).
+struct Onboarding: View {
+    @Bindable var model: Model
+    var onDone: () -> Void
+    @State private var step = 0  // 0 welcome, then one per saved place
+
+    var body: some View {
+        if step == 0 {
+            WelcomeView { withAnimation { step = 1 } }
+        } else {
+            let k = SavedPlace.allCases[step - 1]
+            PlaceQuestion(model: model, place: k) { p in
+                if let p { model[place: k] = p }
+                if step < SavedPlace.allCases.count { withAnimation { step += 1 } } else { onDone() }
+            }
+            .id(k)
+            .transition(.move(edge: .trailing).combined(with: .opacity))
+        }
+    }
+}
+
+/// "Where is Home?": search for the place, or Skip.
+struct PlaceQuestion: View {
+    @Bindable var model: Model
+    let place: SavedPlace
+    var onAnswer: (TripPlanner.Place?) -> Void
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 0) {
+                VStack(spacing: 8) {
+                    Image(systemName: place.icon).font(.scaled(34, .semibold)).foregroundStyle(.tint)
+                    Text(place.question).font(.scaled(22, .bold))
+                    Text(place == .home ? "Then Take Me Home plans the trip there in one tap, from wherever you are."
+                                        : "Then Take Me to Work plans the trip there in one tap, from wherever you are.")
+                        .font(.scaled(14)).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                }
+                .padding(.horizontal, 32).padding(.top, 24)
+                PlaceSearch(model: model, allowHere: false) { choice in
+                    if case .place(let p) = choice { onAnswer(p) }
+                }
+            }
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Skip") { onAnswer(nil) } } }
+        }
     }
 }

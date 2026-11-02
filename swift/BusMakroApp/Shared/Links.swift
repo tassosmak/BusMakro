@@ -11,7 +11,7 @@ import UIKit
 /// the Live Activity, and busmakro:// links. Each becomes an `AppLink`, which ContentView hands
 /// to the model once it is ready.
 enum AppLink: Equatable {
-    case stop(String), line(String), station(String), search, favourites, nearby, plan, home
+    case stop(String), line(String), station(String), search, favourites, nearby, plan, home, work
 
     /// busmakro://stop/400022 · busmakro://line/040 · busmakro://search · busmakro://favourites
     init?(url: URL) {
@@ -26,6 +26,7 @@ enum AppLink: Equatable {
         case "nearby": self = .nearby
         case "plan": self = .plan
         case "home": self = .home
+        case "work": self = .work
         default: return nil
         }
     }
@@ -40,6 +41,7 @@ enum AppLink: Equatable {
         case .nearby: URL(string: "busmakro://nearby")!
         case .plan: URL(string: "busmakro://plan")!
         case .home: URL(string: "busmakro://home")!
+        case .work: URL(string: "busmakro://work")!
         }
     }
 }
@@ -83,7 +85,9 @@ extension Model {
         case .plan:
             searchActive = false; showTrip = true
         case .home:
-            takeMeHome()
+            takeMe(to: .home)
+        case .work:
+            takeMe(to: .work)
         }
     }
 }
@@ -91,17 +95,19 @@ extension Model {
 #if os(iOS)
 // MARK: Home screen quick actions (long-press the icon)
 
-/// Two favourite stops, then Take Me Home and Search (four is the most iOS shows).
+/// Your saved Home and Work, favourite stops, then Search (four is the most iOS shows).
 @MainActor
 enum QuickActions {
-    static func update(favourites: [Stop]) {
-        var items = favourites.prefix(2).map { s in
+    static func update(favourites: [Stop], places: [SavedPlace]) {
+        let trips = places.map { k in
+            UIApplicationShortcutItem(type: k.rawValue, localizedTitle: k == .home ? String(localized: "Take Me Home") : String(localized: "Take Me to Work"),
+                                      localizedSubtitle: nil, icon: UIApplicationShortcutIcon(systemImageName: k.icon), userInfo: nil)
+        }
+        var items = trips + favourites.prefix(3 - trips.count).map { s in
             UIApplicationShortcutItem(type: "stop", localizedTitle: s.title, localizedSubtitle: String(localized: "Stop \(s.id)"),
                                       icon: UIApplicationShortcutIcon(systemImageName: "star.fill"),
                                       userInfo: ["id": s.id as NSString])
         }
-        items.append(UIApplicationShortcutItem(type: "home", localizedTitle: String(localized: "Take Me Home"), localizedSubtitle: nil,
-                                               icon: UIApplicationShortcutIcon(systemImageName: "house.fill"), userInfo: nil))
         items.append(UIApplicationShortcutItem(type: "search", localizedTitle: String(localized: "Search"), localizedSubtitle: nil,
                                                icon: UIApplicationShortcutIcon(type: .search), userInfo: nil))
         UIApplication.shared.shortcutItems = items
@@ -112,6 +118,7 @@ enum QuickActions {
         case "stop": (item.userInfo?["id"] as? String).map(AppLink.stop)
         case "search": .search
         case "home": .home
+        case "work": .work
         default: nil
         }
     }

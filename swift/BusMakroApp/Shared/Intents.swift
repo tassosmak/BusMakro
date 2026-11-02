@@ -117,6 +117,17 @@ struct TakeMeHomeIntent: AppIntent {
     }
 }
 
+struct TakeMeToWorkIntent: AppIntent {
+    static let title: LocalizedStringResource = "Take Me to Work"
+    static let description = IntentDescription("Plans the trip from where you are to your Work.")
+    static let openAppWhenRun = true
+
+    @MainActor func perform() async throws -> some IntentResult {
+        Links.shared.pending = .work
+        return .result()
+    }
+}
+
 struct BusMakroShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(intent: NextBusesIntent(), phrases: [
@@ -132,6 +143,10 @@ struct BusMakroShortcuts: AppShortcutsProvider {
             "Take me home with \(.applicationName)",
             "Get me home with \(.applicationName)",
         ], shortTitle: "Take Me Home", systemImageName: "house.fill")
+        AppShortcut(intent: TakeMeToWorkIntent(), phrases: [
+            "Take me to work with \(.applicationName)",
+            "Get me to work with \(.applicationName)",
+        ], shortTitle: "Take Me to Work", systemImageName: "briefcase.fill")
         AppShortcut(intent: SearchIntent(), phrases: ["Search \(.applicationName)"],
                     shortTitle: "Search", systemImageName: "magnifyingglass")
     }
