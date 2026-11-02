@@ -5,6 +5,7 @@ import SwiftUI
 struct TopBar: View {
     @Binding var text: String
     @Binding var searching: Bool
+    var refreshing = false
     var onRefresh: () -> Void
     var onMenu: () -> Void = {}
     @FocusState private var focused: Bool
@@ -38,7 +39,7 @@ struct TopBar: View {
                 RoundButton(symbol: "xmark", help: "Close") { text = ""; focused = false; searching = false }
                     .transition(.opacity.combined(with: .scale(scale: 0.6)))
             } else {
-                RoundButton(symbol: "arrow.clockwise", help: "Refresh", action: onRefresh)
+                RoundButton(symbol: "arrow.clockwise", help: "Refresh", spinning: refreshing, action: onRefresh)
                     .transition(.opacity.combined(with: .scale(scale: 0.6)))
             }
         }

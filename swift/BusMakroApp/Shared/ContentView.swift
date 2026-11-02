@@ -13,6 +13,9 @@ struct ContentView: View {
     @State private var menuOpen = false
     @State private var showMetroMap = false
     @State private var showDebug = false  // Debug builds only
+    @State private var refreshing = false
+    /// The top bar's height (search bar and chips), so the zoom hint sits right under it.
+    @State private var topHeight: CGFloat = 0
     @State private var followedAt: CLLocationCoordinate2D?
     @State private var visibleRegion: MKCoordinateRegion?
     /// The stops inside the visible map (from the stop index), worked out when the map stops moving.
@@ -35,7 +38,7 @@ struct ContentView: View {
             ZStack(alignment: .bottom) {
                 map
                 VStack(spacing: 8) {
-                    topArea
+                    topArea.overlay(alignment: .top) { zoomHintView }  // outside the bars' fade
                     Spacer()
                     mapButtons
                     Sheet(model: model, height: $sheetHeight, range: 66...(geo.size.height - 120))
@@ -121,7 +124,7 @@ struct ContentView: View {
     /// away as the panel goes down to the strip (the Mac app's map focus); while searching it stays.
     private var topArea: some View {
         VStack(spacing: 8) {
-            TopBar(text: $model.searchText, searching: $model.searchActive, onRefresh: { Task { await refresh() } },
+            TopBar(text: $model.searchText, searching: $model.searchActive, refreshing: refreshing, onRefresh: { Task { await refresh() } },
                    onMenu: { menuOpen = true })
             if showResults {
                 SearchResults(model: model)
@@ -135,6 +138,25 @@ struct ContentView: View {
         .opacity(model.searchActive ? 1 : barShown)
         .offset(y: model.searchActive ? 0 : (barShown - 1) * 40)
         .allowsHitTesting(model.searchActive || barShown > 0.5)
+        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { topHeight = $0 }
+    }
+
+    /// "Zoom in to see bus stops": just under the bars, and up near the top as they slide away
+    /// (it moves with the panel's height, so it follows the drag and the snap frame by frame).
+    private var zoomHintView: some View {
+        Group {
+            if zoomHint {
+                Text("Zoom in to see bus stops")
+                    .font(.footnote.weight(.medium))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 12).padding(.vertical, 6)
+                    .background(.thinMaterial.opacity(0.7), in: Capsule())
+                    .transition(.opacity)
+            }
+        }
+        .offset(y: 6 + barShown * (topHeight + 2))
+        .allowsHitTesting(false)
+        .animation(.easeInOut(duration: 0.25), value: zoomHint)
     }
 
     private var showResults: Bool {
@@ -158,6 +180,7 @@ struct ContentView: View {
                 layersButton
             }
             .opacity(model.searchActive ? 0 : 1)
+            .animation(.spring(response: 0.36, dampingFraction: 1), value: model.searchActive)
         }
     }
 
@@ -261,19 +284,6 @@ struct ContentView: View {
             if model.screen == .home { fittedLine = nil; Task { await model.loadStops(near: centre) } }
         }
         .ignoresSafeArea()
-        .overlay(alignment: .top) {
-            if zoomHint {
-                Text("Zoom in to see bus stops")
-                    .font(.footnote.weight(.medium))
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 12).padding(.vertical, 6)
-                    .background(.thinMaterial.opacity(0.7), in: Capsule())
-                    .padding(.top, 120)
-                    .allowsHitTesting(false)
-                    .transition(.opacity)
-            }
-        }
-        .animation(.easeInOut(duration: 0.25), value: zoomHint)
     }
 
     /// Faint hint when the map is zoomed too far out for stop pins.
@@ -309,8 +319,14 @@ struct ContentView: View {
 
     /// ↻ fetches whatever is on screen again: nearby stops, a stop's lines, or a line's buses (it only
     /// handled the stop screen before, so on home and line views it did nothing).
+    /// The ↻ spins while it works, at least one turn, so a fast answer still shows something happened.
     private func refresh() async {
+        guard !refreshing else { return }
+        refreshing = true
+        async let minimum: Void = { try? await Task.sleep(for: .milliseconds(700)) }()
         await model.retry()
+        await minimum
+        refreshing = false
     }
 }
 

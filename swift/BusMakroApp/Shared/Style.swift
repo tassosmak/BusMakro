@@ -67,12 +67,17 @@ extension View {
 struct RoundButton: View {
     let symbol: String
     var help: LocalizedStringKey = ""
+    /// Turns round and round (a refresh at work).
+    var spinning = false
     let action: () -> Void
+    @State private var turns = 0.0
 
     var body: some View {
         Button(action: action) {
             Image(systemName: symbol)
                 .font(.system(size: 15, weight: .medium))
+                .rotationEffect(.degrees(turns * 360))
+                .contentTransition(.symbolEffect(.replace))
                 .frame(width: Style.roundButton, height: Style.roundButton)
                 .contentShape(Circle())
         }
@@ -80,6 +85,12 @@ struct RoundButton: View {
         .glass(Circle())
         .help(help)
         .accessibilityLabel(help)  // VoiceOver reads the name, not the symbol
+        .onChange(of: spinning) { if spinning { spin() } }
+    }
+
+    /// One whole turn at a time, so it never stops half-way round.
+    private func spin() {
+        withAnimation(.linear(duration: 0.7)) { turns += 1 } completion: { if spinning { spin() } }
     }
 }
 

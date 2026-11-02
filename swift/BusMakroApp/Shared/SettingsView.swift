@@ -21,10 +21,12 @@ struct SettingsView: View {
                 Section("General") {
                     // iPhone apps follow iOS's own per-app language setting
                     Button("Language") { openSettings() }
+                    Button("Notifications") { openSettings() }
+                }
+                Section("Recent Stops") {
                     Toggle("Show recent stops under the search bar", isOn: $showRecents)
                     Button("Clear Recent Stops", role: .destructive) { model.clearRecents() }
                         .disabled(model.recents.isEmpty)
-                    Button("Notifications") { openSettings() }
                 }
                 Section("Map") {
                     Picker("Map Style", selection: $mapStyle) {
@@ -33,9 +35,11 @@ struct SettingsView: View {
                         Text("Dark").tag("dark")
                     }
                     Toggle("3D Buildings", isOn: $map3D)
-                    Toggle("Bus Stops", isOn: $showStops)
                     ColorPicker("Favourite Stops", selection: Binding(get: { Color(hex: favColor) }, set: { favColor = $0.hex }),
                                 supportsOpacity: false)
+                }
+                Section("Show on Map") {
+                    Toggle("Bus Stops", isOn: $showStops)
                     Toggle("Live Buses", isOn: $showBuses)
                     Toggle("Metro", isOn: $showMetro)
                     Toggle("Tram", isOn: $showTram)

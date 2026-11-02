@@ -68,6 +68,8 @@ final class Model: NSObject, CLLocationManagerDelegate {
     // offline: no connection at all, or the bus service didn't answer
     var online = true
     var serviceDown = false
+    /// When live data last arrived (shown while offline, so you know how old what you see is).
+    var lastUpdated: Date?
     private let pathMonitor = NWPathMonitor()
 
     private let oasa = OASAClient(), transit = TransitClient()
@@ -151,7 +153,7 @@ final class Model: NSObject, CLLocationManagerDelegate {
                 Geo.distance(ref.latitude, ref.longitude, $0.latitude, $0.longitude) < Geo.distance(ref.latitude, ref.longitude, $1.latitude, $1.longitude)
             }
             if sorted.map(\.id) != stops.map(\.id) { stops = sorted }
-            error = nil; serviceDown = false
+            error = nil; serviceDown = false; lastUpdated = .now
         } catch { failed(error) }
     }
 
@@ -208,7 +210,7 @@ final class Model: NSObject, CLLocationManagerDelegate {
             // keep the timetable estimates already found (they don't change every 15 s)
             let known = Dictionary((stopLines ?? []).compactMap { l in l.scheduled.map { (l.line, $0) } }, uniquingKeysWith: { a, _ in a })
             stopLines = fresh.map { var l = $0; if l.arrivalsMinutes.isEmpty { l.scheduled = known[l.line] }; return l }
-            serviceDown = false
+            serviceDown = false; lastUpdated = .now
             Task { [oasa] in await oasa.observe(stop: stop.id, lines: fresh) }  // learn (History)
             await loadStopBuses(fresh)
             if known.isEmpty { await addSchedules(stop: stop.id) }
@@ -282,7 +284,7 @@ final class Model: NSObject, CLLocationManagerDelegate {
         do {
             let live = try await transit.live(line: id)
             vehicles = live.vehicles
-            serviceDown = false
+            serviceDown = false; lastUpdated = .now
             checkWatches(line: id, vehicles: live.vehicles)
             if let p = pendingPin, live.vehicles.contains(where: { $0.id == p }) { pinned = p; pendingPin = nil }
             if let p = pinned, !live.vehicles.contains(where: { $0.id == p }) { pinned = nil }  // gone

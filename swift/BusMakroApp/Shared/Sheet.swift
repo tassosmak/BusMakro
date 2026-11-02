@@ -17,11 +17,13 @@ struct Sheet: View {
         VStack(alignment: .leading, spacing: 12) {
             handle
             header.simultaneousGesture(drag)  // the menu row drags the panel too (taps still work)
-            if !model.online || model.serviceDown { offline }
+            if !model.online || model.serviceDown { offline.transition(.opacity.combined(with: .move(edge: .top))) }
             // fades out as the panel nears the slim strip (the strip shows just the handle and the menu)
             // fades with the panel's height, so it follows the drag and the snap exactly
             content.opacity(Double(min(1, max(0, (height - 90) / 70))))
         }
+        // the banner comes and goes with the panel's own spring, not in a jump
+        .animation(.spring(response: 0.36, dampingFraction: 1), value: !model.online || model.serviceDown)
         .padding(.horizontal, Style.gap)
         .padding(.bottom, 16)  // clear of the rounded bottom corners and the home indicator
         .frame(height: height, alignment: .top)
@@ -75,9 +77,15 @@ struct Sheet: View {
         Button { Task { await model.retry() } } label: {
             HStack(spacing: 10) {
                 Image(systemName: model.online ? "exclamationmark.icloud" : "wifi.slash").foregroundStyle(.orange)
-                Text(model.online ? "Couldn't reach the bus service. Tap to try again."
-                                  : "No internet connection. Retrying when you're back online.")
-                    .font(.system(size: 12, weight: .semibold)).multilineTextAlignment(.leading)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(model.online ? "Couldn't reach the bus service. Tap to try again."
+                                      : "No internet connection. Retrying when you're back online.")
+                        .font(.system(size: 12, weight: .semibold)).multilineTextAlignment(.leading)
+                    if let d = model.lastUpdated {
+                        Text("Last updated \(d.formatted(date: Calendar.current.isDateInToday(d) ? .omitted : .abbreviated, time: .shortened))")
+                            .font(.system(size: 11)).foregroundStyle(.secondary)
+                    }
+                }
                 Spacer(minLength: 0)
             }
             .padding(10)
