@@ -171,6 +171,7 @@ struct ContentView: View {
                             Circle().fill(sel ? Color.orange : Color(red: 0.09, green: 0.47, blue: 1.0))
                                 .frame(width: sel ? 15 : 10, height: sel ? 15 : 10)
                                 .overlay(Circle().stroke(.white, lineWidth: sel ? 3 : 2))
+                                .frame(width: 36, height: 36).contentShape(Circle())  // easier to hit than the 10 pt dot
                                 .onTapGesture { model.lineStop = sid }
                                 .accessibilityLabel(st.name)
                                 .accessibilityAddTraits(sel ? [.isButton, .isSelected] : .isButton)
@@ -317,6 +318,7 @@ struct StopPin: View {
             Rectangle().fill(tint).frame(width: 2, height: selected ? 8 : 5)
         }
         .shadow(color: .black.opacity(0.3), radius: 2, y: 1)
+        .frame(width: 44, height: 48).contentShape(Rectangle())  // a finger-sized tap area around the sign (alone it is 22 pt)
         .offset(y: -(size + (selected ? 8 : 5)) / 2)  // the stem's foot is on the stop
         .animation(.smooth(duration: 0.25), value: selected)
     }

@@ -30,7 +30,7 @@ struct Sheet: View {
     // Drag the handle to resize; it snaps to the nearest of strip / normal / full.
     private var handle: some View {
         Capsule().fill(.tertiary).frame(width: 40, height: 5)
-            .frame(maxWidth: .infinity).padding(.top, Style.gap).padding(.bottom, 6)
+            .frame(maxWidth: .infinity).padding(.top, Style.gap).padding(.bottom, 1)  // so the strip leaves Style.gap under the menu
             .contentShape(Rectangle())
             .gesture(drag)
     }
@@ -96,7 +96,9 @@ struct Sheet: View {
             .buttonStyle(.plain)  // works on both iPhone and Mac (.borderlessButton is Mac-only)
             .padding(.horizontal, 10)
             .frame(height: Style.lineMenuHeight)
-            .background(.primary.opacity(0.10), in: RoundedRectangle(cornerRadius: Style.sheetRadius - Style.gap))
+            // the panel's bottom corners (39 pt) less the gap would be wider than the menu is tall:
+            // a capsule is as round as it gets, and follows the corners with the same gap all round
+            .background(.primary.opacity(0.10), in: Capsule())
             if case .stop(let s) = model.screen {
                 Button { model.toggleFavourite(s) } label: {
                     Image(systemName: model.isFavourite(s) ? "star.fill" : "star")

@@ -74,6 +74,7 @@ struct StationPin: View {
             .overlay(RoundedRectangle(cornerRadius: selected ? 7 : 5).stroke(selected ? Color.orange : .black.opacity(0.15), lineWidth: selected ? 2.5 : 1))
             .shadow(color: .black.opacity(0.25), radius: 2, y: 1)
             .animation(.smooth(duration: 0.25), value: selected)
+            .frame(width: 40, height: 40).contentShape(Rectangle())
     }
 }
 
