@@ -158,7 +158,7 @@ final class Model: NSObject, CLLocationManagerDelegate {
     /// Zoomed out further than this (about 3 km top to bottom), the map shows no stop pins.
     static let stopsMaxSpan = 0.03
 
-    /// The stops inside a map region, nearest its centre first, at most 150 (from the stop index,
+    /// The stops inside a map region, nearest its centre first, at most 80 (from the stop index,
     /// so the whole screen is covered, not just the 12 OASA returns around the centre).
     func stops(in region: MKCoordinateRegion) -> [Stop] {
         guard let index = stopIndex, region.span.latitudeDelta <= Self.stopsMaxSpan else { return [] }
@@ -168,7 +168,7 @@ final class Model: NSObject, CLLocationManagerDelegate {
             found.append((Stop(id: id, name: e.name, nameEnglish: "", street: "", latitude: e.lat, longitude: e.lon),
                           Geo.distance(c.latitude, c.longitude, e.lat, e.lon)))
         }
-        return found.sorted { $0.1 < $1.1 }.prefix(150).map(\.0)
+        return found.sorted { $0.1 < $1.1 }.prefix(80).map(\.0)
     }
 
     /// Metres from you (or nil without a fix).
@@ -379,14 +379,16 @@ final class Model: NSObject, CLLocationManagerDelegate {
     var pinnedPosition: CLLocationCoordinate2D? { pinned.flatMap { drawn[$0] } }
 
     private func tickBuses() {
+        // nothing moving: don't touch state, or the whole map redraws every second for nothing
+        if vehicles.isEmpty && stopBuses.isEmpty { if !drawn.isEmpty { drawn = [:] }; return }
         let now = Date()
         var next: [String: CLLocationCoordinate2D] = [:]
         for v in vehicles + stopBuses.map(\.vehicle) {
             let p = Movement.position(v, route: routes[v.id], hold: holds[v.id] ?? 0, now: now)
             next[v.id] = CLLocationCoordinate2D(latitude: p.0, longitude: p.1)
         }
-        withAnimation(.linear(duration: 1)) { drawn = next }  // glide between the once-a-second positions
-        tick += 1
+        if next.count != drawn.count || next.contains(where: { k, v in drawn[k].map { $0.latitude != v.latitude || $0.longitude != v.longitude } ?? true }) { withAnimation(.linear(duration: 1)) { drawn = next } }  // glide between the once-a-second positions
+        if pinned != nil { tick += 1 }  // only the map following a pinned bus needs it
     }
 
     /// The route variant on screen: the one serving the selected stop with the most buses.
