@@ -69,7 +69,10 @@ public enum Movement {
         guard let r = route else { return (v.latitude, v.longitude) }
         let age = v.positionAt.map { now.timeIntervalSince($0) } ?? 0
         let secs = r.speed != nil ? min(max(0, age), maxDeadReckoning) : 0
-        return point(r, at: max(travelled(r, secs), hold))
+        let ahead = travelled(r, secs)
+        // held ahead of the fix: carry on from there at half pace (not frozen until the fix catches
+        // up: a bus that had stopped at a stop sat still on the map long after it drove off)
+        return point(r, at: hold > 0 ? max(ahead, hold + ahead * 0.5) : ahead)
     }
 
     /// How far along the new route to hold a marker drawn at `drawn` (0 = don't hold).

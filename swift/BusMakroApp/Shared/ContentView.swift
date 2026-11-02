@@ -14,6 +14,8 @@ struct ContentView: View {
     @State private var showMetroMap = false
     @State private var showDebug = false  // Debug builds only
     @State private var refreshing = false
+    /// Where the map was before a line opened, to go back there when it closes.
+    @State private var beforeLine: MKCoordinateRegion?
     /// The top bar's height (search bar and chips), so the zoom hint sits right under it.
     @State private var topHeight: CGFloat = 0
     @State private var followedAt: CLLocationCoordinate2D?
@@ -109,6 +111,14 @@ struct ContentView: View {
                                            distance: max(600, region.span.latitudeDelta * 111_000 * 1.6),
                                            pitch: map3D ? 55 : 0))
             }
+        }
+        .onChange(of: model.screen) { old, new in
+            // a line takes over the map; leaving it puts the map back where it was
+            if case .line = new { if case .line = old {} else { beforeLine = visibleRegion }; return }
+            guard case .line = old else { return }
+            fittedLine = nil
+            if let r = beforeLine { withAnimation(.easeInOut(duration: 0.5)) { camera = .region(r) } }
+            beforeLine = nil
         }
         .onChange(of: model.homeTab) { if model.homeTab == .favourites { Task { await model.loadFavourites() } } }
         .onChange(of: model.userLocation?.latitude) {

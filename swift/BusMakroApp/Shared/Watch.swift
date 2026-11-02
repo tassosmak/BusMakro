@@ -22,7 +22,11 @@ extension Model {
     static let watchChoices = [1, 2, 3, 5]
 
     func watch(_ bus: String, stops n: Int?) {
-        guard let n else { watches[bus] = nil; LiveBus.end(bus); return }
+        guard let n else {
+            watches[bus] = nil; LiveBus.end(bus)
+            UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: ["watch-\(bus)"])
+            return
+        }
         guard case .line(let line, _) = screen, let stop = lineStop else { return }
         watches[bus] = BusWatch(line: line, stop: stop, stopName: lineDetail?.stops[stop]?.name ?? stop, stops: n)
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
@@ -45,18 +49,34 @@ extension Model {
                 continue
             }
             LiveBus.update(bus, watch: w, stopsAway: a.stopsAway, seconds: a.seconds)
+            if a.stopsAway > w.stops && !w.notified {
+                // not yet: also book it for when the bus should get there, so it still comes if iOS
+                // has suspended the app by then (each reading moves the booking; same identifier)
+                let perStop = a.seconds / Double(max(1, a.stopsAway))
+                let due = a.seconds - perStop * Double(w.stops)
+                if due > 5 {
+                    UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "watch-\(bus)",
+                        content: Self.alert(line: line, bus: bus, stopsAway: w.stops, stopName: w.stopName),
+                        trigger: UNTimeIntervalNotificationTrigger(timeInterval: due, repeats: false)))
+                }
+            }
             if a.stopsAway <= w.stops && !w.notified {
-                let content = UNMutableNotificationContent()
-                content.title = String(localized: "Your \(line) is almost here")
-                content.body = a.stopsAway == 0 ? String(localized: "Bus \(bus) is arriving at \(w.stopName) now.")
-                    : a.stopsAway == 1 ? String(localized: "Bus \(bus) is 1 stop away from \(w.stopName).")
-                    : String(localized: "Bus \(bus) is \(a.stopsAway) stops away from \(w.stopName).")
-                content.sound = .default
+                let content = Self.alert(line: line, bus: bus, stopsAway: a.stopsAway, stopName: w.stopName)
                 UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "watch-\(bus)", content: content, trigger: nil))
                 if LiveBus.running(bus) { watches[bus]?.notified = true }  // keep the countdown going to the stop
                 else { watches[bus] = nil }
             }
         }
+    }
+
+    static func alert(line: String, bus: String, stopsAway: Int, stopName: String) -> UNMutableNotificationContent {
+        let content = UNMutableNotificationContent()
+        content.title = String(localized: "Your \(line) is almost here")
+        content.body = stopsAway == 0 ? String(localized: "Bus \(bus) is arriving at \(stopName) now.")
+            : stopsAway == 1 ? String(localized: "Bus \(bus) is 1 stop away from \(stopName).")
+            : String(localized: "Bus \(bus) is \(stopsAway) stops away from \(stopName).")
+        content.sound = .default
+        return content
     }
 
     func startWatchLoop() {
@@ -100,7 +120,8 @@ enum LiveBus {
             Task { await a.update(content) }
         } else if ActivityAuthorizationInfo().areActivitiesEnabled {
             let attrs = BusActivityAttributes(line: w.line, bus: bus, stopID: w.stop, stopName: w.stopName, alertAt: w.stops)
-            activities[bus] = try? Activity.request(attributes: attrs, content: content)
+            do { activities[bus] = try Activity.request(attributes: attrs, content: content) }
+            catch { print("Live Activity failed: \(error)") }
         }
         #endif
     }
