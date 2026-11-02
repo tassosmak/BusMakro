@@ -11,7 +11,13 @@ targets:
   BusMakro:
     type: application
     supportedDestinations: [iOS, macOS]
-    sources: [Shared, Activity]
+    sources:
+      - path: Shared
+        excludes: [AppIcon.icon]
+      - path: Activity
+      - path: Shared/AppIcon.icon  # the app icon, made in Icon Composer (layers: Athens roads, bus)
+        type: file
+        buildPhase: resources
     entitlements:
       path: BusMakro.entitlements
       properties:
