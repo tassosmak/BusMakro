@@ -272,6 +272,7 @@ struct Appearing: ViewModifier {
             .offset(y: shown ? 0 : 10)
             .scaleEffect(shown ? 1 : 0.97)
             .onAppear {
+                if LowPower.shared.on { shown = true; return }  // rows just appear
                 withAnimation(.easeOut(duration: 0.38).delay(Double(min(index, 12)) * 0.035)) { shown = true }
             }
     }

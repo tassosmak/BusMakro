@@ -171,7 +171,7 @@ struct PulseDot: View {
         .frame(width: 10, height: 10)
         .accessibilityHidden(true)
         .onAppear {
-            guard !reduceMotion else { return }  // Reduce Motion: a still dot
+            guard !reduceMotion, !LowPower.shared.on else { return }  // Reduce Motion, Low Power: a still dot
             withAnimation(.easeOut(duration: fast ? 1.1 : 2).repeatCount(fast ? 10_000 : 3, autoreverses: false)) { on = true }
         }
     }

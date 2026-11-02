@@ -95,3 +95,15 @@ struct LineBadge: View {
             .background(.blue, in: RoundedRectangle(cornerRadius: 8))
     }
 }
+
+/// Low Power Mode: the phone halves the frame rate and slows the CPU, so the decorative motion
+/// (pulses, ripples, staggered rows, gliding buses) stutters. With it on, those stay still.
+@Observable final class LowPower {
+    static let shared = LowPower()
+    private(set) var on = ProcessInfo.processInfo.isLowPowerModeEnabled
+    private init() {
+        NotificationCenter.default.addObserver(forName: .NSProcessInfoPowerStateDidChange, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.on = ProcessInfo.processInfo.isLowPowerModeEnabled }
+        }
+    }
+}

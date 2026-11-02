@@ -387,7 +387,7 @@ final class Model: NSObject, CLLocationManagerDelegate {
             let p = Movement.position(v, route: routes[v.id], hold: holds[v.id] ?? 0, now: now)
             next[v.id] = CLLocationCoordinate2D(latitude: p.0, longitude: p.1)
         }
-        if next.count != drawn.count || next.contains(where: { k, v in drawn[k].map { $0.latitude != v.latitude || $0.longitude != v.longitude } ?? true }) { withAnimation(.linear(duration: 1)) { drawn = next } }  // glide between the once-a-second positions
+        if next.count != drawn.count || next.contains(where: { k, v in drawn[k].map { $0.latitude != v.latitude || $0.longitude != v.longitude } ?? true }) { if LowPower.shared.on { drawn = next } else { withAnimation(.linear(duration: 1)) { drawn = next } } }  // glide between the once-a-second positions
         if pinned != nil { tick += 1 }  // only the map following a pinned bus needs it
     }
 

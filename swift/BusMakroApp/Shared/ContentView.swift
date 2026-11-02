@@ -349,7 +349,7 @@ struct BusMarker: View {
         .animation(.easeInOut(duration: 1.5), value: bearing)
         .onChange(of: fix) {
             ripple = false
-            guard !reduceMotion else { return }
+            guard !reduceMotion, !LowPower.shared.on else { return }
             withAnimation(.easeOut(duration: 1.2)) { ripple = true }
         }
     }
