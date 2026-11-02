@@ -15,6 +15,8 @@ struct ContentView: View {
     @State private var showDebug = false  // Debug builds only
     @State private var followedAt: CLLocationCoordinate2D?
     @State private var visibleRegion: MKCoordinateRegion?
+    /// The stops inside the visible map (from the stop index), worked out when the map stops moving.
+    @State private var regionStops: [Stop] = []
     @AppStorage("mapStyle") private var mapStyle = "system"
     @AppStorage("showRecents") private var showRecents = true
     @AppStorage("map3D") private var map3D = false
@@ -60,6 +62,7 @@ struct ContentView: View {
                 model.askLocation()
             }
         }
+        .onChange(of: model.stopIndex == nil) { if let r = visibleRegion { regionStops = model.stops(in: r) } }
         .task {
             if let link = links.pending { links.pending = nil; Task { await model.follow(link) } }  // launched from a quick action
             await model.start()
@@ -203,7 +206,8 @@ struct ContentView: View {
             if let rail = Rail.shared, showRail || isStation {
                 switch model.screen {
                 case .home, .station:
-                    RailMapLayer(rail: rail, selected: selectedStation) { id in withAnimation { model.openStation(id) } }
+                    RailMapLayer(rail: rail, selected: selectedStation,
+                                 stations: (visibleRegion?.span.latitudeDelta ?? 0) <= 0.08) { id in withAnimation { model.openStation(id) } }
                 default: EmptyMapContent()
                 }
             }
@@ -223,6 +227,7 @@ struct ContentView: View {
         .safeAreaPadding(.bottom, 66 + Style.panelInset * 2)
         .onMapCameraChange(frequency: .onEnd) { ctx in
             visibleRegion = ctx.region
+            regionStops = model.stops(in: ctx.region)
             if model.screen == .home { fittedLine = nil; Task { await model.loadStops(near: ctx.region.center) } }
         }
         .ignoresSafeArea()
@@ -233,7 +238,13 @@ struct ContentView: View {
 
     private var shownStops: [Stop] {
         switch model.screen {
-        case .home: return model.homeTab == .nearby ? model.stops : model.favourites
+        case .home:
+            if model.homeTab == .favourites { return model.favourites }
+            // zoomed far out the pins would cover the city: none until you zoom in
+            guard (visibleRegion?.span.latitudeDelta ?? 0) <= Model.stopsMaxSpan else { return [] }
+            // every stop on screen, plus the nearby list's (OASA's, with street names) where they're missing
+            let ids = Set(regionStops.map(\.id))
+            return regionStops + model.stops.filter { !ids.contains($0.id) }
         case .stop(let s): return [s]
         case .line, .station: return []
         }

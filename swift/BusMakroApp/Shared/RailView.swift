@@ -159,6 +159,8 @@ struct TrainCard: View {
 struct RailMapLayer: MapContent {
     let rail: Rail
     let selected: String?
+    /// Zoomed far out only the lines show (the station squares would cover them), and the selected one.
+    var stations = true
     let onTap: (String) -> Void
 
     var body: some MapContent {
@@ -169,7 +171,7 @@ struct RailMapLayer: MapContent {
             }
         }
         ForEach(Array(rail.stations.keys).sorted(), id: \.self) { id in
-            if let st = rail.stations[id] {
+            if let st = rail.stations[id], stations || id == selected {
                 Annotation("", coordinate: st.coordinate) {
                     StationPin(station: st, selected: id == selected)
                         .onTapGesture { onTap(id) }

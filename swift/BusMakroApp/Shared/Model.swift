@@ -1,5 +1,6 @@
 import BusMakroKit
 import CoreLocation
+import MapKit
 import Foundation
 import Observation
 import SwiftUI
@@ -145,6 +146,22 @@ final class Model: NSObject, CLLocationManagerDelegate {
             if sorted.map(\.id) != stops.map(\.id) { stops = sorted }
             error = nil; serviceDown = false
         } catch { failed(error) }
+    }
+
+    /// Zoomed out further than this (about 3 km top to bottom), the map shows no stop pins.
+    static let stopsMaxSpan = 0.03
+
+    /// The stops inside a map region, nearest its centre first, at most 150 (from the stop index,
+    /// so the whole screen is covered, not just the 12 OASA returns around the centre).
+    func stops(in region: MKCoordinateRegion) -> [Stop] {
+        guard let index = stopIndex, region.span.latitudeDelta <= Self.stopsMaxSpan else { return [] }
+        let c = region.center, dLat = region.span.latitudeDelta / 2, dLon = region.span.longitudeDelta / 2
+        var found: [(Stop, Double)] = []
+        for (id, e) in index.stops where abs(e.lat - c.latitude) <= dLat && abs(e.lon - c.longitude) <= dLon {
+            found.append((Stop(id: id, name: e.name, nameEnglish: "", street: "", latitude: e.lat, longitude: e.lon),
+                          Geo.distance(c.latitude, c.longitude, e.lat, e.lon)))
+        }
+        return found.sorted { $0.1 < $1.1 }.prefix(150).map(\.0)
     }
 
     /// Metres from you (or nil without a fix).
