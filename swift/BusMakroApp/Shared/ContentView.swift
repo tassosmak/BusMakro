@@ -2,6 +2,9 @@ import BusMakroKit
 import CoreSpotlight
 import MapKit
 import SwiftUI
+#if os(iOS)
+import WidgetKit
+#endif
 
 /// The main screen, laid out like the Mac app: full-bleed Apple Maps, the floating search bar and
 /// recent-stop chips at the top, round map buttons on the right, and the glass panel at the bottom.
@@ -442,9 +445,17 @@ struct LinkHandling: ViewModifier {
                 SpotlightStops.index(favourites: model.favourites, recents: model.recents)
                 #if os(iOS)
                 QuickActions.update(favourites: model.favourites)
+                WidgetFavourites.save(model.favourites.map { .init(id: $0.id, title: $0.title) })
+                WidgetCenter.shared.reloadTimelines(ofKind: "NextBuses")
                 #endif
             }
             .onChange(of: model.recents) { SpotlightStops.index(favourites: model.favourites, recents: model.recents) }
+            #if os(iOS)
+            .onChange(of: model.nicknames) {  // a renamed favourite shows its new name on the widget
+                WidgetFavourites.save(model.favourites.map { .init(id: $0.id, title: $0.title) })
+                WidgetCenter.shared.reloadTimelines(ofKind: "NextBuses")
+            }
+            #endif
     }
 }
 

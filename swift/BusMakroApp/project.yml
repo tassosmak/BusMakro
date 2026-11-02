@@ -12,6 +12,10 @@ targets:
     type: application
     supportedDestinations: [iOS, macOS]
     sources: [Shared, Activity]
+    entitlements:
+      path: BusMakro.entitlements
+      properties:
+        com.apple.security.application-groups: [group.com.tassosmak.busmakro]  # favourites for the widget
     dependencies:
       - package: BusMakroKit
       - target: BusMakroWidgets  # Live Activity (iPhone only)
@@ -42,6 +46,12 @@ targets:
     type: app-extension
     platform: iOS
     sources: [Widgets, Activity]
+    entitlements:
+      path: Widgets/BusMakroWidgets.entitlements
+      properties:
+        com.apple.security.application-groups: [group.com.tassosmak.busmakro]
+    dependencies:
+      - package: BusMakroKit  # the widget fetches OASA's arrivals itself
     info:
       path: Widgets/Info.plist
       properties:

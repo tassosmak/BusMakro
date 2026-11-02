@@ -103,6 +103,12 @@ public struct StopLine: Identifiable, Hashable, Sendable {
     public var routeTypes: [String: String] = [:]
     /// No bus on the road: the timetable's next arrival here (a rough estimate).
     public var scheduled: Scheduled?
+
+    public init(line: String, name: String, nameEnglish: String, lineCode: String, routeCodes: [String],
+                arrivalsMinutes: [Int], vehicles: [String]) {
+        self.line = line; self.name = name; self.nameEnglish = nameEnglish; self.lineCode = lineCode
+        self.routeCodes = routeCodes; self.arrivalsMinutes = arrivalsMinutes; self.vehicles = vehicles
+    }
 }
 
 /// A timetable-based arrival: departure from the terminus and about when it gets here.

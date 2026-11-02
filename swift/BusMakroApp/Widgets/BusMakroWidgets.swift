@@ -4,7 +4,10 @@ import WidgetKit
 
 @main
 struct BusMakroWidgets: WidgetBundle {
-    var body: some Widget { BusLiveActivity() }
+    var body: some Widget {
+        BusLiveActivity()
+        NextBusesWidget()
+    }
 }
 
 /// The bus alert on the lock screen and in the Dynamic Island: line, stop, a live countdown and

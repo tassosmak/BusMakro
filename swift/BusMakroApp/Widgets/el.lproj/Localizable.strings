@@ -3,3 +3,7 @@
 "1 stop away" = "1 στάση μακριά";
 "%lld stops away" = "%lld στάσεις μακριά";
 "Bus %@" = "Λεωφορείο %@";
+"Next Buses" = "Επόμενα λεωφορεία";
+"The next buses at your favourite stops." = "Τα επόμενα λεωφορεία στις αγαπημένες σου στάσεις.";
+"Star a stop in BusMakro to see its next buses here." = "Βάλε αστέρι σε μια στάση στο BusMakro για να βλέπεις εδώ τα επόμενα λεωφορεία της.";
+"No live buses" = "Κανένα λεωφορείο";
