@@ -20,6 +20,8 @@ final class Model: NSObject, CLLocationManagerDelegate {
     var stopLines: [StopLine]?
     var favourites: [Stop] = Model.loadStops("favorites")
     var recents: [Stop] = Model.loadStops("recents")
+    /// Favourite lines (ids such as "040"), in the order you added them.
+    var favouriteLines: [String] = UserDefaults.standard.stringArray(forKey: "favoriteLines") ?? []
     var userLocation: CLLocationCoordinate2D?
     var error: String?
     var searchText = ""
@@ -400,6 +402,13 @@ final class Model: NSObject, CLLocationManagerDelegate {
     func clearRecents() {
         recents = []
         Model.saveStops([], "recents")
+    }
+
+    func isFavouriteLine(_ id: String) -> Bool { favouriteLines.contains(id) }
+
+    func toggleFavouriteLine(_ id: String) {
+        if isFavouriteLine(id) { favouriteLines.removeAll { $0 == id } } else { favouriteLines.append(id) }
+        UserDefaults.standard.set(favouriteLines, forKey: "favoriteLines")
     }
 
     func isFavourite(_ s: Stop) -> Bool { favourites.contains { $0.id == s.id } }

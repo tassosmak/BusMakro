@@ -23,6 +23,10 @@ public struct LineSummary: Identifiable, Hashable, Sendable, Decodable {
 
     enum CodingKeys: String, CodingKey { case id, name, nameEnglish = "name_en" }
 
+    public init(id: String, name: String = "", nameEnglish: String? = nil) {
+        self.id = id; self.name = name; self.nameEnglish = nameEnglish
+    }
+
     /// The English name when there is one (the static data often has "" there), else the Greek one.
     public var title: String { (nameEnglish ?? "").isEmpty ? name : nameEnglish! }
 }

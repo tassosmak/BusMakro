@@ -158,3 +158,10 @@
 "Map Layers" = "Επίπεδα χάρτη";
 "%@ to %@" = "%@ έως %@";
 "Timetable: %@" = "Πρόγραμμα: %@";
+"All" = "Όλα";
+"Stops" = "Στάσεις";
+"Lines" = "Γραμμές";
+"No favourite lines yet. Tap ☆ on a line to add it." = "Δεν υπάρχουν αγαπημένες γραμμές. Πατήστε ☆ σε μια γραμμή για να την προσθέσετε.";
+"No favourites yet. Tap ☆ on a stop or a line to add it." = "Δεν υπάρχουν αγαπημένα. Πατήστε ☆ σε μια στάση ή γραμμή για να την προσθέσετε.";
+"Add to Favourites" = "Προσθήκη στα αγαπημένα";
+"Remove from Favourites" = "Αφαίρεση από τα αγαπημένα";

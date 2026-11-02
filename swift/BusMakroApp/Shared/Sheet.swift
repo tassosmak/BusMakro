@@ -8,6 +8,7 @@ struct Sheet: View {
     @Binding var height: CGFloat
     let range: ClosedRange<CGFloat>
     @State private var dragStart: CGFloat?
+    @AppStorage("favFilter") private var favFilter = "all"
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -99,6 +100,14 @@ struct Sheet: View {
             // the panel's bottom corners (39 pt) less the gap would be wider than the menu is tall:
             // a capsule is as round as it gets, and follows the corners with the same gap all round
             .background(.primary.opacity(0.10), in: Capsule())
+            if case .line(let id, _) = model.screen {
+                Button { model.toggleFavouriteLine(id) } label: {
+                    Image(systemName: model.isFavouriteLine(id) ? "star.fill" : "star")
+                        .foregroundStyle(model.isFavouriteLine(id) ? .yellow : .secondary)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(model.isFavouriteLine(id) ? "Remove from Favourites" : "Add to Favourites")
+            }
             if case .stop(let s) = model.screen {
                 Button { model.toggleFavourite(s) } label: {
                     Image(systemName: model.isFavourite(s) ? "star.fill" : "star")
@@ -131,8 +140,16 @@ struct Sheet: View {
                 Text("Favourites").tag(Model.HomeTab.favourites)
             }
             .pickerStyle(.segmented).labelsHidden()
-            list(model.homeTab == .nearby ? model.stops : model.favourites, empty: model.homeTab == .nearby
-                 ? String(localized: "Finding stops near you…") : String(localized: "No favourite stops yet. Tap ☆ on a stop to add it."))
+            if model.homeTab == .nearby {
+                list(model.stops, empty: String(localized: "Finding stops near you…"))
+            } else {
+                favouritesFilter
+                list(favFilter == "lines" ? [] : model.favourites,
+                     lines: favFilter == "stops" ? [] : model.favouriteLines,
+                     empty: favFilter == "lines" ? String(localized: "No favourite lines yet. Tap ☆ on a line to add it.")
+                          : favFilter == "stops" ? String(localized: "No favourite stops yet. Tap ☆ on a stop to add it.")
+                          : String(localized: "No favourites yet. Tap ☆ on a stop or a line to add it."))
+            }
         case .line:
             LineContent(model: model)
         case .station(let id):
@@ -161,11 +178,22 @@ struct Sheet: View {
         }
     }
 
-    private func list(_ stops: [Stop], empty: String) -> some View {
+    /// Favourites: stops, lines, or both.
+    private var favouritesFilter: some View {
+        Picker("", selection: $favFilter) {
+            Text("All").tag("all")
+            Text("Stops").tag("stops")
+            Text("Lines").tag("lines")
+        }
+        .pickerStyle(.segmented).labelsHidden()
+        .controlSize(.small)
+    }
+
+    private func list(_ stops: [Stop], lines: [String] = [], empty: String) -> some View {
         ScrollView {
             LazyVStack(spacing: 6) {
                 ForEach(model.networkAlerts.prefix(2)) { AlertCard(alert: $0) }
-                if stops.isEmpty {
+                if stops.isEmpty && lines.isEmpty {
                     Text(empty).font(.system(size: 12)).foregroundStyle(.secondary).padding(.top, 20)
                 }
                 ForEach(Array(stops.enumerated()), id: \.element.id) { i, stop in
@@ -175,6 +203,13 @@ struct Sheet: View {
                     }
                     .buttonStyle(.plain)
                     .appearing(i)
+                }
+                ForEach(Array(lines.enumerated()), id: \.element) { i, id in
+                    Button { withAnimation { model.openLine(id, at: nil) } } label: {
+                        LineRow(line: model.lines.first { $0.id == id } ?? LineSummary(id: id))
+                    }
+                    .buttonStyle(.plain)
+                    .appearing(stops.count + i)
                 }
             }
         }
