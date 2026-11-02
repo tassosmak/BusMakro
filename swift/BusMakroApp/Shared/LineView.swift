@@ -129,6 +129,7 @@ struct ArrivalCard: View {
     var onWatch: (Int?) -> Void = { _ in }
     var following = false
     var onFollow: () -> Void = {}
+    @State private var showDetails = false
 
     var body: some View {
         HStack(alignment: .center, spacing: 10) {
@@ -158,7 +159,13 @@ struct ArrivalCard: View {
         .overlay(RoundedRectangle(cornerRadius: Style.cardRadius).stroke(following ? Color.orange : .clear, lineWidth: 1.5))
         // the details live a long press away: bus number, delay, trip
         .contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: Style.cardRadius))
-        .contextMenu {} preview: { details }  // just the explained details, wide (the buttons are on the card)
+        // long press: just the explained details, in a wide popover (the buttons stay on the card;
+        // a context menu with no items never opens)
+        .simultaneousGesture(LongPressGesture(minimumDuration: 0.4).onEnded { _ in showDetails = true })
+        .sensoryFeedback(.impact(weight: .medium), trigger: showDetails) { _, on in on }
+        .popover(isPresented: $showDetails, arrowEdge: .bottom) {
+            details.presentationCompactAdaptation(.popover)
+        }
     }
 
     /// Long press: the bus number, how late or early it runs, and its trip, each with what it means.
