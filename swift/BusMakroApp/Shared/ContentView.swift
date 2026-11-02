@@ -8,7 +8,9 @@ import SwiftUI
 struct ContentView: View {
     @State private var model = Model()
     @State private var links = Links.shared
-    @State private var sheetHeight: CGFloat = 360
+    /// The panel's height, in its own object: dragging changes it every frame, and only the views that
+    /// read it (panel, bars, map buttons) redraw, not this whole screen with the map and its pins.
+    @State private var panel = Panel()
     @State private var fittedLine: String?
     @State private var menuOpen = false
     @State private var showMetroMap = false
@@ -43,12 +45,14 @@ struct ContentView: View {
                     topArea.overlay(alignment: .top) { zoomHintView }  // outside the bars' fade
                     Spacer()
                     mapButtons
-                    Sheet(model: model, height: $sheetHeight, range: 66...(geo.size.height - 120))
+                    PanelReader(panel: panel) { p in
+                    Sheet(model: model, height: Bindable(p).height, range: 66...(geo.size.height - 120))
                         // while searching the panel (and the map buttons) step aside for the keyboard and results
-                        .offset(y: model.searchActive ? sheetHeight + 40 : 0)
+                        .offset(y: model.searchActive ? p.height + 40 : 0)
                         .opacity(model.searchActive ? 0 : 1)
                         .allowsHitTesting(!model.searchActive)
                         .animation(.spring(response: 0.36, dampingFraction: 1), value: model.searchActive)
+                    }
                 }
                 .padding(.horizontal, Style.panelInset)
                 .padding(.top, 4)                  // right under the status bar
@@ -145,9 +149,7 @@ struct ContentView: View {
             }
         }
         .animation(.spring(response: 0.32, dampingFraction: 1), value: showResults)
-        .opacity(model.searchActive ? 1 : barShown)
-        .offset(y: model.searchActive ? 0 : (barShown - 1) * 40)
-        .allowsHitTesting(model.searchActive || barShown > 0.5)
+        .modifier(BarsFollowPanel(panel: panel, searching: model.searchActive))
         .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { topHeight = $0 }
     }
 
@@ -164,7 +166,7 @@ struct ContentView: View {
                     .transition(.opacity)
             }
         }
-        .offset(y: 6 + barShown * (topHeight + 2))
+        .modifier(HintFollowsPanel(panel: panel, below: topHeight))
         .allowsHitTesting(false)
         .animation(.easeInOut(duration: 0.25), value: zoomHint)
     }
@@ -182,9 +184,11 @@ struct ContentView: View {
         HStack {
             Spacer()
             VStack(spacing: 10) {
-                RoundButton(symbol: sheetHeight <= 66 ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right",
+                PanelReader(panel: panel) { p in
+                RoundButton(symbol: p.height <= 66 ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right",
                             help: "Expand the map") {
-                    withAnimation(.spring(response: 0.36, dampingFraction: 1)) { sheetHeight = sheetHeight <= 66 ? 360 : 66 }
+                    withAnimation(.spring(response: 0.36, dampingFraction: 1)) { p.height = p.height <= 66 ? 360 : 66 }
+                }
                 }
                 RoundButton(symbol: "location", help: "Locate Me") { locate() }
                 layersButton
@@ -214,7 +218,6 @@ struct ContentView: View {
     }
 
     /// 0 with the panel at the strip, 1 from the normal height up.
-    private var barShown: Double { min(1, max(0, (sheetHeight - 66) / (360 - 66))) }
 
     private var map: some View {
         Map(position: $camera) {
@@ -441,4 +444,34 @@ struct LinkHandling: ViewModifier {
             }
             .onChange(of: model.recents) { SpotlightStops.index(favourites: model.favourites, recents: model.recents) }
     }
+}
+
+@Observable final class Panel {
+    var height: CGFloat = 360
+    /// 1 with the panel up, 0 down at the slim strip: the top bars slide away in between.
+    var barShown: Double { min(1, max(0, (height - 66) / (360 - 66))) }
+}
+
+/// Reads the panel's height in its own body, so only this part redraws while it's dragged.
+struct PanelReader<Content: View>: View {
+    let panel: Panel
+    @ViewBuilder var content: (Panel) -> Content
+    var body: some View { content(panel) }
+}
+
+/// The search bar and chips fade and rise as the panel goes down (they stay while searching).
+struct BarsFollowPanel: ViewModifier {
+    let panel: Panel, searching: Bool
+    func body(content: Content) -> some View {
+        content
+            .opacity(searching ? 1 : panel.barShown)
+            .offset(y: searching ? 0 : (panel.barShown - 1) * 40)
+            .allowsHitTesting(searching || panel.barShown > 0.5)
+    }
+}
+
+/// The zoom hint sits under the bars, and rises with them.
+struct HintFollowsPanel: ViewModifier {
+    let panel: Panel, below: CGFloat
+    func body(content: Content) -> some View { content.offset(y: 6 + panel.barShown * (below + 2)) }
 }
