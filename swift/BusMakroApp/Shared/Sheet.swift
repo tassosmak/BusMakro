@@ -9,6 +9,9 @@ struct Sheet: View {
     let range: ClosedRange<CGFloat>
     @State private var dragStart: CGFloat?
     @AppStorage("favFilter") private var favFilter = "all"
+    /// The favourite being renamed ("stop:ID" / "line:ID") and the name typed so far.
+    @State private var renaming: String?
+    @State private var nickname = ""
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -26,6 +29,13 @@ struct Sheet: View {
         // what doesn't fit stays inside the panel (dragged small, the tabs and list were drawn below it)
         .clipShape(Style.panelShape)
         .panelGlass(Style.panelShape)
+        .alert("Nickname", isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
+            TextField("Home, Work, Gym…", text: $nickname)
+            Button("Save") { if let k = renaming { model.setNickname(nickname, for: k) }; renaming = nil }
+            Button("Cancel", role: .cancel) { renaming = nil }
+        } message: {
+            Text("Shown instead of its name. Leave empty to use the name again.")
+        }
     }
 
     // Drag the handle to resize; it snaps to the nearest of strip / normal / full.
@@ -178,6 +188,15 @@ struct Sheet: View {
         }
     }
 
+    /// Long-press a favourite: give it a nickname, take it back, or remove the favourite.
+    @ViewBuilder private func favouriteMenu(_ key: String, name: String, remove: @escaping () -> Void) -> some View {
+        Button { nickname = model.nicknames[key] ?? ""; renaming = key } label: { Label("Rename…", systemImage: "pencil") }
+        if model.nicknames[key] != nil {
+            Button { model.setNickname("", for: key) } label: { Label("Remove Nickname", systemImage: "arrow.uturn.backward") }
+        }
+        Button(role: .destructive, action: remove) { Label("Remove from Favourites", systemImage: "star.slash") }
+    }
+
     /// Favourites: stops, lines, or both.
     private var favouritesFilter: some View {
         Picker("", selection: $favFilter) {
@@ -202,13 +221,15 @@ struct Sheet: View {
                                  subtitle: model.homeTab == .favourites ? favouriteSubtitle(model.favLines[stop.id]) : nil)
                     }
                     .buttonStyle(.plain)
+                    .contextMenu { if model.homeTab == .favourites { favouriteMenu("stop:\(stop.id)", name: stop.title) { model.toggleFavourite(stop) } } }
                     .appearing(i)
                 }
                 ForEach(Array(lines.enumerated()), id: \.element) { i, id in
                     Button { withAnimation { model.openLine(id, at: nil) } } label: {
-                        LineRow(line: model.lines.first { $0.id == id } ?? LineSummary(id: id))
+                        LineRow(line: model.lines.first { $0.id == id } ?? LineSummary(id: id), nickname: model.nicknames["line:\(id)"])
                     }
                     .buttonStyle(.plain)
+                    .contextMenu { favouriteMenu("line:\(id)", name: model.nicknames["line:\(id)"] ?? id) { model.toggleFavouriteLine(id) } }
                     .appearing(stops.count + i)
                 }
             }

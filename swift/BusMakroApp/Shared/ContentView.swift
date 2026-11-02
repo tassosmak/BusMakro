@@ -22,6 +22,7 @@ struct ContentView: View {
     @AppStorage("map3D") private var map3D = false
     // map layers (the layers button, or Settings)
     @AppStorage("showStops") private var showStops = true
+    @AppStorage("favColor") private var favColor = Style.favouriteColor
     @AppStorage("showBuses") private var showBuses = true
     @AppStorage("showMetro") private var showMetro = true
     @AppStorage("showTram") private var showTram = true
@@ -239,7 +240,8 @@ struct ContentView: View {
             ForEach(shownStops) { stop in
                 Annotation("", coordinate: CLLocationCoordinate2D(latitude: stop.latitude, longitude: stop.longitude)) {
                     let selected = model.screen == .stop(stop)
-                    StopPin(selected: selected).onTapGesture { model.open(stop) }
+                    StopPin(selected: selected, favourite: model.isFavourite(stop) ? Color(hex: favColor) : nil)
+                        .onTapGesture { model.open(stop) }
                         .accessibilityLabel(Text("Stop \(stop.title)"))
                         .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
                 }
@@ -270,7 +272,9 @@ struct ContentView: View {
             guard (visibleRegion?.span.latitudeDelta ?? 0) <= Model.stopsMaxSpan else { return [] }
             // every stop on screen, plus the nearby list's (OASA's, with street names) where they're missing
             let ids = Set(regionStops.map(\.id))
-            return regionStops + model.stops.filter { !ids.contains($0.id) }
+            let all = regionStops + model.stops.filter { !ids.contains($0.id) }
+            // favourites last, so their pins sit on top of the others
+            return all.filter { !model.isFavourite($0) } + model.favourites
         case .stop(let s): return [s]
         case .line, .station: return []
         }
@@ -343,8 +347,10 @@ extension View {
 /// A bus-stop pin: a small rounded sign with a bus, on a short stem; orange and larger when selected.
 struct StopPin: View {
     var selected = false
+    /// A favourite's colour (Settings → Favourite Stops); nil for the usual blue.
+    var favourite: Color? = nil
     var body: some View {
-        let tint = selected ? Color.orange : Color(red: 0.09, green: 0.47, blue: 1.0)
+        let tint = selected ? Color.orange : favourite ?? Color(red: 0.09, green: 0.47, blue: 1.0)
         let size: CGFloat = selected ? 30 : 22
         VStack(spacing: 0) {
             Image(systemName: "bus.fill")

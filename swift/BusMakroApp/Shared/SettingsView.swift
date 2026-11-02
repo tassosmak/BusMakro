@@ -8,6 +8,7 @@ struct SettingsView: View {
     @AppStorage("showRecents") private var showRecents = true
     @AppStorage("map3D") private var map3D = false
     @AppStorage("showStops") private var showStops = true
+    @AppStorage("favColor") private var favColor = Style.favouriteColor
     @AppStorage("showBuses") private var showBuses = true
     @AppStorage("showMetro") private var showMetro = true
     @AppStorage("showTram") private var showTram = true
@@ -33,6 +34,8 @@ struct SettingsView: View {
                     }
                     Toggle("3D Buildings", isOn: $map3D)
                     Toggle("Bus Stops", isOn: $showStops)
+                    ColorPicker("Favourite Stops", selection: Binding(get: { Color(hex: favColor) }, set: { favColor = $0.hex }),
+                                supportsOpacity: false)
                     Toggle("Live Buses", isOn: $showBuses)
                     Toggle("Metro", isOn: $showMetro)
                     Toggle("Tram", isOn: $showTram)

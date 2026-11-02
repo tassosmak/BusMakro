@@ -18,6 +18,8 @@ enum Style {
     static let lineMenuHeight: CGFloat = 22   // LINE_MENU_H
     static let cardRadius: CGFloat = 14
     static let chipHeight: CGFloat = 26       // CHIP_H
+    /// Favourite stops on the map, until you pick another colour in Settings (a warm pink).
+    static let favouriteColor = "#E8467C"
 
     /// SF Pro Rounded with fixed-width digits, for times and distances.
     static func rounded(_ size: CGFloat, _ weight: Font.Weight = .semibold) -> Font {

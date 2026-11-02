@@ -98,10 +98,19 @@ struct LineCard: View {
 /// A line in search results: badge and name.
 struct LineRow: View {
     let line: LineSummary
+    /// Your nickname for the line, shown over its route name.
+    var nickname: String? = nil
     var body: some View {
         HStack(spacing: 12) {
             LineBadge(line: line.id)
-            Text(line.shown).font(.system(size: 13, weight: .semibold)).lineLimit(2)
+            VStack(alignment: .leading, spacing: 1) {
+                if let nickname {
+                    Text(nickname).font(.system(size: 14, weight: .semibold)).lineLimit(1)
+                    Text(line.shown).font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(1)
+                } else {
+                    Text(line.shown).font(.system(size: 13, weight: .semibold)).lineLimit(2)
+                }
+            }
             Spacer()
         }
         .padding(.horizontal, 12)

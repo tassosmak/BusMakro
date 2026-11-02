@@ -26,6 +26,13 @@ extension Color {
         let v = UInt64(hex.dropFirst(), radix: 16) ?? 0x666666
         self.init(red: Double((v >> 16) & 0xFF) / 255, green: Double((v >> 8) & 0xFF) / 255, blue: Double(v & 0xFF) / 255)
     }
+
+    /// "#RRGGBB", for keeping a picked colour in the settings.
+    var hex: String {
+        let r = resolve(in: EnvironmentValues())
+        func c(_ x: Float) -> Int { Int((min(1, max(0, x)) * 255).rounded()) }
+        return String(format: "#%02X%02X%02X", c(r.red), c(r.green), c(r.blue))
+    }
 }
 
 extension Model {

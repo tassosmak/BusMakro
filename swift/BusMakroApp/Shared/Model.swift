@@ -22,6 +22,7 @@ final class Model: NSObject, CLLocationManagerDelegate {
     var recents: [Stop] = Model.loadStops("recents")
     /// Favourite lines (ids such as "040"), in the order you added them.
     var favouriteLines: [String] = UserDefaults.standard.stringArray(forKey: "favoriteLines") ?? []
+    var nicknames: [String: String] = Nicknames.all
     var userLocation: CLLocationCoordinate2D?
     var error: String?
     var searchText = ""
@@ -404,6 +405,15 @@ final class Model: NSObject, CLLocationManagerDelegate {
         Model.saveStops([], "recents")
     }
 
+    /// Name (or with "" un-name) a favourite stop or line; `key` is "stop:ID" or "line:ID".
+    func setNickname(_ name: String, for key: String) {
+        let n = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        Nicknames.all[key] = n.isEmpty ? nil : n
+        UserDefaults.standard.set(Nicknames.all, forKey: "nicknames")
+        nicknames = Nicknames.all  // views that show names redraw
+        if key.hasPrefix("stop:") { favourites = favourites; recents = recents }  // quick actions, Spotlight, chips
+    }
+
     func isFavouriteLine(_ id: String) -> Bool { favouriteLines.contains(id) }
 
     func toggleFavouriteLine(_ id: String) {
@@ -457,7 +467,15 @@ final class Model: NSObject, CLLocationManagerDelegate {
 }
 
 extension Stop {
-    var title: String { Names.place(name, nameEnglish) }
+    /// Your nickname for it when you gave one ("Home", "Work"), else its name.
+    var title: String { Nicknames.all["stop:\(id)"] ?? Names.place(name, nameEnglish) }
+}
+
+/// Your own names for favourite stops and lines (long-press one in Favourites → Rename).
+/// Keys: "stop:400022", "line:040".
+enum Nicknames {
+    nonisolated(unsafe) static var all: [String: String] =  // changed only on the main actor (setNickname)
+        UserDefaults.standard.dictionary(forKey: "nicknames") as? [String: String] ?? [:]
 }
 
 /// Place and line names in the app's language: Greek as-is, or OASA's English name, else a
