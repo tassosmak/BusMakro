@@ -28,7 +28,7 @@ public struct Approaching: Identifiable, Hashable, Sendable {
     public let stopsAway: Int
     public let metres: Double
     /// Seconds to the stop: OASA's official prediction when there is one, else our own estimate.
-    public let seconds: Double
+    public var seconds: Double
     public let official: Bool
 }
 
@@ -56,6 +56,12 @@ public enum LineMath {
             let L = bx * bx + by * by
             let f = L > 0 ? max(0, min(1, (px * bx + py * by) / L)) : 0
             let off = hypot(px - bx * f, py - by * f) * 111_320
+            // a loop line drives some streets both ways: skip a stretch going against the bus's heading
+            if let h = v.bearing, L > 0 {
+                let dir = atan2(bx, by) * 180 / .pi
+                let diff = abs((h - dir + 540).truncatingRemainder(dividingBy: 360) - 180)
+                if diff > 100 { continue }
+            }
             if off < (best?.off ?? 300) { best = (i, off) }
         }
         return best?.i
@@ -64,7 +70,7 @@ public enum LineMath {
     /// The buses still heading to `stop`, nearest first. `official` maps vehicle code → minutes (OASA).
     public static func approaching(_ stop: String, detail: LineDetail, live: [Vehicle],
                                    official: [String: Int], now: Date = Date()) -> [Approaching] {
-        live.compactMap { v in
+        let found: [Approaching] = live.compactMap { v in
             // its route (or, without one, a route of the line through this stop)
             guard let route = (v.variant.flatMap { detail.variants[$0]?.stops })
                     ?? detail.variants.values.map(\.stops).first(where: { $0.contains(stop) }),
@@ -85,11 +91,34 @@ public enum LineMath {
             if let mins = official[v.id] {
                 return Approaching(vehicle: v, stopsAway: si - ni, metres: m, seconds: Double(mins) * 60, official: true)
             }
+            // the speed of the moment says little (a bus at a light read 2.5 m/s, and a bus nearer
+            // you got a later time than one behind it): a typical pace, tuned below by OASA's own times
             let age = v.positionAt.map { max(0, now.timeIntervalSince($0)) } ?? 0
-            let speed = min(11, max(2.5, (v.speed ?? 0) > 0 ? v.speed! : defaultSpeed))
-            return Approaching(vehicle: v, stopsAway: si - ni, metres: m, seconds: max(0, m / speed - age), official: false)
+            return Approaching(vehicle: v, stopsAway: si - ni, metres: m, seconds: max(0, m / defaultSpeed - age), official: false)
         }
         .sorted { $0.metres < $1.metres }
+        return consistent(found, now: now).sorted { $0.seconds < $1.seconds }
+    }
+
+    /// Estimates that agree with OASA and with the order of the buses: the pace comes from the line's
+    /// official predictions when there are some, and a bus never gets a later time than one behind it.
+    static func consistent(_ list: [Approaching], now: Date) -> [Approaching] {
+        var out = list
+        let paces = list.filter { $0.official && $0.metres > 300 }.map { $0.seconds / $0.metres }.sorted()
+        if !paces.isEmpty {
+            let pace = min(1 / 2.0, max(1 / 11.0, paces[paces.count / 2]))  // seconds per metre, 2-11 m/s
+            for i in out.indices where !out[i].official {
+                let age = out[i].vehicle.positionAt.map { max(0, now.timeIntervalSince($0)) } ?? 0
+                out[i].seconds = max(0, out[i].metres * pace - age)
+            }
+        }
+        // from the furthest in: an estimate is no later than the bus behind it (official times stay)
+        var later = Double.infinity
+        for i in out.indices.reversed() {
+            if !out[i].official { out[i].seconds = min(out[i].seconds, later) }
+            later = out[i].seconds
+        }
+        return out
     }
 }
 

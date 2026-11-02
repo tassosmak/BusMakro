@@ -13,6 +13,14 @@ if CommandLine.arguments.dropFirst().first == "approach", CommandLine.arguments.
         let counts = detail.variants[vid]!.stops.map { LineMath.approaching($0, detail: detail, live: live.vehicles, official: [:]).count }
         print(vid, counts.map(String.init).joined(separator: " "))
     }
+    // one stop late on the route: each bus's distance and time, nearest first
+    if let vid = detail.variants.keys.sorted().first, let stops = detail.variants[vid]?.stops, stops.count > 10 {
+        let stop = stops[stops.count - 5]
+        let official = await OASAClient().predictions(stopID: stop)
+        for a in LineMath.approaching(stop, detail: detail, live: live.vehicles, official: official) {
+            print(stop, a.vehicle.id, Int(a.metres), "m", Int(a.seconds / 60), "min", a.official ? "OASA" : "est")
+        }
+    }
     exit(0)
 }
 if CommandLine.arguments.dropFirst().first == "plan" {

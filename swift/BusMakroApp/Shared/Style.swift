@@ -71,6 +71,9 @@ struct RoundButton: View {
     var spinning = false
     let action: () -> Void
     @State private var turns = 0.0
+    /// The live value for the spin loop (its completion saw a stale copy of `spinning`, always true,
+    /// so the button span forever).
+    @State private var active = false
 
     var body: some View {
         Button(action: action) {
@@ -85,12 +88,12 @@ struct RoundButton: View {
         .glass(Circle())
         .help(help)
         .accessibilityLabel(help)  // VoiceOver reads the name, not the symbol
-        .onChange(of: spinning) { if spinning { spin() } }
+        .onChange(of: spinning) { active = spinning; if spinning { spin() } }
     }
 
     /// One whole turn at a time, so it never stops half-way round.
     private func spin() {
-        withAnimation(.linear(duration: 0.7)) { turns += 1 } completion: { if spinning { spin() } }
+        withAnimation(.linear(duration: 0.7)) { turns += 1 } completion: { if active { spin() } }
     }
 }
 
