@@ -15,7 +15,7 @@ struct LineContent: View {
         }
         .pickerStyle(.segmented).labelsHidden()
         if model.lineDetail == nil {
-            Text("Loading the line…").font(.system(size: 12)).foregroundStyle(.secondary).padding(.top, 20)
+            Text("Loading the line…").font(.scaled(12)).foregroundStyle(.secondary).padding(.top, 20)
                 .frame(maxWidth: .infinity)
         } else {
             switch model.lineTab {
@@ -29,14 +29,14 @@ struct LineContent: View {
 
     private var arrivals: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("APPROACHING BUSES").font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary)
+            Text("APPROACHING BUSES").font(.scaled(11, .semibold)).foregroundStyle(.secondary)
             ScrollView {
                 LazyVStack(spacing: 6) {
                     ForEach(model.alerts(for: [currentLine])) { AlertCard(alert: $0) }
                     let rows = model.approaching
                     if rows.isEmpty {
                         Text(model.lineStop == nil ? String(localized: "Choose a stop to see approaching buses.") : String(localized: "No bus is heading to this stop right now."))
-                            .font(.system(size: 12)).foregroundStyle(.secondary).padding(.top, 20)
+                            .font(.scaled(12)).foregroundStyle(.secondary).padding(.top, 20)
                     }
                     ForEach(Array(rows.enumerated()), id: \.element.id) { i, a in
                         ArrivalCard(item: a, watching: model.watches[a.vehicle.id]?.stops, onWatch: { model.watch(a.vehicle.id, stops: $0) },
@@ -89,13 +89,13 @@ struct LineContent: View {
     /// The line's stops nearest you; tapping one selects it and shows its arrivals.
     private var nearby: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("NEAREST STOPS ON THIS LINE").font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary)
+            Text("NEAREST STOPS ON THIS LINE").font(.scaled(11, .semibold)).foregroundStyle(.secondary)
             ScrollView {
                 LazyVStack(spacing: 6) {
                     let rows = model.nearestOnLine(from: nil)
                     if rows.isEmpty {
                         Text("Tap the location button to find the stops near you.")
-                            .font(.system(size: 12)).foregroundStyle(.secondary).padding(.top, 20)
+                            .font(.scaled(12)).foregroundStyle(.secondary).padding(.top, 20)
                     }
                     ForEach(Array(rows.enumerated()), id: \.element.0) { i, row in
                         Button {
@@ -140,7 +140,7 @@ struct ArrivalCard: View {
                 }
                 Text((item.stopsAway == 0 ? String(localized: "next stop") : item.stopsAway == 1 ? String(localized: "1 stop away") : String(localized: "\(item.stopsAway) stops away"))
                      + (item.waiting ? " · " + String(localized: "waiting to set off") : ""))
-                    .font(.system(size: 11)).foregroundStyle(.secondary)
+                    .font(.scaled(11)).foregroundStyle(.secondary)
             }
             Spacer(minLength: 0)
             // 🔔: notify me when this bus is N stops from my stop
@@ -154,7 +154,7 @@ struct ArrivalCard: View {
                 .accessibilityLabel(Text("Follow on Map"))
         }
         .padding(.horizontal, 14)
-        .frame(height: 72)
+        .frame(minHeight: 72)
         .card()
         .background(item.seconds < 90 ? Color.green.opacity(0.16) : .clear, in: RoundedRectangle(cornerRadius: Style.cardRadius))
         .overlay(RoundedRectangle(cornerRadius: Style.cardRadius).stroke(following ? Color.orange : .clear, lineWidth: 1.5))
@@ -192,11 +192,11 @@ struct ArrivalCard: View {
 
     private func detail(_ symbol: String, _ title: LocalizedStringKey, _ value: String, _ note: String) -> some View {
         HStack(alignment: .top, spacing: 12) {
-            Image(systemName: symbol).font(.system(size: 15)).foregroundStyle(.secondary).frame(width: 22)
+            Image(systemName: symbol).font(.scaled(15)).foregroundStyle(.secondary).frame(width: 22)
             VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary).textCase(.uppercase)
-                Text(value).font(.system(size: 16, weight: .semibold))
-                Text(note).font(.system(size: 12)).foregroundStyle(.secondary)
+                Text(title).font(.scaled(11, .semibold)).foregroundStyle(.secondary).textCase(.uppercase)
+                Text(value).font(.scaled(16, .semibold))
+                Text(note).font(.scaled(12)).foregroundStyle(.secondary)
             }
         }
     }
@@ -212,7 +212,7 @@ struct ArrivalCard: View {
     /// A round, finger-sized button face (44 pt), tinted orange while on.
     private func circle(_ symbol: String, on: Bool) -> some View {
         Image(systemName: symbol)
-            .font(.system(size: 16, weight: .medium))
+            .font(.scaled(16, .medium))
             .foregroundStyle(on ? Color.orange : Color.primary.opacity(0.7))
             .frame(width: 40, height: 40)
             .background(on ? Color.orange.opacity(0.16) : Color.primary.opacity(0.06), in: Circle())
@@ -246,13 +246,13 @@ struct RouteStopRow: View {
             }
             .frame(width: 22)
             VStack(alignment: .leading, spacing: 2) {
-                Text(name).font(.system(size: 13, weight: selected ? .semibold : .regular)).lineLimit(1)
-                Text("Stop \(id)").font(.system(size: 11)).foregroundStyle(.secondary)
+                Text(name).font(.scaled(13, selected ? .semibold : .regular)).lineLimit(1)
+                Text("Stop \(id)").font(.scaled(11)).foregroundStyle(.secondary)
             }
             Spacer()
         }
         .padding(.horizontal, 6)
-        .frame(height: 46)
+        .frame(minHeight: 46)
         .background(selected ? Color.orange.opacity(0.16) : .clear, in: RoundedRectangle(cornerRadius: 10))
         .contentShape(Rectangle())
     }
@@ -265,11 +265,11 @@ struct RouteBusRow: View {
         HStack(spacing: 14) {
             ZStack {
                 Rectangle().fill(.tertiary).frame(width: 2)
-                Image(systemName: "bus.fill").font(.system(size: 10)).foregroundStyle(.white)
+                Image(systemName: "bus.fill").font(.scaled(10)).foregroundStyle(.white)
                     .frame(width: 22, height: 22).background(.green, in: Circle())
             }
             .frame(width: 22)
-            Text("Bus \(id)").font(.system(size: 12, weight: .semibold)).foregroundStyle(.green)
+            Text("Bus \(id)").font(.scaled(12, .semibold)).foregroundStyle(.green)
             Spacer()
         }
         .padding(.horizontal, 6)
@@ -295,17 +295,17 @@ struct TimetableList: View {
                 }
                 .pickerStyle(.segmented).labelsHidden()
                 if let d = model.timetableDays.first(where: { $0.code == model.timetableDay }) {
-                    Text(dayName(d)).font(.system(size: 11)).foregroundStyle(.secondary)
+                    Text(dayName(d)).font(.scaled(11)).foregroundStyle(.secondary)
                 }
             }
             Text(today ? LocalizedStringKey("TODAY'S DEPARTURES FROM EACH END") : "DEPARTURES FROM EACH END")
-                .font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary)
+                .font(.scaled(11, .semibold)).foregroundStyle(.secondary)
             if let tt = model.timetable?.variants {
                 ScrollViewReader { proxy in
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 4) {
                             if tt.isEmpty {
-                                Text("No timetable for today").font(.system(size: 12)).foregroundStyle(.secondary).padding(.top, 20)
+                                Text("No timetable for today").font(.scaled(12)).foregroundStyle(.secondary).padding(.top, 20)
                             }
                             ForEach(Array(tt.enumerated()), id: \.offset) { vi, v in
                                 let ends = v.name.components(separatedBy: " - ")
@@ -318,7 +318,7 @@ struct TimetableList: View {
                     .onAppear { proxy.scrollTo("next", anchor: .center) }
                 }
             } else {
-                Text("Loading the timetable…").font(.system(size: 12)).foregroundStyle(.secondary).padding(.top, 20)
+                Text("Loading the timetable…").font(.scaled(12)).foregroundStyle(.secondary).padding(.top, 20)
                     .frame(maxWidth: .infinity)
             }
         }
@@ -350,7 +350,7 @@ struct TimetableList: View {
     }
 
     private func header(_ text: String) -> some View {
-        Text(text).font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary).padding(.top, 8)
+        Text(text).font(.scaled(11, .semibold)).foregroundStyle(.secondary).padding(.top, 8)
     }
 
     @ViewBuilder private func section(_ times: [Date], from place: String, key: String) -> some View {

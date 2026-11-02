@@ -1,4 +1,7 @@
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#endif
 
 /// The Mac app's look, as SwiftUI: the same sizes, radii, fonts and colours (oasa/config.py, widgets.py).
 enum Style {
@@ -23,7 +26,7 @@ enum Style {
 
     /// SF Pro Rounded with fixed-width digits, for times and distances.
     static func rounded(_ size: CGFloat, _ weight: Font.Weight = .semibold) -> Font {
-        .system(size: size, weight: weight, design: .rounded).monospacedDigit()
+        .scaled(size, weight, design: .rounded).monospacedDigit()
     }
 }
 
@@ -78,7 +81,7 @@ struct RoundButton: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: symbol)
-                .font(.system(size: 15, weight: .medium))
+                .font(.scaled(15, .medium))
                 .rotationEffect(.degrees(turns * 360))
                 .contentTransition(.symbolEffect(.replace))
                 .frame(width: Style.roundButton, height: Style.roundButton)
@@ -103,7 +106,7 @@ struct LineBadge: View {
     var width: CGFloat = 58
     var body: some View {
         Text(line)
-            .font(.system(size: 15, weight: .bold, design: .rounded))
+            .font(.scaled(15, .bold, design: .rounded))
             .foregroundStyle(.white)
             .frame(width: width, height: 28)
             .background(.blue, in: RoundedRectangle(cornerRadius: 8))
@@ -119,5 +122,25 @@ struct LineBadge: View {
         NotificationCenter.default.addObserver(forName: .NSProcessInfoPowerStateDidChange, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.on = ProcessInfo.processInfo.isLowPowerModeEnabled }
         }
+    }
+}
+
+extension Font {
+    /// The app's type sizes, following the system text size (Dynamic Type): each size is the text
+    /// style it equals at the default setting (13 = footnote, 17 = body…), so it grows and shrinks
+    /// with Settings → Display & Brightness → Text Size; the in-between sizes scale like the nearest style.
+    static func scaled(_ size: CGFloat, _ weight: Font.Weight = .regular, design: Font.Design = .default) -> Font {
+        let styles: [(CGFloat, Font.TextStyle)] = [(11, .caption2), (12, .caption), (13, .footnote), (15, .subheadline),
+                                                   (16, .callout), (17, .body), (20, .title3), (22, .title2), (28, .title), (34, .largeTitle)]
+        let nearest = styles.min { abs($0.0 - size) < abs($1.0 - size) }!
+        if nearest.0 == size { return .system(nearest.1, design: design, weight: weight) }
+        #if canImport(UIKit)
+        let uiStyle: [Font.TextStyle: UIFont.TextStyle] = [.caption2: .caption2, .caption: .caption1, .footnote: .footnote,
+            .subheadline: .subheadline, .callout: .callout, .body: .body, .title3: .title3, .title2: .title2, .title: .title1, .largeTitle: .largeTitle]
+        let scaled = UIFontMetrics(forTextStyle: uiStyle[nearest.1]!).scaledValue(for: size)
+        return .system(size: scaled, weight: weight, design: design)
+        #else
+        return .system(size: size, weight: weight, design: design)
+        #endif
     }
 }

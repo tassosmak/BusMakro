@@ -82,7 +82,9 @@ struct TripView: View {
                 ends.padding(Style.gap)
                 Divider()
                 if let editing {
-                    PlaceSearch(model: model, allowHere: true) { choice in
+                    PlaceSearch(model: model, allowHere: !model.pickingHome) { choice in
+                        // setting Home first ("Take Me Home" with no Home yet): keep it, then go there
+                        if model.pickingHome, case .place(let p) = choice { model.home = p; model.pickingHome = false; from = .here }
                         if editing == .from { from = choice } else { to = choice }
                         self.editing = nil
                         Task { await plan() }
@@ -99,7 +101,11 @@ struct TripView: View {
                 ToolbarItem(placement: .cancellationAction) { Button("Close") { dismiss() } }
             }
         }
-        .onAppear { if to == nil { editing = .to } }
+        .onAppear {
+            if let t = model.tripTo { from = .here; to = .place(t); model.tripTo = nil; Task { await plan() } }
+            else if to == nil { editing = .to }
+        }
+        .onDisappear { model.pickingHome = false }
     }
 
     private var ends: some View {
@@ -107,18 +113,18 @@ struct TripView: View {
             VStack(spacing: 0) {
                 Circle().stroke(.blue, lineWidth: 3).frame(width: 10, height: 10)
                 Rectangle().fill(.tertiary).frame(width: 2, height: 26)
-                Image(systemName: "mappin.circle.fill").foregroundStyle(.red).font(.system(size: 14))
+                Image(systemName: "mappin.circle.fill").foregroundStyle(.red).font(.scaled(14))
             }
             VStack(spacing: 8) {
                 endButton(from.title, placeholder: "From", field: .from)
-                endButton(to?.title, placeholder: "To", field: .to)
+                endButton(to?.title, placeholder: model.pickingHome ? "Where is Home?" : "To", field: .to)
             }
             Button {
                 guard let t = to else { return }
                 (from, to) = (t, from)
                 Task { await plan() }
             } label: {
-                Image(systemName: "arrow.up.arrow.down").font(.system(size: 15, weight: .semibold)).frame(width: 36, height: 36)
+                Image(systemName: "arrow.up.arrow.down").font(.scaled(15, .semibold)).frame(width: 36, height: 36)
             }
             .buttonStyle(.plain).accessibilityLabel("Swap")
         }
@@ -131,8 +137,8 @@ struct TripView: View {
                 else { Text(placeholder).foregroundStyle(.secondary) }
                 Spacer()
             }
-            .font(.system(size: 15)).lineLimit(1)
-            .padding(.horizontal, 12).frame(height: 40)
+            .font(.scaled(15)).lineLimit(1)
+            .padding(.horizontal, 12).frame(minHeight: 40)
             .background(.primary.opacity(editing == field ? 0.12 : 0.07), in: RoundedRectangle(cornerRadius: 10))
         }
         .buttonStyle(.plain)
@@ -157,7 +163,7 @@ struct TripView: View {
                     }
                     if !trips.isEmpty {
                         Text("Times are estimates. The first wait is live (bus) or from the timetable (train) when marked with a dot.")
-                            .font(.system(size: 10)).foregroundStyle(.tertiary).multilineTextAlignment(.center).padding(.top, 4)
+                            .font(.scaled(10)).foregroundStyle(.tertiary).multilineTextAlignment(.center).padding(.top, 4)
                     }
                 } else {
                     ProgressView().padding(.top, 30)
@@ -169,7 +175,7 @@ struct TripView: View {
     }
 
     private func note(_ text: LocalizedStringKey) -> some View {
-        Text(text).font(.system(size: 13)).foregroundStyle(.secondary).multilineTextAlignment(.center).padding(.top, 30)
+        Text(text).font(.scaled(13)).foregroundStyle(.secondary).multilineTextAlignment(.center).padding(.top, 30)
     }
 
     private func point(_ end: TripEnd) -> TripPlanner.Place? {
@@ -214,14 +220,14 @@ struct TripCard: View {
             Button(action: onTap) {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(alignment: .firstTextBaseline) {
-                        Text("\(trip.minutes) min").font(.system(size: 20, weight: .bold, design: .rounded))
+                        Text("\(trip.minutes) min").font(.scaled(20, .bold, design: .rounded))
                         Text(String(localized: "arrive \(leaving.addingTimeInterval(Double(trip.minutes) * 60).formatted(date: .omitted, time: .shortened))"))
-                            .font(.system(size: 12)).foregroundStyle(.secondary)
+                            .font(.scaled(12)).foregroundStyle(.secondary)
                         Spacer()
                         if let first = trip.rides.first {
                             HStack(spacing: 4) {
                                 if first.waitIsLive { PulseDot() }
-                                Text(leaveText).font(.system(size: 12, weight: .semibold)).foregroundStyle(.orange)
+                                Text(leaveText).font(.scaled(12, .semibold)).foregroundStyle(.orange)
                             }
                         }
                     }
@@ -262,11 +268,11 @@ struct TripCard: View {
         switch leg.mode {
         case .walk:
             HStack(spacing: 2) {
-                Image(systemName: "figure.walk").font(.system(size: 12))
-                Text("\(leg.minutes)").font(.system(size: 11, weight: .semibold))
+                Image(systemName: "figure.walk").font(.scaled(12))
+                Text("\(leg.minutes)").font(.scaled(11, .semibold))
             }.foregroundStyle(.secondary)
         case .bus:
-            Text(leg.line).font(.system(size: 12, weight: .bold, design: .rounded)).foregroundStyle(.white)
+            Text(leg.line).font(.scaled(12, .bold, design: .rounded)).foregroundStyle(.white)
                 .padding(.horizontal, 6).frame(height: 22).background(.blue, in: RoundedRectangle(cornerRadius: 6))
         case .metro, .tram:
             RailBadge(line: leg.line)
@@ -279,14 +285,14 @@ struct TripCard: View {
                 .frame(width: 22).foregroundStyle(leg.mode == .walk ? Color.secondary : .accentColor).padding(.top, 2)
             VStack(alignment: .leading, spacing: 2) {
                 if leg.mode == .walk {
-                    Text(String(localized: "Walk \(leg.minutes) min to \(Names.place(leg.to.name, nil))")).font(.system(size: 13))
+                    Text(String(localized: "Walk \(leg.minutes) min to \(Names.place(leg.to.name, nil))")).font(.scaled(13))
                 } else {
-                    Text(String(localized: "\(leg.line) towards \(Names.place(leg.headsign, nil))")).font(.system(size: 13, weight: .semibold))
+                    Text(String(localized: "\(leg.line) towards \(Names.place(leg.headsign, nil))")).font(.scaled(13, .semibold))
                     Text(String(localized: "From \(Names.place(leg.from.name, nil)) · \(leg.stops) stops · \(leg.minutes) min"))
-                        .font(.system(size: 11)).foregroundStyle(.secondary)
-                    Text(String(localized: "Get off at \(Names.place(leg.to.name, nil))")).font(.system(size: 11)).foregroundStyle(.secondary)
+                        .font(.scaled(11)).foregroundStyle(.secondary)
+                    Text(String(localized: "Get off at \(Names.place(leg.to.name, nil))")).font(.scaled(11)).foregroundStyle(.secondary)
                     Button(leg.mode == .bus ? String(localized: "Open the stop") : String(localized: "Open the station")) { onOpen(leg) }
-                        .font(.system(size: 12, weight: .semibold)).padding(.top, 2)
+                        .font(.scaled(12, .semibold)).padding(.top, 2)
                 }
             }
             Spacer(minLength: 0)
@@ -310,13 +316,16 @@ struct PlaceSearch: View {
             TextField("Stop, station, address or place", text: $text)
                 .textFieldStyle(.plain).focused($focused)
                 .autocorrectionDisabled()  // place names aren't words: "Kifisia" became "Kiwis is"
-                .padding(.horizontal, 12).frame(height: 40)
+                .padding(.horizontal, 12).frame(minHeight: 40)
                 .background(.primary.opacity(0.07), in: RoundedRectangle(cornerRadius: 10))
                 .padding(Style.gap)
                 .onChange(of: text) { completer.query(text) }
             List {
                 if allowHere && text.isEmpty {
                     row("location.fill", String(localized: "My Location"), nil, tint: .blue) { onPick(.here) }
+                }
+                if text.isEmpty, let h = model.home, !model.pickingHome {
+                    row("house.fill", String(localized: "Home"), h.name, tint: .orange) { onPick(.place(h)) }
                 }
                 if text.isEmpty {
                     ForEach(model.favourites + model.recents.filter { r in !model.favourites.contains { $0.id == r.id } }) { s in
@@ -365,8 +374,8 @@ struct PlaceSearch: View {
             HStack(spacing: 12) {
                 Image(systemName: symbol).foregroundStyle(tint).frame(width: 22)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(title).font(.system(size: 14)).lineLimit(1)
-                    if let sub, !sub.isEmpty { Text(sub).font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(1) }
+                    Text(title).font(.scaled(14)).lineLimit(1)
+                    if let sub, !sub.isEmpty { Text(sub).font(.scaled(11)).foregroundStyle(.secondary).lineLimit(1) }
                 }
                 Spacer()
             }

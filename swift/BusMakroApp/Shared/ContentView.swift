@@ -60,7 +60,7 @@ struct ContentView: View {
                 .ignoresSafeArea(.container, edges: .bottom)  // measured from the screen edge, not the home indicator
             }
         }
-        .overlay { SideMenu(open: $menuOpen, onMetroMap: { showMetroMap = true }, onSettings: { model.showSettings = true }, onTrip: { model.showTrip = true }, onDebug: { showDebug = true }) }
+        .overlay { SideMenu(open: $menuOpen, onMetroMap: { showMetroMap = true }, onSettings: { model.showSettings = true }, onTrip: { model.showTrip = true }, onHome: { model.takeMeHome() }, onDebug: { showDebug = true }) }
         .fullScreenCoverOrSheet(isPresented: $showMetroMap) { MetroMapView() }
         .ignoresSafeArea(.keyboard)
         .preferredColorScheme(mapStyle == "light" ? .light : mapStyle == "dark" ? .dark : nil)
@@ -207,7 +207,7 @@ struct ContentView: View {
             Toggle(isOn: $showTram) { Label("Tram", systemImage: "tram.fill") }
         } label: {
             Image(systemName: "square.3.layers.3d")
-                .font(.system(size: 15, weight: .medium))
+                .font(.scaled(15, .medium))
                 .frame(width: Style.roundButton, height: Style.roundButton)
                 .contentShape(Circle())
         }
@@ -362,12 +362,12 @@ struct BusMarker: View {
                 .frame(width: 27, height: 27)
                 .scaleEffect(ripple ? 2.4 : 1).opacity(ripple ? 0 : 0.8)
             if let b = bearing {
-                Image(systemName: "arrowtriangle.up.fill").font(.system(size: 10)).foregroundStyle(Color(red: 0.10, green: 0.53, blue: 0.33))
+                Image(systemName: "arrowtriangle.up.fill").font(.scaled(10)).foregroundStyle(Color(red: 0.10, green: 0.53, blue: 0.33))
                     .offset(y: -18).rotationEffect(.degrees(b))
             }
             Group {
-                if let label { Text(label).font(.system(size: 10, weight: .bold)).minimumScaleFactor(0.6) }
-                else { Image(systemName: "bus.fill").font(.system(size: 12)) }
+                if let label { Text(label).font(.scaled(10, .bold)).minimumScaleFactor(0.6) }
+                else { Image(systemName: "bus.fill").font(.scaled(12)) }
             }
             .foregroundStyle(.white)
             .frame(width: 27, height: 27)

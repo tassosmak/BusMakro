@@ -96,24 +96,24 @@ struct StationContent: View {
         if let rail = Rail.shared, let st = rail.stations[id] {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 6) {
-                    Text(st.shown.uppercased()).font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary)
+                    Text(st.shown.uppercased()).font(.scaled(11, .semibold)).foregroundStyle(.secondary)
                     ForEach(st.lines, id: \.self) { RailBadge(line: $0, small: true) }
                     if let m = model.userLocation.map({ Geo.distance($0.latitude, $0.longitude, st.lat, st.lon) }) {
                         Spacer()
-                        Text(Geo.format(metres: m)).font(.system(size: 11)).foregroundStyle(.secondary)
+                        Text(Geo.format(metres: m)).font(.scaled(11)).foregroundStyle(.secondary)
                     }
                 }
                 ScrollView {
                     LazyVStack(spacing: 6) {
                         let groups = grouped(rail.next(at: id, from: now, count: 4))
                         if groups.isEmpty {
-                            Text("No more trains today.").font(.system(size: 12)).foregroundStyle(.secondary).padding(.top, 20)
+                            Text("No more trains today.").font(.scaled(12)).foregroundStyle(.secondary).padding(.top, 20)
                         }
                         ForEach(Array(groups.enumerated()), id: \.element.key) { i, g in
                             TrainCard(line: g.line, to: g.to, departures: g.deps).appearing(i)
                         }
                         Text("Scheduled times from STASY's timetable: trains have no live data.")
-                            .font(.system(size: 10)).foregroundStyle(.tertiary).multilineTextAlignment(.center)
+                            .font(.scaled(10)).foregroundStyle(.tertiary).multilineTextAlignment(.center)
                             .frame(maxWidth: .infinity).padding(.top, 6)
                     }
                 }
@@ -143,16 +143,16 @@ struct TrainCard: View {
             RailBadge(line: line)
             VStack(alignment: .leading, spacing: 2) {
                 Text("→ \(Names.place(to, Rail.shared?.stations.values.first { $0.name == to }?.nameEnglish))")
-                    .font(.system(size: 13, weight: .semibold)).lineLimit(1)
+                    .font(.scaled(13, .semibold)).lineLimit(1)
                 Text(departures.dropFirst().map { $0.at.formatted(date: .omitted, time: .shortened) }.joined(separator: " · "))
-                    .font(.system(size: 11)).foregroundStyle(.secondary)
+                    .font(.scaled(11)).foregroundStyle(.secondary)
             }
             Spacer()
             if let first = departures.first {
                 VStack(alignment: .trailing, spacing: 0) {
                     Text(first.minutes == 0 ? String(localized: "Now") : String(localized: "\(first.minutes) min"))
-                        .font(.system(size: 17, weight: .bold, design: .rounded)).monospacedDigit()
-                    Text(first.at.formatted(date: .omitted, time: .shortened)).font(.system(size: 10)).foregroundStyle(.secondary)
+                        .font(.scaled(17, .bold, design: .rounded)).monospacedDigit()
+                    Text(first.at.formatted(date: .omitted, time: .shortened)).font(.scaled(10)).foregroundStyle(.secondary)
                 }
             }
         }

@@ -193,3 +193,10 @@
 "Set off at %@." = "Ξεκίνησε στις %@.";
 "Where this bus is going." = "Πού πηγαίνει αυτό το λεωφορείο.";
 "waiting to set off" = "περιμένει να ξεκινήσει";
+"Take Me Home" = "Πήγαινέ με σπίτι";
+"Home" = "Σπίτι";
+"Where is Home?" = "Πού είναι το σπίτι;";
+"Trips" = "Διαδρομές";
+"Not set" = "Δεν έχει οριστεί";
+"Remove Home" = "Αφαίρεση σπιτιού";
+"Plans the trip from where you are to your Home." = "Σχεδιάζει τη διαδρομή από εκεί που είσαι ως το σπίτι σου.";

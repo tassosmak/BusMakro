@@ -19,12 +19,12 @@ struct TopBar: View {
             HStack(spacing: 8) {
                 // ☰ opens the side menu (where the magnifier was)
                 Button(action: onMenu) {
-                    Image(systemName: "line.3.horizontal").font(.system(size: 16, weight: .medium))
+                    Image(systemName: "line.3.horizontal").font(.scaled(16, .medium))
                         .foregroundStyle(.primary).frame(width: 28, height: Style.barHeight).contentShape(Rectangle())
                 }.buttonStyle(.plain).accessibilityLabel("Menu")
                 TextField("Search stops or lines", text: $text)
                     .textFieldStyle(.plain)
-                    .font(.system(size: 13))
+                    .font(.scaled(13))
                     .focused($focused)
                     .onSubmit { focused = false }
                     .onChange(of: focused) { if focused { searching = true } else if text.isEmpty { searching = false } }
@@ -58,7 +58,7 @@ struct RecentChips: View {
                 ForEach(Array(stops.enumerated()), id: \.offset) { i, name in
                     Button { onTap(i) } label: {
                         Label(name, systemImage: "clock.arrow.circlepath")
-                            .font(.system(size: 11, weight: .semibold)).lineLimit(1)
+                            .font(.scaled(11, .semibold)).lineLimit(1)
                             .padding(.horizontal, 10).frame(height: Style.chipHeight)
                     }
                     .buttonStyle(.plain)

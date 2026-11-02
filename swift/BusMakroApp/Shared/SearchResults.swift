@@ -21,7 +21,7 @@ struct SearchResults: View {
                     Button { close(); withAnimation { model.openStation(r.id) } } label: {
                         HStack(spacing: 10) {
                             StationPin(station: r.station)
-                            Text(r.station.shown).font(.system(size: 13, weight: .semibold))
+                            Text(r.station.shown).font(.scaled(13, .semibold))
                             Spacer()
                             ForEach(r.station.lines, id: \.self) { RailBadge(line: $0, small: true) }
                         }
@@ -31,7 +31,7 @@ struct SearchResults: View {
                     .buttonStyle(.plain).appearing(lines.count + i)
                 }
                 if model.stopIndex == nil {
-                    Text("Preparing stop search…").font(.system(size: 12)).foregroundStyle(.secondary).padding(.top, 12)
+                    Text("Preparing stop search…").font(.scaled(12)).foregroundStyle(.secondary).padding(.top, 12)
                 } else if !stops.isEmpty {
                     sectionTitle("STOPS")
                 }
@@ -43,7 +43,7 @@ struct SearchResults: View {
                     .buttonStyle(.plain).appearing(lines.count + i)
                 }
                 if lines.isEmpty && stops.isEmpty && stations.isEmpty && model.stopIndex != nil {
-                    Text("No results for \"\(model.searchText)\"").font(.system(size: 12)).foregroundStyle(.secondary)
+                    Text("No results for \"\(model.searchText)\"").font(.scaled(12)).foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity).padding(.vertical, 20)
                 }
             }
@@ -62,6 +62,6 @@ struct SearchResults: View {
     }
 
     private func sectionTitle(_ t: LocalizedStringKey) -> some View {
-        Text(t).font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary).padding(.top, 4)
+        Text(t).font(.scaled(11, .semibold)).foregroundStyle(.secondary).padding(.top, 4)
     }
 }

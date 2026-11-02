@@ -80,10 +80,10 @@ struct Sheet: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(model.online ? "Couldn't reach the bus service. Tap to try again."
                                       : "No internet connection. Retrying when you're back online.")
-                        .font(.system(size: 12, weight: .semibold)).multilineTextAlignment(.leading)
+                        .font(.scaled(12, .semibold)).multilineTextAlignment(.leading)
                     if let d = model.lastUpdated {
                         Text("Last updated \(d.formatted(date: Calendar.current.isDateInToday(d) ? .omitted : .abbreviated, time: .shortened))")
-                            .font(.system(size: 11)).foregroundStyle(.secondary)
+                            .font(.scaled(11)).foregroundStyle(.secondary)
                     }
                 }
                 Spacer(minLength: 0)
@@ -110,7 +110,7 @@ struct Sheet: View {
                     Button("\(l.id) — \(l.shown)") { withAnimation { model.openLine(l.id, at: nil) } }
                 }
             } label: {
-                Text(menuTitle).font(.system(size: 12)).lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
+                Text(menuTitle).font(.scaled(12)).lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
             }
             .buttonStyle(.plain)  // works on both iPhone and Mac (.borderlessButton is Mac-only)
             .padding(.horizontal, 10)
@@ -147,7 +147,7 @@ struct Sheet: View {
     }
 
     private func sectionTitle(_ t: String) -> some View {
-        Text(t).font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary).padding(.top, 4)
+        Text(t).font(.scaled(11, .semibold)).foregroundStyle(.secondary).padding(.top, 4)
     }
 
     @ViewBuilder private var screenContent: some View {
@@ -174,14 +174,14 @@ struct Sheet: View {
             StationContent(model: model, id: id)
         case .stop(let stop):
             Text(String(localized: "\(stop.title) · Stop \(stop.id)").uppercased())
-                .font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary)
+                .font(.scaled(11, .semibold)).foregroundStyle(.secondary)
             ScrollView {
                 LazyVStack(spacing: 6) {
                     ForEach(model.networkAlerts.prefix(2)) { AlertCard(alert: $0) }
                     ForEach(model.alerts(for: (model.stopLines ?? []).map(\.line))) { AlertCard(alert: $0) }
                     if let lines = model.stopLines, lines.isEmpty {
                         Text(model.error == nil ? "No lines stop here." : "Couldn't reach the bus service. Tap ↻ to try again.")
-                            .font(.system(size: 12)).foregroundStyle(.secondary).padding(.top, 20)
+                            .font(.scaled(12)).foregroundStyle(.secondary).padding(.top, 20)
                     } else if let lines = model.stopLines {
                         ForEach(Array(lines.enumerated()), id: \.element.id) { i, line in
                             Button { withAnimation { model.openLine(line.line, at: stop) } } label: { LineCard(line: line) }
@@ -189,7 +189,7 @@ struct Sheet: View {
                                 .appearing(i)
                         }
                     } else {
-                        Text("Loading the lines at this stop…").font(.system(size: 12)).foregroundStyle(.secondary).padding(.top, 20)
+                        Text("Loading the lines at this stop…").font(.scaled(12)).foregroundStyle(.secondary).padding(.top, 20)
                     }
                 }
             }
@@ -228,7 +228,7 @@ struct Sheet: View {
             LazyVStack(spacing: 6) {
                 ForEach(model.networkAlerts.prefix(2)) { AlertCard(alert: $0) }
                 if stops.isEmpty && lines.isEmpty {
-                    Text(empty).font(.system(size: 12)).foregroundStyle(.secondary).padding(.top, 20)
+                    Text(empty).font(.scaled(12)).foregroundStyle(.secondary).padding(.top, 20)
                 }
                 ForEach(Array(stops.enumerated()), id: \.element.id) { i, stop in
                     Button { model.open(stop) } label: {

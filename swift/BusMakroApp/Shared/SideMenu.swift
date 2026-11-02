@@ -7,6 +7,7 @@ struct SideMenu: View {
     var onMetroMap: () -> Void
     var onSettings: () -> Void
     var onTrip: () -> Void = {}
+    var onHome: () -> Void = {}
     var onDebug: () -> Void = {}
     @Environment(\.openURL) private var openURL
     @State private var dragX: CGFloat = 0
@@ -28,14 +29,15 @@ struct SideMenu: View {
                     Image("Logo").resizable().frame(width: 56, height: 56)
                         .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("BusMakro").font(.system(size: 22, weight: .bold, design: .rounded))
-                        Text("Athens buses, live").font(.system(size: 13)).foregroundStyle(.secondary)
-                        Text(version).font(.system(size: 11)).foregroundStyle(.tertiary)
+                        Text("BusMakro").font(.scaled(22, .bold, design: .rounded))
+                        Text("Athens buses, live").font(.scaled(13)).foregroundStyle(.secondary)
+                        Text(version).font(.scaled(11)).foregroundStyle(.tertiary)
                     }
                 }
                 .padding(.top, 70).padding(.bottom, 26)
                 Divider()
                 VStack(spacing: 4) {
+                    row("house.fill", "Take Me Home") { close(); onHome() }
                     row("arrow.triangle.turn.up.right.diamond.fill", "Plan a Trip") { close(); onTrip() }
                     row("tram.fill", "Metro Map") { close(); onMetroMap() }
                     row("gearshape.fill", "Settings") { close(); onSettings() }
@@ -49,7 +51,7 @@ struct SideMenu: View {
                 .padding(.top, 14)
                 Spacer()
                 Text("Data: OASA · athens-transit-rt. Unofficial app, not affiliated with OASA or STASY.")
-                    .font(.system(size: 11)).foregroundStyle(.tertiary).padding(.bottom, 30)
+                    .font(.scaled(11)).foregroundStyle(.tertiary).padding(.bottom, 30)
             }
             .padding(.horizontal, 22)
             .frame(width: width, alignment: .leading)
@@ -74,10 +76,10 @@ struct SideMenu: View {
     private func row(_ symbol: String, _ title: LocalizedStringKey, external: Bool = false, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 14) {
-                Image(systemName: symbol).font(.system(size: 17)).foregroundStyle(.tint).frame(width: 28)
-                Text(title).font(.system(size: 16, weight: .medium))
+                Image(systemName: symbol).font(.scaled(17)).foregroundStyle(.tint).frame(width: 28)
+                Text(title).font(.scaled(16, .medium))
                 Spacer()
-                Image(systemName: external ? "arrow.up.right" : "chevron.right").font(.system(size: 13)).foregroundStyle(.tertiary)
+                Image(systemName: external ? "arrow.up.right" : "chevron.right").font(.scaled(13)).foregroundStyle(.tertiary)
             }
             .padding(.vertical, 12).padding(.horizontal, 10)
             .contentShape(Rectangle())
@@ -121,7 +123,7 @@ struct MetroMapView: View {
             }
             .background(Color(white: 0.93))
             .overlay(alignment: .bottom) {
-                Text("Map: STASY S.A.").font(.system(size: 11)).foregroundStyle(.secondary)
+                Text("Map: STASY S.A.").font(.scaled(11)).foregroundStyle(.secondary)
                     .padding(.horizontal, 10).padding(.vertical, 4)
                     .background(.thinMaterial, in: Capsule()).padding(.bottom, 10)
             }

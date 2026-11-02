@@ -13,6 +13,7 @@ struct SettingsView: View {
     @AppStorage("showMetro") private var showMetro = true
     @AppStorage("showTram") private var showTram = true
     @Environment(\.dismiss) private var dismiss
+    @State private var pickingHome = false
     @Environment(\.openURL) private var openURL
 
     var body: some View {
@@ -27,6 +28,13 @@ struct SettingsView: View {
                     Toggle("Show recent stops under the search bar", isOn: $showRecents)
                     Button("Clear Recent Stops", role: .destructive) { model.clearRecents() }
                         .disabled(model.recents.isEmpty)
+                }
+                Section("Trips") {
+                    Button { pickingHome = true } label: {
+                        LabeledContent("Home", value: model.home?.name ?? String(localized: "Not set"))
+                    }
+                    .foregroundStyle(.primary)
+                    if model.home != nil { Button("Remove Home", role: .destructive) { model.home = nil } }
                 }
                 Section("Map") {
                     Picker("Map Style", selection: $mapStyle) {
@@ -46,6 +54,19 @@ struct SettingsView: View {
                 }
                 Section {
                     Button("Show Welcome") { dismiss(); model.showWelcome = true }
+                }
+            }
+            .sheet(isPresented: $pickingHome) {
+                NavigationStack {
+                    PlaceSearch(model: model, allowHere: false) { choice in
+                        if case .place(let p) = choice { model.home = p }
+                        pickingHome = false
+                    }
+                    .navigationTitle("Home")
+                    #if os(iOS)
+                    .navigationBarTitleDisplayMode(.inline)
+                    #endif
+                    .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { pickingHome = false } } }
                 }
             }
             .navigationTitle("Settings")

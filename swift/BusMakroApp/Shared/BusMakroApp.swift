@@ -7,6 +7,6 @@ struct BusMakroApp: App {
     #endif
 
     var body: some Scene {
-        WindowGroup { ContentView() }
+        WindowGroup { ContentView().dynamicTypeSize(...DynamicTypeSize.xxxLarge) }  // follows Text Size, up to where the layout still holds
     }
 }

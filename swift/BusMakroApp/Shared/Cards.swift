@@ -12,9 +12,9 @@ struct StopCard: View {
     var body: some View {
         HStack(alignment: .center, spacing: 8) {
             VStack(alignment: .leading, spacing: 4) {
-                Text(stop.title).font(.system(size: 13, weight: .semibold)).lineLimit(1)
+                Text(stop.title).font(.scaled(13, .semibold)).lineLimit(1)
                 Text(subtitle ?? ((stop.street.isEmpty ? "" : stop.street + " · ") + String(localized: "Stop \(stop.id)")))
-                    .font(.system(size: 12)).foregroundStyle(.secondary).lineLimit(1)
+                    .font(.scaled(12)).foregroundStyle(.secondary).lineLimit(1)
             }
             Spacer(minLength: 8)
             if let m = metres {
@@ -22,12 +22,12 @@ struct StopCard: View {
                     Text(Geo.format(metres: m)).font(Style.rounded(20))
                         .foregroundStyle(closest ? .orange : .primary)
                     Text("~\(max(1, Int((m / 80).rounded()))) min walk")
-                        .font(.system(size: 11)).foregroundStyle(.secondary)
+                        .font(.scaled(11)).foregroundStyle(.secondary)
                 }
             }
         }
         .padding(.horizontal, 14)
-        .frame(height: 64)
+        .frame(minHeight: 64)
         .card()
     }
 }
@@ -44,8 +44,8 @@ struct LineCard: View {
                 }
             VStack(alignment: .leading, spacing: 3) {
                 Text(Names.place(line.name, line.nameEnglish))
-                    .font(.system(size: 13, weight: .semibold)).lineLimit(1)
-                Text(next).font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(1)
+                    .font(.scaled(13, .semibold)).lineLimit(1)
+                Text(next).font(.scaled(11)).foregroundStyle(.secondary).lineLimit(1)
             }
             Spacer(minLength: 8)
             Text(eta)
@@ -54,7 +54,7 @@ struct LineCard: View {
                 .contentTransition(.numericText(countsDown: true))  // rolls to the new value, like the Mac app
         }
         .padding(.horizontal, 12)
-        .frame(height: 58)
+        .frame(minHeight: 58)
         .card()
         .background(due ? Color.green.opacity(0.16) : .clear, in: RoundedRectangle(cornerRadius: Style.cardRadius))
     }
@@ -105,16 +105,16 @@ struct LineRow: View {
             LineBadge(line: line.id)
             VStack(alignment: .leading, spacing: 1) {
                 if let nickname {
-                    Text(nickname).font(.system(size: 14, weight: .semibold)).lineLimit(1)
-                    Text(line.shown).font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(1)
+                    Text(nickname).font(.scaled(14, .semibold)).lineLimit(1)
+                    Text(line.shown).font(.scaled(11)).foregroundStyle(.secondary).lineLimit(1)
                 } else {
-                    Text(line.shown).font(.system(size: 13, weight: .semibold)).lineLimit(2)
+                    Text(line.shown).font(.scaled(13, .semibold)).lineLimit(2)
                 }
             }
             Spacer()
         }
         .padding(.horizontal, 12)
-        .frame(height: 52)
+        .frame(minHeight: 52)
         .card()
     }
 }
@@ -130,10 +130,10 @@ struct AlertCard: View {
         Button { if let u = URL(string: alert.link), u.scheme == "https" { openURL(u) } } label: {
             HStack(alignment: .top, spacing: 12) {
                 Image(systemName: alert.strike ? "xmark.octagon.fill" : "exclamationmark.triangle.fill")
-                    .font(.system(size: 18)).foregroundStyle(tint).padding(.top, 2)
+                    .font(.scaled(18)).foregroundStyle(tint).padding(.top, 2)
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(alert.title).font(.system(size: 12, weight: .semibold)).lineLimit(2).multilineTextAlignment(.leading)
-                    Text(meta).font(.system(size: 11)).foregroundStyle(.secondary)
+                    Text(alert.title).font(.scaled(12, .semibold)).lineLimit(2).multilineTextAlignment(.leading)
+                    Text(meta).font(.scaled(11)).foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 0)
             }

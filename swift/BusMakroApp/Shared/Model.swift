@@ -51,6 +51,16 @@ final class Model: NSObject, CLLocationManagerDelegate {
     var showWelcome = !UserDefaults.standard.bool(forKey: "onboarded")
     var showSettings = false
     var showTrip = false
+    /// Your saved Home, for "Take Me Home"; set in Settings or the first time you ask to go home.
+    var home: TripPlanner.Place? = Model.loadHome() {
+        didSet {
+            if let h = home { UserDefaults.standard.set(["name": h.name, "lat": h.lat, "lon": h.lon, "id": h.id], forKey: "home") }
+            else { UserDefaults.standard.removeObject(forKey: "home") }
+        }
+    }
+    /// Where the trip planner should go when it opens (Take Me Home), and whether it should first ask for Home.
+    var tripTo: TripPlanner.Place?
+    var pickingHome = false
     @ObservationIgnored var cachedPlanner: TripPlanner?
     var watchTask: Task<Void, Never>?
     private var lineCodes: [String: [(code: String, name: String, nameEnglish: String)]]?
@@ -476,6 +486,19 @@ final class Model: NSObject, CLLocationManagerDelegate {
     nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {}
 
     // MARK: Saved stops (same fields as the Mac app's favourites)
+    static func loadHome() -> TripPlanner.Place? {
+        guard let d = UserDefaults.standard.dictionary(forKey: "home"), let lat = d["lat"] as? Double, let lon = d["lon"] as? Double
+        else { return nil }
+        return TripPlanner.Place(id: d["id"] as? String ?? "", name: d["name"] as? String ?? "", lat: lat, lon: lon)
+    }
+
+    /// From where you are to your Home; without one, the planner first asks where Home is.
+    func takeMeHome() {
+        searchActive = false
+        if let home { tripTo = home } else { pickingHome = true }
+        showTrip = true
+    }
+
     static func loadStops(_ key: String) -> [Stop] {
         (UserDefaults.standard.array(forKey: key) as? [[String: Any]] ?? []).compactMap { d in
             guard let id = d["id"] as? String, let lat = d["lat"] as? Double, let lon = d["lon"] as? Double else { return nil }
