@@ -8,6 +8,10 @@ public struct Timetable: Sendable, Identifiable {
     public let nameEnglish: String
     public let go: [Date]
     public let come: [Date]
+
+    public init(code: String, name: String, nameEnglish: String, go: [Date], come: [Date]) {
+        self.code = code; self.name = name; self.nameEnglish = nameEnglish; self.go = go; self.come = come
+    }
 }
 
 extension OASAClient {
@@ -37,6 +41,65 @@ extension OASAClient {
                 return cal.date(bySettingHour: hm.hour!, minute: hm.minute!, second: hm.second!, of: day)
             })
             return set.sorted()
+        }
+        return (times("go", "sde_start1"), times("come", "sde_start2"))
+    }
+
+    /// A kind of day a line has its own timetable for (OASA: "WINTER DAILY", "WINTER SATURDAY", …).
+    public struct ScheduleDay: Sendable, Hashable, Identifiable {
+        public var id: String { code }
+        public let code: String
+        public let name: String
+        public let nameEnglish: String
+        /// 1 Monday … 7 Sunday: the weekdays this kind of day covers, from its name ("WINTER DAILY",
+        /// "WINTER FRIDAY", "WINTER MONDAY TO THURSDAY", "WINTER ALL DAYS EXCEPT SUNDAY", …).
+        public var weekdays: Set<Int> {
+            let n = nameEnglish.uppercased()
+            let names = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"]
+            if n.contains("ALL DAYS EXCEPT SUNDAY") { return Set(1...6) }
+            if n.contains("ALL DAYS") { return Set(1...7) }
+            if n.contains("DAILY") { return Set(1...5) }
+            let found = names.enumerated().filter { n.contains($0.element) }.map { $0.offset + 1 }
+            if n.contains(" TO "), found.count == 2 { return Set(found[0]...found[1]) }
+            return found.isEmpty ? Set(1...5) : Set(found)
+        }
+    }
+
+    /// The kind of day that applies on a weekday (1 Monday … 7 Sunday): the most specific one
+    /// (a line's own "FRIDAY" before its "DAILY").
+    public static func day(for weekday: Int, in days: [ScheduleDay]) -> ScheduleDay? {
+        days.filter { $0.weekdays.contains(weekday) }.min { $0.weekdays.count < $1.weekdays.count }
+    }
+
+    /// Every line's master line code (what the per-day timetables are filed under).
+    public func masterCodes() async throws -> [String: String] {
+        var out: [String: String] = [:]
+        for m in (try await call("webGetMasterLines")) as? [[String: Any]] ?? [] {
+            if let id = m["ml_id"] as? String, let ml = m["ml_code"] as? String, out[id] == nil { out[id] = ml }
+        }
+        return out
+    }
+
+    /// The kinds of day a variant has timetables for.
+    public func scheduleDays(code: String) async throws -> [ScheduleDay] {
+        ((try await call("getScheduleDaysMasterline", [code])) as? [[String: Any]] ?? []).compactMap { r in
+            guard let c = r["sdc_code"] as? String else { return nil }
+            return ScheduleDay(code: c, name: r["sdc_descr"] as? String ?? "", nameEnglish: r["sdc_descr_eng"] as? String ?? "")
+        }
+    }
+
+    /// One kind of day's timetable of a variant, as times on `day` (go from the start, come back).
+    public func schedule(master: String, dayKind: String, code: String, on day: Date = Date()) async throws -> (go: [Date], come: [Date]) {
+        let raw = try await call("getSchedLines", [master, dayKind, code]) as? [String: Any] ?? [:]
+        var cal = Calendar(identifier: .gregorian); cal.timeZone = Self.athens
+        let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd HH:mm:ss"; fmt.timeZone = Self.athens
+        func times(_ key: String, _ field: String) -> [Date] {
+            let rows = raw[key] as? [[String: Any]] ?? []
+            return Set(rows.compactMap { r -> Date? in
+                guard let s = r[field] as? String, let t = fmt.date(from: s) else { return nil }
+                let hm = cal.dateComponents([.hour, .minute], from: t)
+                return cal.date(bySettingHour: hm.hour!, minute: hm.minute!, second: 0, of: day)
+            }).sorted()
         }
         return (times("go", "sde_start1"), times("come", "sde_start2"))
     }

@@ -145,3 +145,16 @@
 "Open the stop" = "Άνοιγμα στάσης";
 "Open the station" = "Άνοιγμα σταθμού";
 "Stop, station, address or place" = "Στάση, σταθμός, διεύθυνση ή μέρος";
+"DEPARTURES FROM EACH END" = "ΑΝΑΧΩΡΗΣΕΙΣ ΑΠΟ ΚΑΘΕ ΑΦΕΤΗΡΙΑ";
+"Weekdays" = "Καθημερινές";
+"Saturday" = "Σάββατο";
+"Sunday" = "Κυριακή";
+"From %@  ·  %lld departures" = "Από %@  ·  %lld αναχωρήσεις";
+"Contact" = "Επικοινωνία";
+"Bus Stops" = "Στάσεις λεωφορείων";
+"Live Buses" = "Λεωφορεία σε κίνηση";
+"Metro" = "Μετρό";
+"Tram" = "Τραμ";
+"Map Layers" = "Επίπεδα χάρτη";
+"%@ to %@" = "%@ έως %@";
+"Timetable: %@" = "Πρόγραμμα: %@";

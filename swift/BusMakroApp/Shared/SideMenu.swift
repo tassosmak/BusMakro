@@ -8,6 +8,7 @@ struct SideMenu: View {
     var onSettings: () -> Void
     var onTrip: () -> Void = {}
     var onDebug: () -> Void = {}
+    @Environment(\.openURL) private var openURL
     @State private var dragX: CGFloat = 0
     private let width: CGFloat = 290
 
@@ -38,6 +39,9 @@ struct SideMenu: View {
                     row("arrow.triangle.turn.up.right.diamond.fill", "Plan a Trip") { close(); onTrip() }
                     row("tram.fill", "Metro Map") { close(); onMetroMap() }
                     row("gearshape.fill", "Settings") { close(); onSettings() }
+                    row("envelope.fill", "Contact", external: true) {
+                        close(); openURL(URL(string: "https://github.com/tassosmak/BusMakro/issues")!)
+                    }
                     #if DEBUG
                     row("ladybug.fill", "Debug") { close(); onDebug() }
                     #endif
@@ -67,13 +71,13 @@ struct SideMenu: View {
 
     private func close() { open = false }
 
-    private func row(_ symbol: String, _ title: LocalizedStringKey, action: @escaping () -> Void) -> some View {
+    private func row(_ symbol: String, _ title: LocalizedStringKey, external: Bool = false, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 14) {
                 Image(systemName: symbol).font(.system(size: 17)).foregroundStyle(.tint).frame(width: 28)
                 Text(title).font(.system(size: 16, weight: .medium))
                 Spacer()
-                Image(systemName: "chevron.right").font(.system(size: 13)).foregroundStyle(.tertiary)
+                Image(systemName: external ? "arrow.up.right" : "chevron.right").font(.system(size: 13)).foregroundStyle(.tertiary)
             }
             .padding(.vertical, 12).padding(.horizontal, 10)
             .contentShape(Rectangle())

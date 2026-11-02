@@ -240,7 +240,19 @@ struct TimetableList: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("TODAY'S DEPARTURES FROM EACH END").font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary)
+            if model.timetableDays.count > 1 {
+                // the days of the week, Monday first; each shows the timetable that applies to it
+                Picker("", selection: Binding(get: { model.timetableWeekday },
+                                              set: { w in Task { await model.loadTimetable(weekday: w) } })) {
+                    ForEach(1...7, id: \.self) { Text(Self.dayLetters[$0 - 1]).tag($0) }
+                }
+                .pickerStyle(.segmented).labelsHidden()
+                if let d = model.timetableDays.first(where: { $0.code == model.timetableDay }) {
+                    Text(dayName(d)).font(.system(size: 11)).foregroundStyle(.secondary)
+                }
+            }
+            Text(today ? LocalizedStringKey("TODAY'S DEPARTURES FROM EACH END") : "DEPARTURES FROM EACH END")
+                .font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary)
             if let tt = model.timetable?.variants {
                 ScrollViewReader { proxy in
                     ScrollView {
@@ -266,15 +278,41 @@ struct TimetableList: View {
         .task { await model.loadTimetable() }
     }
 
+    private var today: Bool { model.timetableIsToday }
+
+    /// Mon … Sun, short, in the app's language.
+    private static var dayLetters: [String] {
+        var cal = Calendar(identifier: .gregorian)
+        cal.locale = Locale(identifier: Names.greek ? "el" : "en")
+        let s = cal.shortWeekdaySymbols  // Sunday first
+        return Array(s[1...]) + [s[0]]
+    }
+
+    /// Which timetable the chosen day uses: "Timetable: Monday to Friday", "…: Friday", …
+    private func dayName(_ d: OASAClient.ScheduleDay) -> String {
+        let w = d.weekdays.sorted()
+        var cal = Calendar(identifier: .gregorian)
+        cal.locale = Locale(identifier: Names.greek ? "el" : "en")
+        let names = cal.weekdaySymbols.map { $0.capitalized }
+        func name(_ i: Int) -> String { names[i % 7] }  // 1 Monday … 7 Sunday → weekdaySymbols (Sunday first)
+        let text: String
+        if w.count == 1 { text = name(w[0]) }
+        else if w == Array(w[0]...w[w.count - 1]) { text = String(localized: "\(name(w[0])) to \(name(w.last!))") }
+        else { text = w.map(name).joined(separator: ", ") }
+        return String(localized: "Timetable: \(text)")
+    }
+
     private func header(_ text: String) -> some View {
         Text(text).font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary).padding(.top, 8)
     }
 
     @ViewBuilder private func section(_ times: [Date], from place: String, key: String) -> some View {
         if !times.isEmpty {
-            let now = Date()
-            let next = times.first { $0 >= now }
-            header(String(localized: "From \(Names.place(place, ""))  ·  \(times.filter { $0 >= now }.count) more today"))
+            // another day's timetable: all times plain, no "next"
+            let now = today ? Date() : .distantPast
+            let next = today ? times.first { $0 >= now } : nil
+            header(today ? String(localized: "From \(Names.place(place, ""))  ·  \(times.filter { $0 >= now }.count) more today")
+                         : String(localized: "From \(Names.place(place, ""))  ·  \(times.count) departures"))
             let rows = stride(from: 0, to: times.count, by: 5).map { Array(times[$0..<min($0 + 5, times.count)]) }
             ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
                 HStack(spacing: 0) {

@@ -51,6 +51,10 @@ final class Model: NSObject, CLLocationManagerDelegate {
     @ObservationIgnored var cachedPlanner: TripPlanner?
     var watchTask: Task<Void, Never>?
     private var lineCodes: [String: [(code: String, name: String, nameEnglish: String)]]?
+    private var masterCodes: [String: String]?
+    var timetableDays: [OASAClient.ScheduleDay] = []
+    var timetableDay: String?
+    var timetableWeekday = 1
     // follow a bus (the map keeps it centred), buses heading to the open stop, favourites' live times
     var pinned: String?
     var pendingPin: String?
@@ -283,13 +287,51 @@ final class Model: NSObject, CLLocationManagerDelegate {
         if let s = lineStop { official = await oasa.predictions(stopID: s) }
     }
 
-    /// Today's timetable of the open line (fetched once per line).
-    func loadTimetable() async {
-        guard case .line(let id, _) = screen, timetable?.line != id else { return }
-        if lineCodes == nil { lineCodes = try? await oasa.lineCodes() }
-        let variants = await oasa.timetable(line: id, codes: lineCodes ?? [:])
-        if case .line(id, _) = screen { timetable = (id, variants) }
+    /// Today, 1 Monday … 7 Sunday (in Athens).
+    static var weekdayToday: Int {
+        var cal = Calendar(identifier: .gregorian); cal.timeZone = OASAClient.athens
+        return (cal.component(.weekday, from: Date()) + 5) % 7 + 1
     }
+
+    /// The open line's timetable for a day of the week (today at first; fetched once per line).
+    /// Each weekday gets the kind of day OASA files it under: most lines have one for Monday to
+    /// Friday, Saturday and Sunday; some have their own Friday, Wednesday, Monday to Thursday…
+    func loadTimetable(weekday: Int? = nil) async {
+        guard case .line(let id, _) = screen, weekday != nil || timetable?.line != id else { return }
+        timetableWeekday = weekday ?? Self.weekdayToday
+        let day: String? = weekday == nil ? nil : OASAClient.day(for: weekday!, in: timetableDays)?.code
+        if lineCodes == nil { lineCodes = try? await oasa.lineCodes() }
+        if masterCodes == nil { masterCodes = try? await oasa.masterCodes() }
+        let variants = lineCodes?[id] ?? []
+        if day == nil {
+            timetableDays = []
+            timetableDay = nil
+            if let first = variants.first, let days = try? await oasa.scheduleDays(code: first.code), !days.isEmpty {
+                timetableDays = days
+                timetableDay = (OASAClient.day(for: Self.weekdayToday, in: days) ?? days[0]).code
+            }
+        } else {
+            if day == timetableDay { return }  // another weekday with the same timetable
+            timetableDay = day
+            timetable = nil
+        }
+        // that kind of day's timetable; without one (or the master code), OASA's "today"
+        var out: [Timetable] = []
+        if let kind = timetableDay, let master = masterCodes?[id] {
+            for v in variants {
+                if let d = try? await oasa.schedule(master: master, dayKind: kind, code: v.code), !(d.go.isEmpty && d.come.isEmpty) {
+                    out.append(Timetable(code: v.code, name: v.name, nameEnglish: v.nameEnglish, go: d.go, come: d.come))
+                }
+            }
+            out.sort { $0.go.count + $0.come.count > $1.go.count + $1.come.count }
+        } else {
+            out = await oasa.timetable(line: id, codes: lineCodes ?? [:])
+        }
+        if case .line(id, _) = screen, timetableDay == (day ?? timetableDay) { timetable = (id, out) }
+    }
+
+    /// Whether the chosen day is today (only then is there a "next" departure).
+    var timetableIsToday: Bool { timetableWeekday == Self.weekdayToday }
 
     /// The line's stops nearest you (or the map's centre without a fix): (stop id, info, metres).
     func nearestOnLine(from c: CLLocationCoordinate2D?, limit: Int = 6) -> [(String, LineDetail.StopInfo, Double)] {

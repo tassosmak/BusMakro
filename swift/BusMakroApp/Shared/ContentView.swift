@@ -11,7 +11,7 @@ struct ContentView: View {
     @State private var sheetHeight: CGFloat = 360
     @State private var fittedLine: String?
     @State private var menuOpen = false
-    @State private var showMetro = false
+    @State private var showMetroMap = false
     @State private var showDebug = false  // Debug builds only
     @State private var followedAt: CLLocationCoordinate2D?
     @State private var visibleRegion: MKCoordinateRegion?
@@ -20,7 +20,11 @@ struct ContentView: View {
     @AppStorage("mapStyle") private var mapStyle = "system"
     @AppStorage("showRecents") private var showRecents = true
     @AppStorage("map3D") private var map3D = false
-    @AppStorage("showRail") private var showRail = true
+    // map layers (the layers button, or Settings)
+    @AppStorage("showStops") private var showStops = true
+    @AppStorage("showBuses") private var showBuses = true
+    @AppStorage("showMetro") private var showMetro = true
+    @AppStorage("showTram") private var showTram = true
     @State private var camera: MapCameraPosition = .region(MKCoordinateRegion(
         center: CLLocationCoordinate2D(latitude: 37.9755, longitude: 23.7348),  // Syntagma
         span: MKCoordinateSpan(latitudeDelta: 0.012, longitudeDelta: 0.012)))
@@ -46,8 +50,8 @@ struct ContentView: View {
                 .ignoresSafeArea(.container, edges: .bottom)  // measured from the screen edge, not the home indicator
             }
         }
-        .overlay { SideMenu(open: $menuOpen, onMetroMap: { showMetro = true }, onSettings: { model.showSettings = true }, onTrip: { model.showTrip = true }, onDebug: { showDebug = true }) }
-        .fullScreenCoverOrSheet(isPresented: $showMetro) { MetroMapView() }
+        .overlay { SideMenu(open: $menuOpen, onMetroMap: { showMetroMap = true }, onSettings: { model.showSettings = true }, onTrip: { model.showTrip = true }, onDebug: { showDebug = true }) }
+        .fullScreenCoverOrSheet(isPresented: $showMetroMap) { MetroMapView() }
         .ignoresSafeArea(.keyboard)
         .preferredColorScheme(mapStyle == "light" ? .light : mapStyle == "dark" ? .dark : nil)
         .sheet(isPresented: $model.showSettings) { SettingsView(model: model) }
@@ -150,9 +154,29 @@ struct ContentView: View {
                     withAnimation(.spring(response: 0.36, dampingFraction: 1)) { sheetHeight = sheetHeight <= 66 ? 360 : 66 }
                 }
                 RoundButton(symbol: "location", help: "Locate Me") { locate() }
+                layersButton
             }
             .opacity(model.searchActive ? 0 : 1)
         }
+    }
+
+    /// What the map shows: bus stops, live buses, metro, tram (each can be hidden).
+    private var layersButton: some View {
+        Menu {
+            Toggle(isOn: $showStops) { Label("Bus Stops", systemImage: "bus") }
+            Toggle(isOn: $showBuses) { Label("Live Buses", systemImage: "dot.radiowaves.left.and.right") }
+            Toggle(isOn: $showMetro) { Label("Metro", systemImage: "tram.fill.tunnel") }
+            Toggle(isOn: $showTram) { Label("Tram", systemImage: "tram.fill") }
+        } label: {
+            Image(systemName: "square.3.layers.3d")
+                .font(.system(size: 15, weight: .medium))
+                .frame(width: Style.roundButton, height: Style.roundButton)
+                .contentShape(Circle())
+        }
+        .menuActionDismissBehavior(.disabled)  // flip several at once
+        .buttonStyle(.plain)
+        .glass(Circle())
+        .accessibilityLabel("Map Layers")
     }
 
     /// 0 with the panel at the strip, 1 from the normal height up.
@@ -181,7 +205,7 @@ struct ContentView: View {
                         }
                     }
                 }
-                ForEach(model.vehicles) { b in
+                ForEach(showBuses ? model.vehicles : []) { b in
                     Annotation("", coordinate: model.drawn[b.id] ?? CLLocationCoordinate2D(latitude: b.latitude, longitude: b.longitude)) {
                         BusMarker(bearing: b.bearing, faded: (b.positionAt.map { Date().timeIntervalSince($0) > 120 } ?? false),
                                   pinned: model.pinned == b.id, fix: b.positionAt)
@@ -194,7 +218,7 @@ struct ContentView: View {
             }
             if case .stop(let stop) = model.screen {
                 // the buses on their way to this stop, labelled with their line; tap opens it, following the bus
-                ForEach(model.stopBuses, id: \.vehicle.id) { b in
+                ForEach(showBuses ? model.stopBuses : [], id: \.vehicle.id) { b in
                     Annotation("", coordinate: model.drawn[b.vehicle.id] ?? CLLocationCoordinate2D(latitude: b.vehicle.latitude, longitude: b.vehicle.longitude)) {
                         BusMarker(bearing: b.vehicle.bearing, label: b.line, fix: b.vehicle.positionAt)
                             .onTapGesture { model.pendingPin = b.vehicle.id; model.openLine(b.line, at: stop) }
@@ -203,11 +227,12 @@ struct ContentView: View {
                     }
                 }
             }
-            if let rail = Rail.shared, showRail || isStation {
+            if let rail = Rail.shared, showMetro || showTram || isStation {
                 switch model.screen {
                 case .home, .station:
                     RailMapLayer(rail: rail, selected: selectedStation,
-                                 stations: (visibleRegion?.span.latitudeDelta ?? 0) <= 0.08) { id in withAnimation { model.openStation(id) } }
+                                 stations: (visibleRegion?.span.latitudeDelta ?? 0) <= 0.08,
+                                 kinds: Set((showMetro ? ["metro"] : []) + (showTram ? ["tram"] : []))) { id in withAnimation { model.openStation(id) } }
                 default: EmptyMapContent()
                 }
             }
@@ -240,6 +265,7 @@ struct ContentView: View {
         switch model.screen {
         case .home:
             if model.homeTab == .favourites { return model.favourites }
+            guard showStops else { return [] }
             // zoomed far out the pins would cover the city: none until you zoom in
             guard (visibleRegion?.span.latitudeDelta ?? 0) <= Model.stopsMaxSpan else { return [] }
             // every stop on screen, plus the nearby list's (OASA's, with street names) where they're missing

@@ -161,17 +161,20 @@ struct RailMapLayer: MapContent {
     let selected: String?
     /// Zoomed far out only the lines show (the station squares would cover them), and the selected one.
     var stations = true
+    /// Which kinds to draw ("metro", "tram"): the map's layer options.
+    var kinds: Set<String> = ["metro", "tram"]
     let onTap: (String) -> Void
 
     var body: some MapContent {
-        ForEach(rail.lines) { line in
+        ForEach(rail.lines.filter { kinds.contains($0.kind) }) { line in
             if let dir = line.dirs.first {
                 let coords = dir.stations.compactMap { rail.stations[$0]?.coordinate }
                 MapPolyline(coordinates: coords).stroke(line.tint.opacity(0.75), style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round))
             }
         }
         ForEach(Array(rail.stations.keys).sorted(), id: \.self) { id in
-            if let st = rail.stations[id], stations || id == selected {
+            if let st = rail.stations[id], (stations && st.lines.contains { l in rail.line(l).map { kinds.contains($0.kind) } ?? false })
+                || id == selected {
                 Annotation("", coordinate: st.coordinate) {
                     StationPin(station: st, selected: id == selected)
                         .onTapGesture { onTap(id) }
