@@ -87,7 +87,7 @@
 "Turn On Notifications" = "Ενεργοποίηση ειδοποιήσεων";
 "2 together, then a %lld min gap" = "2 μαζί, μετά κενό %lld λεπ.";
 "2 buses together" = "2 λεωφορεία μαζί";
-"👻 %lld%% of buses vanish" = "👻 το %lld%% των λεωφορείων χάνεται";
+"%lld%% of buses don't arrive" = "το %lld%% των λεωφορείων δεν έρχεται";
 "learned · OASA says %lld min" = "από ιστορικό · ΟΑΣΑ: %lld λεπ.";
 "No live buses" = "Κανένα λεωφορείο";
 "3D Buildings" = "Κτίρια 3D";
@@ -216,3 +216,5 @@
 "Saved just now" = "Αποθηκεύτηκε μόλις τώρα";
 "Saved %lld min ago, at %@" = "Αποθηκεύτηκε πριν από %lld λεπ., στις %@";
 "You're offline: these are the times as they were then." = "Είσαι εκτός σύνδεσης: αυτοί είναι οι χρόνοι όπως ήταν τότε.";
+"Buses to %@" = "Λεωφορεία προς %@";
+"Approaching buses" = "Λεωφορεία που έρχονται";

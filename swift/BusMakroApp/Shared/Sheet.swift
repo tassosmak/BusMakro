@@ -105,9 +105,9 @@ struct Sheet: View {
             if case .line = model.screen {
                 Button { withAnimation { model.closeLine() } } label: { Label("Back", systemImage: "chevron.left") }
             }
-            if case .stop(let stop) = model.screen {
-                // in a stop: its name where "Browse a line…" was
-                Text(stop.title).font(.scaled(12, .semibold)).lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
+            if let place = placeTitle {
+                // in a stop or station: its name where "Browse a line…" was
+                Text(place).font(.scaled(12, .semibold)).lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 10)
                     .frame(height: Style.lineMenuHeight)
                     .background(.primary.opacity(0.10), in: Capsule())
@@ -140,6 +140,15 @@ struct Sheet: View {
                         .foregroundStyle(model.isFavourite(s) ? .yellow : .secondary)
                 }.buttonStyle(.plain)
             }
+        }
+    }
+
+    /// The open stop's or station's name (nil on the home and line screens).
+    private var placeTitle: String? {
+        switch model.screen {
+        case .stop(let s): return s.title
+        case .station(let id): return Rail.shared?.stations[id]?.shown
+        default: return nil
         }
     }
 
@@ -183,24 +192,26 @@ struct Sheet: View {
         case .stop(let stop):
             Text(String(localized: "Stop \(stop.id)").uppercased())
                 .font(.scaled(11, .semibold)).foregroundStyle(.secondary)
-            ScrollView {
-                LazyVStack(spacing: 6) {
-                    ForEach(model.networkAlerts.prefix(2)) { AlertCard(alert: $0) }
-                    ForEach(model.alerts(for: (model.stopLines ?? []).map(\.line))) { AlertCard(alert: $0) }
-                    if let at = model.stopLinesSaved { SavedTimesNote(at: at) }
-                    if let lines = model.stopLines, lines.isEmpty {
-                        Text(model.error == nil ? "No lines stop here." : "Couldn't reach the bus service. Tap ↻ to try again.")
-                            .font(.scaled(12)).foregroundStyle(.secondary).padding(.top, 20)
-                    } else if let lines = model.stopLines {
+            if let at = model.stopLinesSaved { SavedTimesNote(at: at) }
+            if let lines = model.stopLines, !lines.isEmpty {
+                ScrollView {
+                    LazyVStack(spacing: 6) {
+                        ForEach(model.networkAlerts.prefix(2)) { AlertCard(alert: $0) }
+                        ForEach(model.alerts(for: lines.map(\.line))) { AlertCard(alert: $0) }
                         ForEach(Array(lines.enumerated()), id: \.element.id) { i, line in
                             Button { withAnimation { model.openLine(line.line, at: stop) } } label: { LineCard(line: line) }
                                 .buttonStyle(.plain)
                                 .appearing(i)
                         }
-                    } else {
-                        Text("Loading the lines at this stop…").font(.scaled(12)).foregroundStyle(.secondary).padding(.top, 20)
                     }
                 }
+            } else {
+                // outside the scroll view: a lone message inside it wasn't drawn
+                Text(model.stopLines == nil ? "Loading the lines at this stop…"
+                     : model.error == nil ? "No lines stop here." : "Couldn't reach the bus service. Tap ↻ to try again.")
+                    .font(.scaled(12)).foregroundStyle(.subtle)
+                    .frame(maxWidth: .infinity).padding(.top, 20)
+                Spacer(minLength: 0)
             }
         }
     }

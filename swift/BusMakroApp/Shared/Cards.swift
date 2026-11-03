@@ -21,7 +21,7 @@ struct StopCard: View {
                     Text(stop.title).font(.scaled(13, .semibold)).lineLimit(1)
                 }
                 Text(subtitle ?? ((stop.street.isEmpty ? "" : stop.street + " · ") + String(localized: "Stop \(stop.id)")))
-                    .font(.scaled(12)).foregroundStyle(.secondary).lineLimit(1)
+                    .font(.scaled(12)).foregroundStyle(.subtle).lineLimit(1)
             }
             Spacer(minLength: 8)
             if let m = metres {
@@ -29,7 +29,7 @@ struct StopCard: View {
                     Text(Geo.format(metres: m)).font(Style.rounded(20))
                         .foregroundStyle(closest ? .orange : .primary)
                     Text("~\(max(1, Int((m / 80).rounded()))) min walk")
-                        .font(.scaled(11)).foregroundStyle(.secondary)
+                        .font(.scaled(11)).foregroundStyle(.subtle)
                 }
             }
         }
@@ -52,7 +52,7 @@ struct LineCard: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(Names.place(line.name, line.nameEnglish))
                     .font(.scaled(13, .semibold)).lineLimit(1)
-                Text(next).font(.scaled(11)).foregroundStyle(.secondary).lineLimit(1)
+                Text(next).font(.scaled(11)).foregroundStyle(.subtle).lineLimit(1)
             }
             Spacer(minLength: 8)
             Text(eta)
@@ -89,15 +89,15 @@ struct LineCard: View {
         }
         if line.arrivalsMinutes.isEmpty { return String(localized: "No more buses today") }
         let rest = line.arrivalsMinutes.dropFirst().prefix(2).map { String(localized: "\($0) min") }
-        var hints: [String] = []
-        if let g = History.shared.ghostRate(line: line.line), g >= 0.25 {
-            hints.append(String(localized: "👻 \(Int(g * 100))% of buses vanish"))
-        }
-        if let b = History.bunching(line.arrivalsMinutes) { hints.append(b) }
+        // the next times first: the hints after them got cut off (and the ghost emoji drew as "?")
+        var hints: [String] = [rest.isEmpty ? String(localized: "Live") : String(localized: "then \(rest.joined(separator: ", "))")]
         if let m = line.arrivalsMinutes.first, History.shared.learnedMinutes(line: line.line, minutes: m) != nil {
             hints.append(String(localized: "learned · OASA says \(m) min"))
         }
-        hints.append(rest.isEmpty ? String(localized: "Live") : String(localized: "then \(rest.joined(separator: ", "))"))
+        if let b = History.bunching(line.arrivalsMinutes) { hints.append(b) }
+        if let g = History.shared.ghostRate(line: line.line), g >= 0.25 {
+            hints.append(String(localized: "\(Int(g * 100))% of buses don't arrive"))
+        }
         return hints.joined(separator: " · ")
     }
 }
@@ -113,7 +113,7 @@ struct LineRow: View {
             VStack(alignment: .leading, spacing: 1) {
                 if let nickname {
                     Text(nickname).font(.scaled(14, .semibold)).lineLimit(1)
-                    Text(line.shown).font(.scaled(11)).foregroundStyle(.secondary).lineLimit(1)
+                    Text(line.shown).font(.scaled(11)).foregroundStyle(.subtle).lineLimit(1)
                 } else {
                     Text(line.shown).font(.scaled(13, .semibold)).lineLimit(2)
                 }
@@ -140,7 +140,7 @@ struct AlertCard: View {
                     .font(.scaled(18)).foregroundStyle(tint).padding(.top, 2)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(alert.title).font(.scaled(12, .semibold)).lineLimit(2).multilineTextAlignment(.leading)
-                    Text(meta).font(.scaled(11)).foregroundStyle(.secondary)
+                    Text(meta).font(.scaled(11)).foregroundStyle(.subtle)
                 }
                 Spacer(minLength: 0)
             }

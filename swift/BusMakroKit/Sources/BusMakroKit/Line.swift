@@ -90,7 +90,7 @@ public enum LineMath {
                   // send none, and then every bus was dropped: "no bus is heading to this stop")
                   let ni = v.nextStopID.flatMap({ route.firstIndex(of: $0) }) ?? nextStop(v, on: route, detail: detail),
                   // this stop at or after it (a loop line passes its first stop again at the end)
-                  let si = route[ni...].firstIndex(of: stop) else { return nil }
+                  let si = route[ni...].firstIndex(of: stop) else { return turning(v, stop: stop, detail: detail, official: official) }
             let next = route[ni]
             // along the route: bus → its next stop → … → this stop
             var m = 0.0
@@ -110,6 +110,22 @@ public enum LineMath {
         }
         .sorted { $0.metres < $1.metres }
         return consistent(found, now: now).sorted { $0.seconds < $1.seconds }
+    }
+
+    /// A bus on the other direction that OASA itself predicts for this stop: it turns round at its
+    /// terminus and comes back (opened at the start of a line, every bus was "not heading here").
+    static func turning(_ v: Vehicle, stop: String, detail: LineDetail, official: [String: Int]) -> Approaching? {
+        guard let mins = official[v.id],
+              let route = v.variant.flatMap({ detail.variants[$0]?.stops }),
+              let ni = v.nextStopID.flatMap({ route.firstIndex(of: $0) }) ?? nextStop(v, on: route, detail: detail),
+              let back = detail.variants.values.map(\.stops).first(where: { $0.contains(stop) && $0 != route }),
+              let si = back.firstIndex(of: stop) else { return nil }
+        let path = Array(route[ni...]) + Array(back[...si])
+        var m = detail.stops[path[0]].map { Geo.distance(v.latitude, v.longitude, $0.lat, $0.lon) } ?? 0
+        for (a, b) in zip(path, path.dropFirst()) {
+            if let p = detail.stops[a], let q = detail.stops[b] { m += Geo.distance(p.lat, p.lon, q.lat, q.lon) }
+        }
+        return Approaching(vehicle: v, stopsAway: path.count - 1, metres: m, seconds: Double(mins) * 60, official: true)
     }
 
     /// Estimates that agree with OASA and with the order of the buses: the pace comes from the line's

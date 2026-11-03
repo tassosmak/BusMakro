@@ -15,7 +15,7 @@ if CommandLine.arguments.dropFirst().first == "approach", CommandLine.arguments.
     }
     // one stop late on the route: each bus's distance and time, nearest first
     if let vid = detail.variants.keys.sorted().first, let stops = detail.variants[vid]?.stops, stops.count > 10 {
-        let stop = stops[stops.count - 5]
+        let stop = CommandLine.arguments.count > 3 ? CommandLine.arguments[3] : stops[stops.count - 5]  // or: approach 040 10341
         let official = await OASAClient().predictions(stopID: stop)
         for a in LineMath.approaching(stop, detail: detail, live: live.vehicles, official: official) {
             let age = a.vehicle.positionAt.map { Int(Date().timeIntervalSince($0)) } ?? -1

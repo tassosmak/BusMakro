@@ -45,7 +45,10 @@ final class Model: NSObject, CLLocationManagerDelegate {
     var lineStop: String?          // the stop the line was opened at (selected)
     private var lineTask: Task<Void, Never>?
     var timetable: (line: String, variants: [Timetable])?
-    var stopIndex: StopIndex?
+    var stopIndex: StopIndex? {
+        // the nearby list came first: now drop the stops no line serves
+        didSet { if let ix = stopIndex { stops = stops.filter { !(ix.stops[$0.id]?.lines.isEmpty ?? true) } } }
+    }
     var alerts: [ServiceAlert] = []
     var watches: [String: BusWatch] = [:]
     var showWelcome = !UserDefaults.standard.bool(forKey: "onboarded")
@@ -167,7 +170,9 @@ final class Model: NSObject, CLLocationManagerDelegate {
             let sorted = found.sorted {
                 Geo.distance(ref.latitude, ref.longitude, $0.latitude, $0.longitude) < Geo.distance(ref.latitude, ref.longitude, $1.latitude, $1.longitude)
             }
-            if sorted.map(\.id) != stops.map(\.id) { stops = sorted }
+            // stops no line serves any more (OASA still lists some, like Pl. Syntagmatos 60003)
+            let served = sorted.filter { s in stopIndex.map { !($0.stops[s.id]?.lines.isEmpty ?? true) } ?? true }
+            if served.map(\.id) != stops.map(\.id) { stops = served }
             error = nil; serviceDown = false; lastUpdated = .now
         } catch { failed(error) }
     }
@@ -296,11 +301,25 @@ final class Model: NSObject, CLLocationManagerDelegate {
         lineTask = Task { [weak self] in
             guard let self else { return }
             self.lineDetail = try? await self.transit.detail(line: id)
+            var first = true
             while !Task.isCancelled, case .line(id, _) = self.screen {
                 await self.refreshLine(id)
+                if first { first = false; if self.lineStop == nil { await self.pickStopNearYou(id) } }
                 try? await Task.sleep(for: .seconds(15))
             }
         }
+    }
+
+    /// Opened without a stop: of the line's stops near you (within 1.5 km), the nearest one buses
+    /// are heading to (the nearest was sometimes a stop where they only drop off), instead of
+    /// "choose a stop".
+    private func pickStopNearYou(_ id: String) async {
+        guard let d = lineDetail else { return }
+        let near = nearestOnLine(from: nil, limit: 8).filter { $0.2 < 1500 }
+        let pick = near.first { !LineMath.approaching($0.0, detail: d, live: vehicles, official: [:]).isEmpty } ?? near.first
+        guard let pick, case .line(id, _) = screen else { return }
+        lineStop = pick.0
+        official = await oasa.predictions(stopID: pick.0)
     }
 
     func refreshLine(_ id: String) async {

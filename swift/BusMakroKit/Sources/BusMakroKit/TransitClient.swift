@@ -36,16 +36,27 @@ public struct TransitClient: Sendable {
     public func live(line: String) async throws -> LineLive {
         if await !OASABackup.shared.isUsed(line) {
             // both at once: athens-transit-rt for each bus's road ahead and pace, OASA for where it is
-            async let oasa = try? OASAClient().buses(line: line)
+            let oasa = Task { try? await OASAClient().buses(line: line) }
             do {
                 let live = try await get(Self.live.appendingPathComponent("v1/lines").appendingPathComponent(line), as: LineLive.self)
-                return fresher(live, oasa: await oasa)
+                return fresher(live, oasa: await Self.within(3, oasa))
             }
             catch {
                 if error is CancellationError || (error as? URLError)?.code == .cancelled { throw error }
             }
         }
         return LineLive(line: line, vehicles: try await OASAClient().buses(line: line))
+    }
+
+    /// A task's result, or nil if it takes longer than `seconds` (OASA slow: the buses show anyway).
+    static func within<T: Sendable>(_ seconds: Double, _ task: Task<T?, Never>) async -> T? {
+        await withTaskGroup(of: T?.self) { g in
+            g.addTask { await task.value }
+            g.addTask { try? await Task.sleep(for: .seconds(seconds)); return nil }
+            let first = await g.next() ?? nil
+            g.cancelAll()
+            return first
+        }
     }
 
     /// athens-transit-rt's positions run 1-2 minutes behind OASA's (measured: 70-130 s against

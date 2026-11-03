@@ -31,6 +31,11 @@ enum Style {
 }
 
 /// Frosted pane on the glass: a faint fill and a hairline edge (card_base in widgets.py).
+extension ShapeStyle where Self == Color {
+    /// Second lines on cards: .secondary turned nearly invisible on the panel's glass in dark mode.
+    static var subtle: Color { Color.primary.opacity(0.62) }
+}
+
 struct CardBackground: ViewModifier {
     func body(content: Content) -> some View {
         content
