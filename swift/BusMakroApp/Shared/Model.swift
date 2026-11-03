@@ -45,6 +45,8 @@ final class Model: NSObject, CLLocationManagerDelegate {
     var lineStop: String?          // the stop the line was opened at (selected)
     private var lineTask: Task<Void, Never>?
     var timetable: (line: String, variants: [Timetable])?
+    /// The open line has no route anywhere (not running: Χ80 outside the summer), not "loading".
+    var lineMissing = false
     var stopIndex: StopIndex? {
         // the nearby list came first: now drop the stops no line serves
         didSet { if let ix = stopIndex { stops = stops.filter { !(ix.stops[$0.id]?.lines.isEmpty ?? true) } } }
@@ -295,12 +297,13 @@ final class Model: NSObject, CLLocationManagerDelegate {
         lineStop = stop?.id
         chosenVariant = nil
         pinned = nil
-        lineDetail = nil; vehicles = []; official = [:]
+        lineDetail = nil; lineMissing = false; vehicles = []; official = [:]
         lineTab = .arrivals
         lineTask?.cancel()
         lineTask = Task { [weak self] in
             guard let self else { return }
             self.lineDetail = try? await self.transit.detail(line: id)
+            self.lineMissing = self.lineDetail == nil
             while !Task.isCancelled, case .line(id, _) = self.screen {
                 await self.refreshLine(id)
                 try? await Task.sleep(for: .seconds(15))
@@ -593,8 +596,18 @@ enum Names {
     static func place(_ greekName: String, _ english: String?) -> String {
         if greek { return greekName.isEmpty ? (english ?? "") : greekName }
         let e = (english ?? "").trimmingCharacters(in: .whitespaces)
-        return e.isEmpty ? Translit.latin(greekName) : e
+        if !e.isEmpty { return e }
+        // OASA's notes on temporary routes, in words rather than transliterated ("PROSORINI LOGO ERGON")
+        var g = greekName.replacingOccurrences(of: "(", with: " (")
+        for (el, en) in notes { g = g.replacingOccurrences(of: el, with: " \(en) ") }
+        return Translit.latin(g).replacingOccurrences(of: "  ", with: " ").replacingOccurrences(of: "( ", with: "(")
+            .replacingOccurrences(of: " )", with: ")").trimmingCharacters(in: .whitespaces)
     }
+
+    private static let notes: [(String, String)] = [
+        ("ΠΡΟΣΩΡΙΝΗ ΛΟΓΩ ΕΡΓΩΝ", "temporary, roadworks"), ("ΠΡΟΣΩΡΙΝΗ", "temporary"), ("ΛΟΓΩ ΕΡΓΩΝ", "roadworks"),
+        ("ΚΥΚΛΙΚΗ", "circular"),
+    ]
 }
 
 extension LineSummary {

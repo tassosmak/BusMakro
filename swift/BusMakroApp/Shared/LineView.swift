@@ -14,7 +14,15 @@ struct LineContent: View {
             Text("Timetable").tag(Model.LineTab.timetable)
         }
         .pickerStyle(.segmented).labelsHidden()
-        if model.lineDetail == nil {
+        if model.lineMissing {
+            VStack(spacing: 6) {
+                Image(systemName: "moon.zzz").font(.scaled(26)).foregroundStyle(.subtle)
+                Text("This line isn't running right now").font(.scaled(15, .semibold))
+                Text("Some lines run only part of the year (like Χ80 outside summer) or were withdrawn. Its timetable may still be in the Timetable tab when it runs again.")
+                    .font(.scaled(12)).foregroundStyle(.subtle).multilineTextAlignment(.center)
+            }
+            .frame(maxWidth: .infinity).padding(.top, 24).padding(.horizontal, 12)
+        } else if model.lineDetail == nil {
             Text("Loading the line…").font(.scaled(12)).foregroundStyle(.subtle).padding(.top, 20)
                 .frame(maxWidth: .infinity)
         } else {

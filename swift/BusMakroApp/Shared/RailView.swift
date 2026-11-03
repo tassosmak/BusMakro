@@ -132,6 +132,9 @@ struct StationContent: View {
                         Text(Geo.format(metres: m)).font(.scaled(11)).foregroundStyle(.subtle)
                     }
                 }
+                if rail.isOutOfDate(now) {
+                    frequencies(rail, st)
+                } else {
                 ScrollView {
                     LazyVStack(spacing: 6) {
                         let groups = grouped(rail.next(at: id, from: now, count: 4))
@@ -146,8 +149,35 @@ struct StationContent: View {
                             .frame(maxWidth: .infinity).padding(.top, 6)
                     }
                 }
+                }
             }
             .onReceive(timer) { now = $0 }
+        }
+    }
+
+    /// STASY's timetable has run out: how often each line runs here, not exact (wrong) times.
+    private func frequencies(_ rail: Rail, _ st: Rail.Station) -> some View {
+        ScrollView {
+            VStack(spacing: 6) {
+                ForEach(st.lines, id: \.self) { lid in
+                    ForEach(rail.line(lid)?.dirs.filter { $0.stations.last != id } ?? [], id: \.d) { dir in
+                        HStack(spacing: 10) {
+                            RailBadge(line: lid)
+                            Text("→ \(Names.place(dir.to, rail.stations.values.first { $0.name == dir.to }?.nameEnglish))")
+                                .font(.scaled(13, .semibold)).lineLimit(1)
+                            Spacer()
+                            if let n = rail.every(id, line: lid, direction: dir.d, at: now) {
+                                Text("every ~\(n) min").font(.scaled(15, .bold, design: .rounded)).monospacedDigit()
+                            }
+                        }
+                        .padding(10)
+                        .background(.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: Style.cardRadius))
+                    }
+                }
+                Text("STASY hasn't published this season's timetable yet, so these are how often trains run, not exact times.")
+                    .font(.scaled(10)).foregroundStyle(.tertiary).multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity).padding(.top, 6)
+            }
         }
     }
 

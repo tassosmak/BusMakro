@@ -154,7 +154,8 @@ struct Sheet: View {
 
     private var menuTitle: String {
         if case .line(let id, _) = model.screen {
-            return "\(id) — " + (model.lines.first { $0.id == id }?.shown ?? "")
+            let name = model.lines.first { $0.id == id }?.shown ?? ""
+            return name.isEmpty ? id : "\(id) — \(name)"
         }
         return String(localized: "Browse a line…")
     }

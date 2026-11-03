@@ -89,6 +89,31 @@ public struct Rail: Sendable, Decodable {
         return out.sorted { $0.minutes < $1.minutes }
     }
 
+    /// The timetable's last day has passed (STASY hadn't published the new season's): exact times
+    /// would be wrong, so stations show how often trains run instead.
+    public func isOutOfDate(_ now: Date = Date()) -> Bool {
+        guard let last = valid?.last else { return false }
+        let f = DateFormatter(); f.dateFormat = "yyyyMMdd"; f.timeZone = TimeZone(identifier: "Europe/Athens")
+        return f.string(from: now) > last
+    }
+
+    /// STASY's announced frequencies where they differ from the last published timetable (minutes
+    /// between trains, weekdays): the tram from 7 September 2026, 7:30 mornings and 8:10 afternoons.
+    static let announced: [String: Int] = ["T6": 8, "T7": 8]
+
+    /// About how often a line runs past a station now (minutes): STASY's announcement for a
+    /// weekday daytime, else the typical gap in the timetable around this time of day.
+    public func every(_ station: String, line: String, direction: String, at now: Date = Date()) -> Int? {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: "Europe/Athens")!
+        let wd = cal.component(.weekday, from: now), hour = cal.component(.hour, from: now)
+        if (2...6).contains(wd), (6..<21).contains(hour), let n = Self.announced[line] { return n }
+        let nowMin = hour * 60 + cal.component(.minute, from: now)
+        let ts = times(station, line: line, direction: direction, on: now).filter { abs($0 - nowMin) <= 60 }
+        let gaps = zip(ts, ts.dropFirst()).map { $1 - $0 }.sorted()
+        return gaps.isEmpty ? nil : max(1, gaps[gaps.count / 2])
+    }
+
     /// Minutes a train takes from one station to another along a line (from the timetable gaps of
     /// one day's first trains); nil if they aren't in that order on the line.
     public func rideMinutes(line: String, direction: String, from a: String, to b: String) -> Int? {
