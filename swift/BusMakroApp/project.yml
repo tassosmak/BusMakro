@@ -32,7 +32,8 @@ targets:
         CFBundleDisplayName: BusMakro
         CFBundleLocalizations: [en, el]
         CFBundleAllowMixedLocalizations: true
-        NSLocationWhenInUseUsageDescription: BusMakro uses your location to show the bus stops near you.
+        NSLocationWhenInUseUsageDescription: BusMakro uses your location to show the stops near you, and to keep tracking your bus after you lock the phone while a bus alert is on.
+        ITSAppUsesNonExemptEncryption: false  # only HTTPS (exempt): no export documents needed
         UILaunchScreen: {}
         NSSupportsLiveActivities: true
         UIBackgroundModes: [location]  # keeps bus alerts checking while the app is in the background

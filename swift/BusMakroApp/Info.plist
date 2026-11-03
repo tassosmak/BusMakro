@@ -38,8 +38,10 @@
 	</array>
 	<key>CFBundleVersion</key>
 	<string>1</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>BusMakro uses your location to show the bus stops near you.</string>
+	<string>BusMakro uses your location to show the stops near you, and to keep tracking your bus after you lock the phone while a bus alert is on.</string>
 	<key>NSSupportsLiveActivities</key>
 	<true/>
 	<key>UIBackgroundModes</key>
