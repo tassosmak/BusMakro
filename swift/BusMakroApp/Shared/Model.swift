@@ -10,7 +10,7 @@ import Network
 @MainActor @Observable
 final class Model: NSObject, CLLocationManagerDelegate {
     enum Screen: Equatable { case home, stop(Stop), line(String, Stop?), station(String) }
-    enum LineTab: Hashable { case arrivals, route, nearby, timetable }
+    enum LineTab: Hashable { case arrivals, route, timetable }
     enum HomeTab: Hashable { case nearby, favourites }
 
     var screen: Screen = .home

@@ -10,7 +10,6 @@ struct LineContent: View {
         Picker("", selection: $model.lineTab) {
             Text("Arrivals").tag(Model.LineTab.arrivals)
             Text("Route").tag(Model.LineTab.route)
-            Text("Nearby").tag(Model.LineTab.nearby)
             Text("Timetable").tag(Model.LineTab.timetable)
         }
         .pickerStyle(.segmented).labelsHidden()
@@ -29,7 +28,6 @@ struct LineContent: View {
             switch model.lineTab {
             case .arrivals: arrivals
             case .route: route
-            case .nearby: nearby
             case .timetable: TimetableList(model: model)
             }
         }
@@ -100,36 +98,6 @@ struct LineContent: View {
             .onAppear { if let s = model.lineStop { proxy.scrollTo(s, anchor: .center) } }
         }
     }
-
-    /// The line's stops nearest you; tapping one selects it and shows its arrivals.
-    private var nearby: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("NEAREST STOPS ON THIS LINE").font(.scaled(11, .semibold)).foregroundStyle(.subtle)
-            ScrollView {
-                LazyVStack(spacing: 6) {
-                    let rows = model.nearestOnLine(from: nil)
-                    if rows.isEmpty {
-                        Text("Tap the location button to find the stops near you.")
-                            .font(.scaled(12)).foregroundStyle(.subtle).padding(.top, 20)
-                    }
-                    ForEach(Array(rows.enumerated()), id: \.element.0) { i, row in
-                        Button {
-                            model.lineStop = row.0
-                            model.lineTab = .arrivals
-                            Task { await model.refreshLine(currentLine) }
-                        } label: {
-                            StopCard(stop: Stop(id: row.0, name: row.1.name, nameEnglish: "", street: "",
-                                                latitude: row.1.lat, longitude: row.1.lon),
-                                     metres: row.2, closest: i == 0)
-                        }
-                        .buttonStyle(.plain)
-                        .appearing(i)
-                    }
-                }
-            }
-        }
-    }
-
     private var currentLine: String {
         if case .line(let id, _) = model.screen { return id }
         return ""
