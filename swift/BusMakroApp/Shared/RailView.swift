@@ -17,7 +17,7 @@ extension Rail {
     }()
 
     /// Rebuilt from STASY's feed every week by a GitHub Action and published with the website.
-    private static let remote = URL(string: "https://tassosmak.github.io/BusMakro/rail.json")!
+    private static let remote = URL(string: "https://tassosmak.github.io/BusMakro-Swift/rail.json")!
     private static var savedURL: URL {
         URL.applicationSupportDirectory.appendingPathComponent("rail.json")
     }

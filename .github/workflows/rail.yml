@@ -1,5 +1,5 @@
 # Weekly: rebuild the metro/tram timetable from STASY's GTFS feed (data.gov.gr) and publish it
-# with the website (docs/rail.json on the swiftui branch), where the app picks it up.
+# with the website (docs/rail.json), where the app picks it up.
 name: Rail timetable
 on:
   schedule:
@@ -13,7 +13,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: swiftui
       - name: Download STASY's feed
         run: curl -sSfL -o /tmp/stasy_gtfs.zip "https://data.gov.gr/dataset/4e897a75-975a-4ce7-af65-f32ea01f93b9/resource/5e3858ee-d9ba-48c2-9015-744ea160976d/download/stasy_gtfs.zip"
       - name: Build rail.json

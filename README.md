@@ -4,9 +4,9 @@
 
 Athens buses, metro and tram, live, for **iPhone and Mac**, in Greek or English. Open it and it shows the stops around you. Tap one to see every line that stops there and when the next bus comes, with the buses moving on the map.
 
-This branch (`swiftui`) is the native SwiftUI app, built with Apple Maps (MapKit). The original Python/AppKit Mac app lives on the [`main`](https://github.com/tassosmak/BusMakro/tree/main) branch.
+The native SwiftUI app for iPhone and Mac, built with Apple Maps (MapKit). The original Python/AppKit Mac app lives in [tassosmak/BusMakro](https://github.com/tassosmak/BusMakro).
 
-[Privacy Policy](https://tassosmak.github.io/BusMakro/privacy.html) · [Support](https://github.com/tassosmak/BusMakro/issues)
+[Privacy Policy](https://tassosmak.github.io/BusMakro-Swift/privacy.html) · [Support](mailto:amakrostergios@icloud.com)
 
 ## Features
 
@@ -94,7 +94,7 @@ The metro and tram data (`Rail.json`) is rebuilt from STASY's GTFS feed with `sw
 
 ## Privacy
 
-BusMakro collects no personal data: no accounts, analytics, ads or tracking. Location is used only on the device. Read the [privacy policy](https://tassosmak.github.io/BusMakro/privacy.html).
+BusMakro collects no personal data: no accounts, analytics, ads or tracking. Location is used only on the device. Read the [privacy policy](https://tassosmak.github.io/BusMakro-Swift/privacy.html).
 
 ## Credits
 

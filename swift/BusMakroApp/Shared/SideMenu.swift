@@ -42,7 +42,7 @@ struct SideMenu: View {
                     row("tram.fill", "Metro Map") { close(); onMetroMap() }
                     row("gearshape.fill", "Settings") { close(); onSettings() }
                     row("envelope.fill", "Contact", external: true) {
-                        close(); openURL(URL(string: "https://github.com/tassosmak/BusMakro/issues")!)
+                        close(); openURL(URL(string: "mailto:amakrostergios@icloud.com?subject=BusMakro")!)
                     }
                     #if DEBUG
                     row("ladybug.fill", "Debug") { close(); onDebug() }
