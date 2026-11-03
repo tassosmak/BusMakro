@@ -179,6 +179,7 @@ struct Sheet: View {
                 LazyVStack(spacing: 6) {
                     ForEach(model.networkAlerts.prefix(2)) { AlertCard(alert: $0) }
                     ForEach(model.alerts(for: (model.stopLines ?? []).map(\.line))) { AlertCard(alert: $0) }
+                    if let at = model.stopLinesSaved { SavedTimesNote(at: at) }
                     if let lines = model.stopLines, lines.isEmpty {
                         Text(model.error == nil ? "No lines stop here." : "Couldn't reach the bus service. Tap ↻ to try again.")
                             .font(.scaled(12)).foregroundStyle(.secondary).padding(.top, 20)
@@ -233,7 +234,8 @@ struct Sheet: View {
                 ForEach(Array(stops.enumerated()), id: \.element.id) { i, stop in
                     Button { model.open(stop) } label: {
                         StopCard(stop: stop, metres: model.distance(to: stop), closest: i == 0 && (model.distance(to: stop) ?? .infinity) < 500,  // only when the list is around you
-                                 subtitle: model.homeTab == .favourites ? favouriteSubtitle(model.favLines[stop.id]) : nil)
+                                 subtitle: model.homeTab == .favourites ? favouriteSubtitle(model.favLines[stop.id]) : nil,
+                                 favourite: model.homeTab == .nearby && model.isFavourite(stop))
                     }
                     .buttonStyle(.plain)
                     .contextMenu { if model.homeTab == .favourites { favouriteMenu("stop:\(stop.id)", name: stop.title, index: i, count: stops.count) { model.toggleFavourite(stop) } } }
@@ -288,4 +290,27 @@ struct Appearing: ViewModifier {
 
 extension View {
     func appearing(_ index: Int) -> some View { modifier(Appearing(index: index)) }
+}
+
+/// Over a stop's saved times while offline: when they were seen, so "12'" reads as "12' back then".
+struct SavedTimesNote: View {
+    let at: Date
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 30)) { ctx in
+            let ago = max(0, Int(ctx.date.timeIntervalSince(at) / 60))
+            HStack(spacing: 10) {
+                Image(systemName: "clock.arrow.circlepath").foregroundStyle(.orange)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(ago == 0 ? String(localized: "Saved just now") : String(localized: "Saved \(ago) min ago, at \(at.formatted(date: .omitted, time: .shortened))"))
+                        .font(.scaled(13, .semibold))
+                    Text("You're offline: these are the times as they were then.")
+                        .font(.scaled(12)).foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(12)
+            .card()
+        }
+    }
 }

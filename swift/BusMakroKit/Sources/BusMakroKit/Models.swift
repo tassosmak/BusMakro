@@ -34,22 +34,22 @@ public struct LineSummary: Identifiable, Hashable, Sendable, Decodable {
 /// A bus on the road, as athens-transit-rt reports it (`/v1/lines/{id}`).
 public struct Vehicle: Identifiable, Hashable, Sendable, Decodable {
     public let id: String
-    public let latitude: Double
-    public let longitude: Double
+    public private(set) var latitude: Double
+    public private(set) var longitude: Double
     public let bearing: Double?
-    public let positionAt: Date?
+    public private(set) var positionAt: Date?
     public let variant: String?
     public let nextStopID: String?
     public let delaySeconds: Int?
     /// m/s along the route; 0 = standing, nil = unknown.
-    public let speed: Double?
+    public private(set) var speed: Double?
     public let tripLabel: String?
     /// The road ahead to the next stop, as [latitude, longitude] pairs.
-    public let path: [[Double]]?
+    public private(set) var path: [[Double]]?
     /// The road on from the end of `path` to the third stop ahead.
-    public let pathBeyond: [[Double]]?
+    public private(set) var pathBeyond: [[Double]]?
     /// Typical speed (m/s) per 200 m ahead; a nil step means unknown.
-    public let pathSpeeds: [Double?]?
+    public private(set) var pathSpeeds: [Double?]?
 
     enum CodingKeys: String, CodingKey {
         case id, lat, lon, bearing, variant, speed, path, pathSpeeds = "path_speeds", pathBeyond = "path_beyond"
@@ -61,6 +61,25 @@ public struct Vehicle: Identifiable, Hashable, Sendable, Decodable {
         self.id = id; self.latitude = latitude; self.longitude = longitude; self.bearing = bearing
         self.positionAt = positionAt; self.variant = variant
         nextStopID = nil; delaySeconds = nil; speed = nil; tripLabel = nil; path = nil; pathBeyond = nil; pathSpeeds = nil
+    }
+
+    /// The same bus at a newer fix (from OASA, when the feed's is stale): its road starts again from
+    /// there, and a bus the feed thought standing that has clearly moved drives on at a typical pace.
+    public func moved(to lat: Double, _ lon: Double, at when: Date) -> Vehicle {
+        var v = self
+        let r = Movement.route(for: self)
+        let a = r.map { Movement.along($0, (lat, lon)) }
+        if let r, let a, a.off < 60 {
+            let i = r.cum.firstIndex { $0 > a.d } ?? r.pts.count
+            v.path = [[lat, lon]] + r.pts[i...].map { [$0.0, $0.1] }
+            v.pathBeyond = nil
+            v.pathSpeeds = pathSpeeds.map { Array($0.dropFirst(Int(a.d / 200))) }
+        } else {
+            v.path = nil; v.pathBeyond = nil; v.pathSpeeds = nil  // off its road: just the fix
+        }
+        if (speed ?? 0) <= 0, Geo.distance(latitude, longitude, lat, lon) > 40 { v.speed = LineMath.defaultSpeed }
+        v.latitude = lat; v.longitude = lon; v.positionAt = when
+        return v
     }
 
     public init(from decoder: Decoder) throws {

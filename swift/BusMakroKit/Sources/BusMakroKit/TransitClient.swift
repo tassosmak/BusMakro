@@ -33,11 +33,28 @@ public struct TransitClient: Sendable {
     /// route came from OASA (its variants are OASA's route codes, so the buses must be too).
     public func live(line: String) async throws -> LineLive {
         if await !OASABackup.shared.isUsed(line) {
-            do { return try await get(Self.live.appendingPathComponent("v1/lines").appendingPathComponent(line), as: LineLive.self) }
+            do {
+                let live = try await get(Self.live.appendingPathComponent("v1/lines").appendingPathComponent(line), as: LineLive.self)
+                return await fresher(live)
+            }
             catch {
                 if error is CancellationError || (error as? URLError)?.code == .cancelled { throw error }
             }
         }
         return LineLive(line: line, vehicles: try await OASAClient().buses(line: line))
+    }
+
+    /// The feed sometimes keeps a bus at an old fix for minutes (it sat at the start of its route
+    /// while its ETA counted down): any fix over 75 s old is checked against OASA's own, and the
+    /// newer one wins.
+    private func fresher(_ live: LineLive) async -> LineLive {
+        let now = Date()
+        guard live.vehicles.contains(where: { now.timeIntervalSince($0.positionAt ?? now) > 75 }),
+              let oasa = try? await OASAClient().buses(line: live.line) else { return live }
+        let byID = Dictionary(oasa.map { ($0.id, $0) }, uniquingKeysWith: { a, b in (a.positionAt ?? .distantPast) > (b.positionAt ?? .distantPast) ? a : b })
+        return LineLive(line: live.line, vehicles: live.vehicles.map { v in
+            guard let o = byID[v.id], let t = o.positionAt, t > (v.positionAt ?? .distantPast).addingTimeInterval(20) else { return v }
+            return v.moved(to: o.latitude, o.longitude, at: t)
+        })
     }
 }

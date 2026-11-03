@@ -10,8 +10,8 @@ public enum Movement {
 
     /// A route as (latitude, longitude) points with cumulative metres.
     public struct Route: Sendable {
-        let pts: [(Double, Double)]
-        let cum: [Double]
+        public let pts: [(Double, Double)]
+        public let cum: [Double]
         let speeds: [Double?]
         let speed: Double?
         public var total: Double { cum.last ?? 0 }
@@ -42,7 +42,7 @@ public enum Movement {
         return r.total
     }
 
-    static func point(_ r: Route, at d: Double) -> (Double, Double) {
+    public static func point(_ r: Route, at d: Double) -> (Double, Double) {
         var i = 1
         while i < r.pts.count - 1 && r.cum[i] < d { i += 1 }
         let a = r.pts[i - 1], b = r.pts[i], seg = r.cum[i] - r.cum[i - 1]

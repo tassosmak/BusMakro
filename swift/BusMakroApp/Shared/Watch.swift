@@ -7,8 +7,8 @@ import ActivityKit
 
 /// Bus alerts: "notify me when this bus is N stops from my stop" (oasa/app/watch.py). The watch
 /// keeps checking the line every 20 s, posts one notification, then ends; or ends quietly when the
-/// bus passes the stop or disappears for 10 minutes. On iPhone it runs while the app is open (and
-/// briefly after); reliable background alerts would need push notifications from a server.
+/// bus passes the stop or disappears for 10 minutes. While a watch is set the app keeps location on
+/// in the background, so the checks carry on with the app closed or the phone locked.
 /// On iPhone a Live Activity shows the countdown on the lock screen and in the Dynamic Island,
 /// from when the alert is set until the bus reaches the stop.
 struct BusWatch: Hashable {
@@ -81,6 +81,7 @@ extension Model {
 
     func startWatchLoop() {
         guard watchTask == nil else { return }
+        keepRunningInBackground(true)
         watchTask = Task { [weak self] in
             while let self, !self.watches.isEmpty {
                 try? await Task.sleep(for: .seconds(20))
@@ -92,6 +93,7 @@ extension Model {
                 }
             }
             self?.watchTask = nil
+            self?.keepRunningInBackground(false)
         }
     }
 }

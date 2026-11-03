@@ -8,11 +8,18 @@ struct StopCard: View {
     let metres: Double?
     var closest = false
     var subtitle: String? = nil
+    var favourite = false
 
     var body: some View {
         HStack(alignment: .center, spacing: 8) {
             VStack(alignment: .leading, spacing: 4) {
-                Text(stop.title).font(.scaled(13, .semibold)).lineLimit(1)
+                HStack(spacing: 4) {
+                    if favourite {
+                        Image(systemName: "star.fill").font(.scaled(11)).foregroundStyle(.yellow)
+                            .accessibilityLabel("Favourite")
+                    }
+                    Text(stop.title).font(.scaled(13, .semibold)).lineLimit(1)
+                }
                 Text(subtitle ?? ((stop.street.isEmpty ? "" : stop.street + " · ") + String(localized: "Stop \(stop.id)")))
                     .font(.scaled(12)).foregroundStyle(.secondary).lineLimit(1)
             }

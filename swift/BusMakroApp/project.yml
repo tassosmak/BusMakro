@@ -35,6 +35,7 @@ targets:
         NSLocationWhenInUseUsageDescription: BusMakro uses your location to show the bus stops near you.
         UILaunchScreen: {}
         NSSupportsLiveActivities: true
+        UIBackgroundModes: [location]  # keeps bus alerts checking while the app is in the background
         CFBundleURLTypes:  # busmakro://stop/ID, busmakro://line/ID (quick actions, Siri, Spotlight, Live Activity)
           - CFBundleURLName: com.tassosmak.busmakro
             CFBundleURLSchemes: [busmakro]
@@ -72,3 +73,11 @@ targets:
         MARKETING_VERSION: "0.1.0"
         CURRENT_PROJECT_VERSION: 1
         IPHONEOS_DEPLOYMENT_TARGET: "17.0"
+schemes:
+  BusMakro:  # shared, so a regenerated project still builds from the command line
+    build:
+      targets:
+        BusMakro: all
+        BusMakroWidgets: all
+    run:
+      config: Debug

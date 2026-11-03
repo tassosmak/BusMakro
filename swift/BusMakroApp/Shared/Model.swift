@@ -28,7 +28,7 @@ final class Model: NSObject, CLLocationManagerDelegate {
     var searchText = ""
     /// The search field is open (focused or holding text): results drop down under it, the panel hides.
     var searchActive = false
-    private var stopsOrigin: CLLocationCoordinate2D?
+    private(set) var stopsOrigin: CLLocationCoordinate2D?
     var centredOnUser = false
     // line view
     var lineTab: LineTab = .arrivals
@@ -77,6 +77,8 @@ final class Model: NSObject, CLLocationManagerDelegate {
     var serviceDown = false
     /// When live data last arrived (shown while offline, so you know how old what you see is).
     var lastUpdated: Date?
+    /// The open stop's times are the saved ones from then (offline), not live.
+    var stopLinesSaved: Date?
     private let pathMonitor = NWPathMonitor()
 
     private let oasa = OASAClient(), transit = TransitClient()
@@ -114,7 +116,10 @@ final class Model: NSObject, CLLocationManagerDelegate {
     func loadFavourites() async {
         await withTaskGroup(of: (String, [StopLine]?).self) { group in
             for f in favourites { group.addTask { [oasa] in (f.id, try? await oasa.stopLines(stopID: f.id)) } }
-            for await (id, l) in group { if let l { favLines[id] = l } }
+            for await (id, l) in group {
+                if let l { favLines[id] = l; ArrivalCache.save(stop: id, l) }
+                else if favLines[id] == nil, let saved = ArrivalCache.load(stop: id) { favLines[id] = saved.lines }
+            }
         }
     }
 
@@ -155,6 +160,8 @@ final class Model: NSObject, CLLocationManagerDelegate {
         stopsOrigin = c
         do {
             let found = try await oasa.closestStops(latitude: c.latitude, longitude: c.longitude)
+            // a newer request (your fix, the map moved) went out meanwhile: its stops win
+            guard let o = stopsOrigin, o.latitude == c.latitude, o.longitude == c.longitude else { return }
             let ref = userLocation ?? c
             let sorted = found.sorted {
                 Geo.distance(ref.latitude, ref.longitude, $0.latitude, $0.longitude) < Geo.distance(ref.latitude, ref.longitude, $1.latitude, $1.longitude)
@@ -188,7 +195,7 @@ final class Model: NSObject, CLLocationManagerDelegate {
     /// Show a stop at once (the tap must feel instant), then load its lines.
     func open(_ stop: Stop) {
         screen = .stop(stop)
-        stopLines = nil
+        stopLines = nil; stopLinesSaved = nil
         recents = [stop] + recents.filter { $0.id != stop.id }
         recents = Array(recents.prefix(6))
         Model.saveStops(recents, "recents")
@@ -217,12 +224,18 @@ final class Model: NSObject, CLLocationManagerDelegate {
             // keep the timetable estimates already found (they don't change every 15 s)
             let known = Dictionary((stopLines ?? []).compactMap { l in l.scheduled.map { (l.line, $0) } }, uniquingKeysWith: { a, _ in a })
             stopLines = fresh.map { var l = $0; if l.arrivalsMinutes.isEmpty { l.scheduled = known[l.line] }; return l }
-            serviceDown = false; lastUpdated = .now
+            serviceDown = false; lastUpdated = .now; stopLinesSaved = nil
+            ArrivalCache.save(stop: stop.id, fresh)
             Task { [oasa] in await oasa.observe(stop: stop.id, lines: fresh) }  // learn (History)
             await loadStopBuses(fresh)
             if known.isEmpty { await addSchedules(stop: stop.id) }
         } catch {
             failed(error)
+            guard case .stop(let s) = screen, s.id == stop.id else { return }
+            // offline: what was last seen here, with when (only until live times come back)
+            if stopLines?.isEmpty ?? true || stopLinesSaved != nil, let saved = ArrivalCache.load(stop: stop.id) {
+                stopLines = saved.lines; stopLinesSaved = saved.at
+            }
             if stopLines == nil { stopLines = [] }  // don't stay on "Loading…"
         }
     }
@@ -395,7 +408,13 @@ final class Model: NSObject, CLLocationManagerDelegate {
         let now = Date()
         var next: [String: CLLocationCoordinate2D] = [:]
         for v in vehicles + stopBuses.map(\.vehicle) {
-            let p = Movement.position(v, route: routes[v.id], hold: holds[v.id] ?? 0, now: now)
+            var p = Movement.position(v, route: routes[v.id], hold: holds[v.id] ?? 0, now: now)
+            // following the bus you're on: you are the best fix there is (driven on from an old fix,
+            // it ran ahead of you through stops and lights)
+            if v.id == pinned, let u = userLocation, let r = routes[v.id] {
+                let me = Movement.along(r, (u.latitude, u.longitude)), bus = Movement.along(r, p)
+                if me.off < 35 && abs(me.d - bus.d) < 400 { p = Movement.point(r, at: me.d) }
+            }
             next[v.id] = CLLocationCoordinate2D(latitude: p.0, longitude: p.1)
         }
         if next.count != drawn.count || next.contains(where: { k, v in drawn[k].map { $0.latitude != v.latitude || $0.longitude != v.longitude } ?? true }) { if LowPower.shared.on { drawn = next } else { withAnimation(.linear(duration: 1)) { drawn = next } } }  // glide between the once-a-second positions
@@ -468,6 +487,17 @@ final class Model: NSObject, CLLocationManagerDelegate {
         location.requestWhenInUseAuthorization()
         if let c = location.location?.coordinate { userLocation = c }
         location.startUpdatingLocation()
+    }
+
+    /// While a bus alert is set, keep location running in the background (the blue pill shows it), so
+    /// iOS doesn't suspend the app and the alert's checks go on with the app closed or the phone locked.
+    func keepRunningInBackground(_ on: Bool) {
+        #if os(iOS)
+        location.allowsBackgroundLocationUpdates = on
+        location.showsBackgroundLocationIndicator = on
+        location.pausesLocationUpdatesAutomatically = !on
+        if on { location.startUpdatingLocation() }
+        #endif
     }
 
     nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {

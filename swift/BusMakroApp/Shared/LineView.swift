@@ -39,7 +39,7 @@ struct LineContent: View {
                             .font(.scaled(12)).foregroundStyle(.secondary).padding(.top, 20)
                     }
                     ForEach(Array(rows.enumerated()), id: \.element.id) { i, a in
-                        ArrivalCard(item: a, watching: model.watches[a.vehicle.id]?.stops, onWatch: { model.watch(a.vehicle.id, stops: $0) },
+                        ArrivalCard(item: a, watching: model.watches[a.vehicle.id].flatMap { $0.notified ? nil : $0.stops },  // back to normal once it has notified onWatch: { model.watch(a.vehicle.id, stops: $0) },
                                     following: model.pinned == a.vehicle.id,
                                     onFollow: { model.pinned = model.pinned == a.vehicle.id ? nil : a.vehicle.id })
                             .appearing(i)

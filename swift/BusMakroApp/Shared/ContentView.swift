@@ -83,7 +83,10 @@ struct ContentView: View {
         .task {
             if let link = links.pending { links.pending = nil; Task { await model.follow(link) } }  // launched from a quick action
             await model.start()
-            await model.loadStops(near: CLLocationCoordinate2D(latitude: 37.9755, longitude: 23.7348))  // until a fix arrives
+            // central Athens until a fix arrives (start() is slow: by now your stops may already be listed)
+            if model.userLocation == nil && model.stopsOrigin == nil {
+                await model.loadStops(near: CLLocationCoordinate2D(latitude: 37.9755, longitude: 23.7348))
+            }
         }
         .modifier(LinkHandling(model: model, links: links, menuOpen: $menuOpen))
         .onChange(of: model.variantID) {
@@ -299,7 +302,9 @@ struct ContentView: View {
             // zoomed far out, the nearby list stays around you rather than following the map
             let far = ctx.region.span.latitudeDelta > Model.stopsMaxSpan
             let centre = far ? (model.userLocation ?? ctx.region.center) : ctx.region.center
-            if model.screen == .home { fittedLine = nil; Task { await model.loadStops(near: centre) } }
+            // before the map has moved to your first fix, its starting region (central Athens) isn't where you are
+            let settling = model.userLocation != nil && !model.centredOnUser
+            if model.screen == .home && !settling { fittedLine = nil; Task { await model.loadStops(near: centre) } }
         }
         .ignoresSafeArea()
     }

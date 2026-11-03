@@ -20,11 +20,8 @@ struct WelcomeView: View {
     var body: some View {
         VStack(spacing: 0) {
             Spacer(minLength: 24)
-            Image(systemName: "bus.fill")
-                .font(.scaled(44, .semibold)).foregroundStyle(.white)
-                .frame(width: 96, height: 96)
-                .background(LinearGradient(colors: [.blue, Color(red: 0.05, green: 0.35, blue: 0.9)], startPoint: .top, endPoint: .bottom),
-                            in: RoundedRectangle(cornerRadius: 22))
+            Image("Logo").resizable().frame(width: 96, height: 96)
+                .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
                 .appearing(0)
             Text("Welcome to BusMakro").font(.scaled(28, .bold)).multilineTextAlignment(.center)
                 .padding(.top, 18).appearing(1)
@@ -81,25 +78,59 @@ struct WelcomeView: View {
     }
 }
 
-/// First launch: the welcome, then one question each for Home and Work (both skippable, asked once;
-/// they can be set later in Settings → Trips).
+/// First launch: the welcome, then whether to save places at all; only on yes, one question each for
+/// Home and Work (both skippable, asked once; they can be set later in Settings → Trips).
 struct Onboarding: View {
     @Bindable var model: Model
     var onDone: () -> Void
-    @State private var step = 0  // 0 welcome, then one per saved place
+    @State private var step = 0  // 0 welcome, 1 save places?, then one per saved place
 
     var body: some View {
         if step == 0 {
             WelcomeView { withAnimation { step = 1 } }
+        } else if step == 1 {
+            SavePlacesQuestion { yes in if yes { withAnimation { step = 2 } } else { onDone() } }
+                .transition(.move(edge: .trailing).combined(with: .opacity))
         } else {
-            let k = SavedPlace.allCases[step - 1]
+            let k = SavedPlace.allCases[step - 2]
             PlaceQuestion(model: model, place: k) { p in
                 if let p { model[place: k] = p }
-                if step < SavedPlace.allCases.count { withAnimation { step += 1 } } else { onDone() }
+                if step - 1 < SavedPlace.allCases.count { withAnimation { step += 1 } } else { onDone() }
             }
             .id(k)
             .transition(.move(edge: .trailing).combined(with: .opacity))
         }
+    }
+}
+
+/// "Save your places?": Yes goes on to Home and Work, Not Now finishes.
+struct SavePlacesQuestion: View {
+    var onAnswer: (Bool) -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Spacer()
+            VStack(spacing: 10) {
+                HStack(spacing: 14) {
+                    Image(systemName: SavedPlace.home.icon)
+                    Image(systemName: SavedPlace.work.icon)
+                }
+                .font(.scaled(34, .semibold)).foregroundStyle(.tint)
+                Text("Save your places?").font(.scaled(28, .bold)).multilineTextAlignment(.center)
+                Text("Add Home and Work, and Take Me Home plans the trip there in one tap, from wherever you are. You can add them later in Settings.")
+                    .font(.scaled(15)).foregroundStyle(.secondary).multilineTextAlignment(.center)
+            }
+            .padding(.horizontal, 32)
+            Spacer()
+            Button { onAnswer(true) } label: {
+                Text("Add Home and Work").font(.scaled(17, .semibold)).frame(maxWidth: .infinity).frame(minHeight: 50)
+            }
+            .buttonStyle(.borderedProminent).buttonBorderShape(.roundedRectangle(radius: 14))
+            .padding(.horizontal, 32)
+            Button("Not Now") { onAnswer(false) }
+                .font(.scaled(15)).padding(.top, 14).padding(.bottom, 24)
+        }
+        .frame(maxWidth: 520)
     }
 }
 
