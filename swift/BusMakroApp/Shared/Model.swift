@@ -32,6 +32,8 @@ final class Model: NSObject, CLLocationManagerDelegate {
     var centredOnUser = false
     // line view
     var lineTab: LineTab = .arrivals
+    /// The open line's first buses and times aren't in yet (a spinner, not "no bus").
+    var lineLoading = false
     var lineDetail: LineDetail?
     var vehicles: [Vehicle] = [] {
         didSet { renewRoutes() }
@@ -204,6 +206,10 @@ final class Model: NSObject, CLLocationManagerDelegate {
     func open(_ stop: Stop) {
         screen = .stop(stop)
         stopLines = nil; stopLinesSaved = nil
+        // the last times seen here (if recent) show at once, marked, until live ones arrive
+        if let saved = ArrivalCache.load(stop: stop.id), saved.at.timeIntervalSinceNow > -600 {
+            stopLines = saved.lines; stopLinesSaved = saved.at
+        }
         recents = [stop] + recents.filter { $0.id != stop.id }
         recents = Array(recents.prefix(6))
         Model.saveStops(recents, "recents")
@@ -235,8 +241,9 @@ final class Model: NSObject, CLLocationManagerDelegate {
             serviceDown = false; lastUpdated = .now; stopLinesSaved = nil
             ArrivalCache.save(stop: stop.id, fresh)
             Task { [oasa] in await oasa.observe(stop: stop.id, lines: fresh) }  // learn (History)
-            await loadStopBuses(fresh)
+            async let buses: Void = loadStopBuses(fresh)
             if known.isEmpty { await addSchedules(stop: stop.id) }
+            await buses
         } catch {
             failed(error)
             guard case .stop(let s) = screen, s.id == stop.id else { return }
@@ -297,15 +304,22 @@ final class Model: NSObject, CLLocationManagerDelegate {
         lineStop = stop?.id
         chosenVariant = nil
         pinned = nil
-        lineDetail = nil; lineMissing = false; vehicles = []; official = [:]
+        // the buses already on the map from the stop stay put (they vanished and came back)
+        vehicles = stopBuses.filter { $0.line == id }.map(\.vehicle)
+        lineDetail = nil; lineMissing = false; official = [:]; lineLoading = true
         lineTab = .arrivals
         lineTask?.cancel()
         lineTask = Task { [weak self] in
             guard let self else { return }
+            // the route and the first live buses side by side (one after the other was twice as slow)
+            async let live = try? self.transit.live(line: id)
             self.lineDetail = try? await self.transit.detail(line: id)
             self.lineMissing = self.lineDetail == nil
+            var first = await live
             while !Task.isCancelled, case .line(id, _) = self.screen {
-                await self.refreshLine(id)
+                await self.refreshLine(id, live: first?.vehicles)
+                first = nil
+                self.lineLoading = false
                 try? await Task.sleep(for: .seconds(15))
             }
         }
@@ -320,14 +334,24 @@ final class Model: NSObject, CLLocationManagerDelegate {
         lineStop = (near.first { !LineMath.approaching($0.0, detail: d, live: vehicles, official: [:]).isEmpty } ?? near.first)?.0
     }
 
-    func refreshLine(_ id: String) async {
+    /// A missed bus is kept for one refresh: the feed sometimes skips one (it blinked out and back).
+    @ObservationIgnored private var missedOnce: Set<String> = []
+
+    private func take(_ live: [Vehicle], line id: String) {
+        let ids = Set(live.map(\.id))
+        let missed = vehicles.filter { !ids.contains($0.id) && !missedOnce.contains($0.id) }
+        missedOnce = Set(missed.map(\.id))
+        vehicles = live + missed
+        serviceDown = false; lastUpdated = .now
+        checkWatches(line: id, vehicles: live)
+        if let p = pendingPin, vehicles.contains(where: { $0.id == p }) { pinned = p; pendingPin = nil }
+        if let p = pinned, !vehicles.contains(where: { $0.id == p }) { pinned = nil }  // gone
+    }
+
+    /// `live`: buses just fetched (opening the line), not asked for again.
+    func refreshLine(_ id: String, live: [Vehicle]? = nil) async {
         do {
-            let live = try await transit.live(line: id)
-            vehicles = live.vehicles
-            serviceDown = false; lastUpdated = .now
-            checkWatches(line: id, vehicles: live.vehicles)
-            if let p = pendingPin, live.vehicles.contains(where: { $0.id == p }) { pinned = p; pendingPin = nil }
-            if let p = pinned, !live.vehicles.contains(where: { $0.id == p }) { pinned = nil }  // gone
+            if let live { take(live, line: id) } else { take(try await transit.live(line: id).vehicles, line: id) }
             // opened without a stop: chosen as soon as the buses are in, so OASA's times are asked
             // for once, for that stop (picking after them waited on OASA twice: 20-30 s when slow)
             if lineStop == nil { pickStopNearYou() }

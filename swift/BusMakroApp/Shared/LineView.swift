@@ -22,8 +22,7 @@ struct LineContent: View {
             }
             .frame(maxWidth: .infinity).padding(.top, 24).padding(.horizontal, 12)
         } else if model.lineDetail == nil {
-            Text("Loading the line…").font(.scaled(12)).foregroundStyle(.subtle).padding(.top, 20)
-                .frame(maxWidth: .infinity)
+            loading("Loading the line…")
         } else {
             switch model.lineTab {
             case .arrivals: arrivals
@@ -37,6 +36,14 @@ struct LineContent: View {
         model.lineStop.flatMap { id in model.lineDetail?.stops[id].map { Names.place($0.name, "") } }
     }
 
+    private func loading(_ text: LocalizedStringKey) -> some View {
+        VStack(spacing: 8) {
+            ProgressView().controlSize(.regular)
+            Text(text).font(.scaled(12)).foregroundStyle(.subtle)
+        }
+        .frame(maxWidth: .infinity).padding(.top, 20)
+    }
+
     private var arrivals: some View {
         VStack(alignment: .leading, spacing: 8) {
             // which stop: picked for you when the line opened without one
@@ -46,7 +53,9 @@ struct LineContent: View {
                 LazyVStack(spacing: 6) {
                     ForEach(model.alerts(for: [currentLine])) { AlertCard(alert: $0) }
                     let rows = model.approaching
-                    if rows.isEmpty {
+                    if rows.isEmpty && model.lineLoading {
+                        loading("Finding the buses…")
+                    } else if rows.isEmpty {
                         Text(model.lineStop == nil ? String(localized: "Choose a stop to see approaching buses.") : String(localized: "No bus is heading to this stop right now."))
                             .font(.scaled(12)).foregroundStyle(.subtle).padding(.top, 20)
                     }
