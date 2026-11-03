@@ -342,6 +342,7 @@ final class Model: NSObject, CLLocationManagerDelegate {
         let missed = vehicles.filter { !ids.contains($0.id) && !missedOnce.contains($0.id) }
         missedOnce = Set(missed.map(\.id))
         vehicles = live + missed
+        lineLoading = false  // buses in: OASA's minutes follow (they kept the spinner up 10 s)
         serviceDown = false; lastUpdated = .now
         checkWatches(line: id, vehicles: live)
         if let p = pendingPin, vehicles.contains(where: { $0.id == p }) { pinned = p; pendingPin = nil }

@@ -6,7 +6,28 @@ public struct OASAClient: Sendable {
     public static let base = URL(string: "https://telematics.oasa.gr/api/")!
     let session: URLSession
 
-    public init(session: URLSession = .shared) { self.session = session }
+    public init(session: URLSession = OASAClient.shared) { self.session = session }
+
+    /// Its own session: the shared one lets only a few requests per host run at once, so a stop's
+    /// times queued behind timetable and favourite lookups (10-20 s while OASA answers in 0.5 s).
+    public static let shared: URLSession = {
+        let c = URLSessionConfiguration.default
+        c.httpMaximumConnectionsPerHost = 16
+        c.requestCachePolicy = .reloadIgnoringLocalCacheData
+        return URLSession(configuration: c)
+    }()
+
+    /// Answers kept for a short while, and one request shared by everyone asking at the same time.
+    actor Recent {
+        static let shared = Recent()
+        private var kept: [String: (at: Date, task: Task<Any, Error>)] = [:]
+        func get(_ key: String, for seconds: TimeInterval, _ fetch: @escaping @Sendable () async throws -> Any) async throws -> Any {
+            if let k = kept[key], Date().timeIntervalSince(k.at) < seconds { return try await k.task.value }
+            let task = Task { try await fetch() }
+            kept[key] = (Date(), task)
+            do { return try await task.value } catch { kept[key] = nil; throw error }
+        }
+    }
 
     func call(_ act: String, _ args: [String] = [], named: [String: String] = [:]) async throws -> Any {
         var comps = URLComponents(url: Self.base, resolvingAgainstBaseURL: false)!
@@ -41,7 +62,8 @@ public struct OASAClient: Sendable {
 
     /// Official predictions at a stop: (route code, vehicle code, minutes).
     public func stopArrivals(stopID: String) async throws -> [(route: String, vehicle: String, minutes: Int)] {
-        Self.rows(try await call("getStopArrivals", [stopID])).compactMap { a in
+        // the list, the map's buses and the prediction history all ask: one request between them
+        Self.rows(try await Recent.shared.get("arr|" + stopID, for: 8) { try await call("getStopArrivals", [stopID]) }).compactMap { a in
             guard let m = Int(Self.str(a["btime2"])) else { return nil }
             return (Self.str(a["route_code"]), Self.str(a["veh_code"]), m)
         }
@@ -49,9 +71,14 @@ public struct OASAClient: Sendable {
 
     /// Every line at a stop with its next official arrivals, soonest first (as get_stop_lines in the Mac app).
     public func stopLines(stopID: String) async throws -> [StopLine] {
-        async let routesCall = call("webRoutesForStop", [stopID])
+        // which lines stop here changes rarely: asked once an hour, not every 15 s
+        async let routesCall = Recent.shared.get("routes|" + stopID, for: 3600) {
+            let r = try await call("webRoutesForStop", [stopID])
+            if Self.rows(r).isEmpty { throw URLError(.zeroByteResource) }  // a null answer isn't kept
+            return r
+        }
         let arrivals = (try? await stopArrivals(stopID: stopID)) ?? []  // lines are worth showing without times
-        var routes = Self.rows(try await routesCall)
+        var routes = Self.rows((try? await routesCall) ?? [Any]())
         if routes.isEmpty {  // OASA sometimes answers null for a stop that has lines: ask once more
             try? await Task.sleep(for: .milliseconds(800))
             routes = Self.rows(try await call("webRoutesForStop", [stopID]))
