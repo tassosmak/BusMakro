@@ -38,6 +38,8 @@ public struct Rail: Sendable, Decodable {
 
     public let lines: [Line]
     public let stations: [String: Station]
+    /// The feed's first and last service dates ("20260701", "20260831"): a newer one ends later.
+    public let valid: [String]?
     let departures: [String: [String: [Int]]]  // "station|line|dir" → day kind → gaps in minutes
 
     public static func load(_ data: Data) throws -> Rail { try JSONDecoder().decode(Rail.self, from: data) }

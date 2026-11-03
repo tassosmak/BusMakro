@@ -123,15 +123,20 @@ def main(src, out):
         of_platform[p['stop_id']] = st
     for i, s in enumerate(stations):
         s['id'] = f'R{i + 1:03d}'
-    # a typical day of each kind: the service running on that date
-    by_date = {r['date']: r['service_id'] for r in table(z, 'calendar_dates.txt') if r['exception_type'] == '1'}
+    # a typical day of each kind: the LATEST such date in the feed (the newest timetable; the first
+    # dates were the start of an older period), with every service running that day (one per line
+    # in some feeds)
+    by_date = defaultdict(set)
+    for r in table(z, 'calendar_dates.txt'):
+        if r['exception_type'] == '1':
+            by_date[r['date']].add(r['service_id'])
     pick = {}
-    for d, sid in sorted(by_date.items()):
+    for d in sorted(by_date, reverse=True):
         wd = date(int(d[:4]), int(d[4:6]), int(d[6:])).weekday()
         kind = 'wd' if wd < 5 else 'sa' if wd == 5 else 'su'
         if kind not in pick and (kind != 'wd' or wd == 2):  # a Wednesday for weekdays
-            pick[kind] = sid
-    service_kind = {v: k for k, v in pick.items()}
+            pick[kind] = d
+    service_kind = {sid: k for k, d in pick.items() for sid in by_date[d]}
     trips = {t['trip_id']: t for t in table(z, 'trips.txt')}
     seqs = defaultdict(list)
     for r in table(z, 'stop_times.txt'):
@@ -170,7 +175,7 @@ def main(src, out):
             ms = sorted(set(ms))
             entry[kind] = [ms[0]] + [b - a for a, b in zip(ms, ms[1:])]
         deps[f'{sid}|{line}|{d}'] = entry
-    data = {'source': 'STASY S.A. GTFS', 'lines': lines,
+    data = {'source': 'STASY S.A. GTFS', 'valid': [min(by_date), max(by_date)], 'days': pick, 'lines': lines,
             'stations': {s['id']: {'name': s['name'], 'name_en': s['name_en'], 'lat': round(s['pos'][0], 6), 'lon': round(s['pos'][1], 6),
                                    'lines': sorted(s['lines'])} for s in stations if s['lines']},
             'departures': deps}

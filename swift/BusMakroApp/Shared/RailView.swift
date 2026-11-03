@@ -6,9 +6,39 @@ import SwiftUI
 /// Trains have no live positions, so the times are STASY's timetable (marked "scheduled").
 
 extension Rail {
-    /// Shipped with the app (Rail.json, from tools/build_rail.py).
-    static let shared: Rail? = Bundle.main.url(forResource: "Rail", withExtension: "json")
-        .flatMap { try? Data(contentsOf: $0) }.flatMap { try? Rail.load($0) }
+    /// The newest timetable the phone has: the one shipped with the app (Rail.json, from
+    /// tools/build_rail.py), or a later one downloaded by `refresh()`.
+    static let shared: Rail? = {
+        let shipped = Bundle.main.url(forResource: "Rail", withExtension: "json")
+            .flatMap { try? Data(contentsOf: $0) }.flatMap { try? Rail.load($0) }
+        let saved = (try? Data(contentsOf: savedURL)).flatMap { try? Rail.load($0) }
+        guard let saved, newer(saved, than: shipped) else { return shipped }
+        return saved
+    }()
+
+    /// Rebuilt from STASY's feed every week by a GitHub Action and published with the website.
+    private static let remote = URL(string: "https://tassosmak.github.io/BusMakro/rail.json")!
+    private static var savedURL: URL {
+        URL.applicationSupportDirectory.appendingPathComponent("rail.json")
+    }
+
+    private static func newer(_ a: Rail, than b: Rail?) -> Bool {
+        (a.valid?.last ?? "") > (b?.valid?.last ?? "")
+    }
+
+    /// Once a week: fetch the published timetable and keep it when it runs later than ours (used
+    /// from the next launch, so nothing changes under you).
+    static func refresh() async {
+        let key = "railChecked"
+        if let last = UserDefaults.standard.object(forKey: key) as? Date, Date().timeIntervalSince(last) < 7 * 86_400 { return }
+        var req = URLRequest(url: remote, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 30)
+        guard let (data, resp) = try? await URLSession.shared.data(for: req),
+              (resp as? HTTPURLResponse)?.statusCode == 200, let got = try? Rail.load(data) else { return }
+        UserDefaults.standard.set(Date(), forKey: key)
+        guard newer(got, than: shared) else { return }
+        try? FileManager.default.createDirectory(at: URL.applicationSupportDirectory, withIntermediateDirectories: true)
+        try? data.write(to: savedURL, options: .atomic)
+    }
 }
 
 extension Rail.Station {

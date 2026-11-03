@@ -125,6 +125,7 @@ final class Model: NSObject, CLLocationManagerDelegate {
 
     func start() async {
         if !showWelcome { askLocation() }  // during the welcome, Continue asks (not over it)
+        Task.detached { await Rail.refresh() }  // a newer metro/tram timetable, weekly
         lines = (try? await transit.lines()) ?? []
         async let index = StopIndex.load(lines: lines.map(\.id))  // for search; cached for a day
         alerts = await Alerts.fetch(known: Set(lines.map(\.id)))
