@@ -154,11 +154,23 @@ extension TransitClient {
     /// A line's route variants and stops.
     /// From athens-transit-rt's static data, or OASA's own when that fails or lacks the line (Χ25).
     public func detail(line: String) async throws -> LineDetail {
+        // saved on the phone for a day: a line opens at once the second time (routes rarely change)
+        let saved = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("lines", isDirectory: true)
+        let file = saved.appendingPathComponent("\(line.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? line).json")
+        if let at = (try? file.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate,
+           Date().timeIntervalSince(at) < 86_400, let data = try? Data(contentsOf: file),
+           let d = try? JSONDecoder().decode(LineDetail.self, from: data) {
+            return d
+        }
         do {
             let url = Self.staticBase.appendingPathComponent("lines").appendingPathComponent("\(line).json")
             let (data, resp) = try await session.data(for: URLRequest(url: url, timeoutInterval: Self.patience))
             guard (resp as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
-            return try JSONDecoder().decode(LineDetail.self, from: data)
+            let d = try JSONDecoder().decode(LineDetail.self, from: data)
+            try? FileManager.default.createDirectory(at: saved, withIntermediateDirectories: true)
+            try? data.write(to: file, options: .atomic)
+            return d
         } catch {
             if error is CancellationError || (error as? URLError)?.code == .cancelled { throw error }
             await OASABackup.shared.used(line)

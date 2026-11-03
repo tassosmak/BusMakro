@@ -301,10 +301,8 @@ final class Model: NSObject, CLLocationManagerDelegate {
         lineTask = Task { [weak self] in
             guard let self else { return }
             self.lineDetail = try? await self.transit.detail(line: id)
-            var first = true
             while !Task.isCancelled, case .line(id, _) = self.screen {
                 await self.refreshLine(id)
-                if first { first = false; if self.lineStop == nil { await self.pickStopNearYou(id) } }
                 try? await Task.sleep(for: .seconds(15))
             }
         }
@@ -313,13 +311,10 @@ final class Model: NSObject, CLLocationManagerDelegate {
     /// Opened without a stop: of the line's stops near you (within 1.5 km), the nearest one buses
     /// are heading to (the nearest was sometimes a stop where they only drop off), instead of
     /// "choose a stop".
-    private func pickStopNearYou(_ id: String) async {
+    private func pickStopNearYou() {
         guard let d = lineDetail else { return }
         let near = nearestOnLine(from: nil, limit: 8).filter { $0.2 < 1500 }
-        let pick = near.first { !LineMath.approaching($0.0, detail: d, live: vehicles, official: [:]).isEmpty } ?? near.first
-        guard let pick, case .line(id, _) = screen else { return }
-        lineStop = pick.0
-        official = await oasa.predictions(stopID: pick.0)
+        lineStop = (near.first { !LineMath.approaching($0.0, detail: d, live: vehicles, official: [:]).isEmpty } ?? near.first)?.0
     }
 
     func refreshLine(_ id: String) async {
@@ -330,6 +325,9 @@ final class Model: NSObject, CLLocationManagerDelegate {
             checkWatches(line: id, vehicles: live.vehicles)
             if let p = pendingPin, live.vehicles.contains(where: { $0.id == p }) { pinned = p; pendingPin = nil }
             if let p = pinned, !live.vehicles.contains(where: { $0.id == p }) { pinned = nil }  // gone
+            // opened without a stop: chosen as soon as the buses are in, so OASA's times are asked
+            // for once, for that stop (picking after them waited on OASA twice: 20-30 s when slow)
+            if lineStop == nil { pickStopNearYou() }
         } catch { failed(error) }
         if let s = lineStop { official = await oasa.predictions(stopID: s) }
     }
