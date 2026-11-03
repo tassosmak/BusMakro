@@ -344,7 +344,9 @@ final class Model: NSObject, CLLocationManagerDelegate {
         }
         // that kind of day's timetable; without one (or the master code), OASA's "today"
         var out: [Timetable] = []
-        if let kind = timetableDay, let master = masterCodes?[id] {
+        // OASA ignores the master code (any value gives the same timetable); many lines (810) have none
+        if let kind = timetableDay {
+            let master = masterCodes?[id] ?? "0"
             for v in variants {
                 if let d = try? await oasa.schedule(master: master, dayKind: kind, code: v.code), !(d.go.isEmpty && d.come.isEmpty) {
                     out.append(Timetable(code: v.code, name: v.name, nameEnglish: v.nameEnglish, go: d.go, come: d.come))

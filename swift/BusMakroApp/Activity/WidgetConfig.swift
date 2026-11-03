@@ -109,14 +109,21 @@ enum WidgetTimetable {
 
     static func load(line: String, weekday: Int) async -> [Direction] {
         let oasa = OASAClient()
-        guard let variants = (try? await oasa.lineCodes())?[line], let first = variants.first else { return [] }
-        let master = (try? await oasa.masterCodes())?[line]
-        let days = (try? await oasa.scheduleDays(code: first.code)) ?? []
-        guard let master, let kind = OASAClient.day(for: weekday, in: days)?.code,
-              let d = try? await oasa.schedule(master: master, dayKind: kind, code: first.code) else { return [] }
-        // the variant's name is "START - END": going leaves START, coming back leaves END
-        let ends = first.name.components(separatedBy: " - ")
-        return [Direction(name: ends.first ?? first.name, times: d.go), Direction(name: ends.count > 1 ? ends[1] : "", times: d.come)]
-            .filter { !$0.times.isEmpty }
+        guard let variants = (try? await oasa.lineCodes())?[line], !variants.isEmpty else { return [] }
+        // OASA ignores the master code (any value gives the same timetable), and many lines (810)
+        // have none: "0" then
+        let master = (try? await oasa.masterCodes())?[line] ?? "0"
+        var best: [Direction] = []
+        for v in variants {
+            let days = (try? await oasa.scheduleDays(code: v.code)) ?? []
+            guard let kind = OASAClient.day(for: weekday, in: days)?.code,
+                  let d = try? await oasa.schedule(master: master, dayKind: kind, code: v.code) else { continue }
+            // the variant's name is "START - END": going leaves START, coming back leaves END
+            let ends = v.name.components(separatedBy: " - ")
+            let dirs = [Direction(name: ends.first ?? v.name, times: d.go), Direction(name: ends.count > 1 ? ends[1] : "", times: d.come)]
+                .filter { !$0.times.isEmpty }
+            if dirs.map(\.times.count).reduce(0, +) > best.map(\.times.count).reduce(0, +) { best = dirs }  // the main variant
+        }
+        return best
     }
 }
