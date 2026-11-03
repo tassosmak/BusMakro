@@ -105,6 +105,13 @@ struct Sheet: View {
             if case .line = model.screen {
                 Button { withAnimation { model.closeLine() } } label: { Label("Back", systemImage: "chevron.left") }
             }
+            if case .stop(let stop) = model.screen {
+                // in a stop: its name where "Browse a line…" was
+                Text(stop.title).font(.scaled(12, .semibold)).lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 10)
+                    .frame(height: Style.lineMenuHeight)
+                    .background(.primary.opacity(0.10), in: Capsule())
+            } else {
             Menu {
                 ForEach(model.lines) { l in
                     Button("\(l.id) — \(l.shown)") { withAnimation { model.openLine(l.id, at: nil) } }
@@ -118,6 +125,7 @@ struct Sheet: View {
             // the panel's bottom corners (39 pt) less the gap would be wider than the menu is tall:
             // a capsule is as round as it gets, and follows the corners with the same gap all round
             .background(.primary.opacity(0.10), in: Capsule())
+            }
             if case .line(let id, _) = model.screen {
                 Button { model.toggleFavouriteLine(id) } label: {
                     Image(systemName: model.isFavouriteLine(id) ? "star.fill" : "star")
@@ -173,7 +181,7 @@ struct Sheet: View {
         case .station(let id):
             StationContent(model: model, id: id)
         case .stop(let stop):
-            Text(String(localized: "\(stop.title) · Stop \(stop.id)").uppercased())
+            Text(String(localized: "Stop \(stop.id)").uppercased())
                 .font(.scaled(11, .semibold)).foregroundStyle(.secondary)
             ScrollView {
                 LazyVStack(spacing: 6) {
