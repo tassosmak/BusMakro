@@ -6,8 +6,17 @@
     {
       "layers" : [
         {
+          "blend-mode" : "normal",
+          "glass" : true,
           "image-name" : "bus.svg",
-          "name" : "Bus"
+          "name" : "Bus",
+          "position" : {
+            "scale" : 1.47,
+            "translation-in-points" : [
+              0,
+              0
+            ]
+          }
         }
       ],
       "name" : "Bus",
@@ -24,6 +33,8 @@
     {
       "layers" : [
         {
+          "glass" : true,
+          "hidden" : false,
           "image-name" : "roads.svg",
           "name" : "Roads",
           "opacity" : 0.45
