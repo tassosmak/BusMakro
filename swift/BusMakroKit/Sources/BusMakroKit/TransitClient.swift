@@ -12,7 +12,9 @@ public struct TransitClient: Sendable {
     static let patience: TimeInterval = 8
 
     private func get<T: Decodable>(_ url: URL, as: T.Type) async throws -> T {
-        let (data, resp) = try await session.data(for: URLRequest(url: url, timeoutInterval: Self.patience))
+        // never from the phone's cache: the server says keep answers 67 s, which froze live buses
+        // for a minute however often we asked
+        let (data, resp) = try await session.data(for: URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: Self.patience))
         guard (resp as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
         return try JSONDecoder().decode(T.self, from: data)
     }
@@ -33,9 +35,11 @@ public struct TransitClient: Sendable {
     /// route came from OASA (its variants are OASA's route codes, so the buses must be too).
     public func live(line: String) async throws -> LineLive {
         if await !OASABackup.shared.isUsed(line) {
+            // both at once: athens-transit-rt for each bus's road ahead and pace, OASA for where it is
+            async let oasa = try? OASAClient().buses(line: line)
             do {
                 let live = try await get(Self.live.appendingPathComponent("v1/lines").appendingPathComponent(line), as: LineLive.self)
-                return await fresher(live)
+                return fresher(live, oasa: await oasa)
             }
             catch {
                 if error is CancellationError || (error as? URLError)?.code == .cancelled { throw error }
@@ -44,16 +48,13 @@ public struct TransitClient: Sendable {
         return LineLive(line: line, vehicles: try await OASAClient().buses(line: line))
     }
 
-    /// The feed sometimes keeps a bus at an old fix for minutes (it sat at the start of its route
-    /// while its ETA counted down): any fix over 75 s old is checked against OASA's own, and the
-    /// newer one wins.
-    private func fresher(_ live: LineLive) async -> LineLive {
-        let now = Date()
-        guard live.vehicles.contains(where: { now.timeIntervalSince($0.positionAt ?? now) > 75 }),
-              let oasa = try? await OASAClient().buses(line: live.line) else { return live }
+    /// athens-transit-rt's positions run 1-2 minutes behind OASA's (measured: 70-130 s against
+    /// 2-37 s), so every bus takes OASA's fix when it is newer, keeping the feed's road and pace.
+    private func fresher(_ live: LineLive, oasa: [Vehicle]?) -> LineLive {
+        guard let oasa, !oasa.isEmpty else { return live }
         let byID = Dictionary(oasa.map { ($0.id, $0) }, uniquingKeysWith: { a, b in (a.positionAt ?? .distantPast) > (b.positionAt ?? .distantPast) ? a : b })
         return LineLive(line: live.line, vehicles: live.vehicles.map { v in
-            guard let o = byID[v.id], let t = o.positionAt, t > (v.positionAt ?? .distantPast).addingTimeInterval(20) else { return v }
+            guard let o = byID[v.id], let t = o.positionAt, t > (v.positionAt ?? .distantPast) else { return v }
             return v.moved(to: o.latitude, o.longitude, at: t)
         })
     }

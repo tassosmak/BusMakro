@@ -13,7 +13,7 @@ public struct OASAClient: Sendable {
         comps.queryItems = [URLQueryItem(name: "act", value: act)]
             + args.enumerated().map { URLQueryItem(name: "p\($0.offset + 1)", value: $0.element) }
             + named.map { URLQueryItem(name: $0.key, value: $0.value) }
-        var req = URLRequest(url: comps.url!, timeoutInterval: 15)
+        var req = URLRequest(url: comps.url!, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 15)  // live answers, never cached
         req.httpMethod = "POST"
         let (data, resp) = try await session.data(for: req)
         guard (resp as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
