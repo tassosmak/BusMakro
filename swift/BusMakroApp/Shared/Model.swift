@@ -431,7 +431,10 @@ final class Model: NSObject, CLLocationManagerDelegate {
 
     var approaching: [Approaching] {
         guard let d = lineDetail, let s = lineStop else { return [] }
-        return LineMath.approaching(s, detail: d, live: vehicles, official: official)
+        // from where each bus is drawn, not its last fix: a bus seen passing stops counts them down
+        let now = Date()
+        let here = vehicles.map { v in drawn[v.id].map { v.moved(to: $0.latitude, $0.longitude, at: now) } ?? v }
+        return LineMath.approaching(s, detail: d, live: here, official: official, now: now)
     }
 
     func clearRecents() {

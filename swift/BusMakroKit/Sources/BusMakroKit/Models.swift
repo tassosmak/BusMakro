@@ -36,10 +36,10 @@ public struct Vehicle: Identifiable, Hashable, Sendable, Decodable {
     public let id: String
     public private(set) var latitude: Double
     public private(set) var longitude: Double
-    public let bearing: Double?
+    public private(set) var bearing: Double?
     public private(set) var positionAt: Date?
     public let variant: String?
-    public let nextStopID: String?
+    public private(set) var nextStopID: String?
     public let delaySeconds: Int?
     /// m/s along the route; 0 = standing, nil = unknown.
     public private(set) var speed: Double?
@@ -65,8 +65,11 @@ public struct Vehicle: Identifiable, Hashable, Sendable, Decodable {
 
     /// The same bus at a newer fix (from OASA, when the feed's is stale): its road starts again from
     /// there, and a bus the feed thought standing that has clearly moved drives on at a typical pace.
-    public func moved(to lat: Double, _ lon: Double, at when: Date) -> Vehicle {
+    public func moved(to lat: Double, _ lon: Double, at when: Date, bearing: Double? = nil) -> Vehicle {
         var v = self
+        // the feed's next stop belongs to its older fix: worked out again from here
+        v.nextStopID = nil
+        if let bearing { v.bearing = bearing }
         let r = Movement.route(for: self)
         let a = r.map { Movement.along($0, (lat, lon)) }
         if let r, let a, a.off < 60 {

@@ -55,7 +55,7 @@ public struct TransitClient: Sendable {
         let byID = Dictionary(oasa.map { ($0.id, $0) }, uniquingKeysWith: { a, b in (a.positionAt ?? .distantPast) > (b.positionAt ?? .distantPast) ? a : b })
         return LineLive(line: live.line, vehicles: live.vehicles.map { v in
             guard let o = byID[v.id], let t = o.positionAt, t > (v.positionAt ?? .distantPast) else { return v }
-            return v.moved(to: o.latitude, o.longitude, at: t)
+            return v.moved(to: o.latitude, o.longitude, at: t, bearing: o.bearing)
         })
     }
 }
