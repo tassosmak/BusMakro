@@ -1,4 +1,3 @@
-#if DEBUG
 import BusMakroKit
 import CoreLocation
 import SwiftUI
@@ -83,4 +82,15 @@ struct DebugView: View {
 private extension Bool {
     var inverted: Bool { get { !self } set { self = !newValue } }
 }
-#endif
+
+/// Debug tools: in builds from Xcode and in TestFlight (testers need them), never in the App Store
+/// version (its receipt isn't the sandbox one).
+enum DebugTools {
+    static let available: Bool = {
+        #if DEBUG
+        return true
+        #else
+        return Bundle.main.appStoreReceiptURL?.lastPathComponent == "sandboxReceipt"
+        #endif
+    }()
+}

@@ -71,9 +71,7 @@ struct ContentView: View {
         .preferredColorScheme(mapStyle == "light" ? .light : mapStyle == "dark" ? .dark : nil)
         .sheet(isPresented: $model.showSettings) { SettingsView(model: model) }
         .sheet(isPresented: $model.showTrip) { TripView(model: model) }
-        #if DEBUG
         .sheet(isPresented: $showDebug) { DebugView(model: model) }
-        #endif
         .fullScreenCoverOrSheet(isPresented: $model.showWelcome) {
             Onboarding(model: model) {
                 UserDefaults.standard.set(true, forKey: "onboarded")

@@ -44,9 +44,9 @@ struct SideMenu: View {
                     row("envelope.fill", "Contact", external: true) {
                         close(); openURL(URL(string: "mailto:amakrostergios@icloud.com?subject=BusMakro")!)
                     }
-                    #if DEBUG
-                    row("ladybug.fill", "Debug") { close(); onDebug() }
-                    #endif
+                    if DebugTools.available {  // Xcode and TestFlight builds only
+                        row("ladybug.fill", "Debug") { close(); onDebug() }
+                    }
                 }
                 .padding(.top, 14)
                 Spacer()

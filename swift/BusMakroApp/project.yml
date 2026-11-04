@@ -49,7 +49,7 @@ targets:
         CODE_SIGN_STYLE: Automatic
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         TARGETED_DEVICE_FAMILY: "1"  # iPhone only for now (on iPad it runs in iPhone mode); a real iPad layout later
-        MARKETING_VERSION: "1.0"
+        MARKETING_VERSION: "1.1"
         CURRENT_PROJECT_VERSION: 1
   BusMakroWidgets:
     type: app-extension
@@ -72,7 +72,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.tassosmak.busmakro.LiveActivity
         DEVELOPMENT_TEAM: LXL43GG782
         CODE_SIGN_STYLE: Automatic
-        MARKETING_VERSION: "1.0"
+        MARKETING_VERSION: "1.1"
         CURRENT_PROJECT_VERSION: 1
         IPHONEOS_DEPLOYMENT_TARGET: "17.0"
   BusMakroUITests:  # Apple's accessibility audit on each main screen
