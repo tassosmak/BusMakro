@@ -13,7 +13,8 @@ struct NextBusesWidget: Widget {
         }
         .configurationDisplayName("Next Buses")
         .description("The next buses at your favourite stops, or at one stop, or a line's timetable.")
-        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
+        // the Lock Screen too (and StandBy, which shows the small one)
+        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge, .accessoryRectangular, .accessoryCircular, .accessoryInline])
     }
 }
 
@@ -58,7 +59,7 @@ struct NextBusesProvider: AppIntentTimelineProvider {
             let dirs = await WidgetTimetable.load(line: line.id, weekday: config.day.weekday)
             return NextBusesEntry(date: .now, fetched: .now, stops: [], timetable: (line.id, config.day, dirs))
         }
-        let count = family == .systemSmall ? 1 : family == .systemMedium ? 2 : 4
+        let count = family == .systemMedium ? 2 : family == .systemLarge ? 4 : 1
         let favourites = config.show == .stop && config.stop != nil
             ? [WidgetFavourites.Stop(id: config.stop!.id, title: config.stop!.name)]
             : Array(WidgetFavourites.load().prefix(count))
@@ -81,7 +82,9 @@ struct NextBusesView: View {
     @Environment(\.widgetFamily) private var family
 
     var body: some View {
-        if let t = entry.timetable {
+        if [.accessoryRectangular, .accessoryCircular, .accessoryInline].contains(family) {
+            LockScreenNextBuses(entry: entry, family: family)
+        } else if let t = entry.timetable {
             timetable(t.line, t.day, t.directions)
         } else if entry.noFavourites {
             VStack(spacing: 6) {
@@ -177,4 +180,71 @@ struct LineBadgeSmall: View {
 
 extension WidgetDay {
     var localizedName: String { String(localized: Self.caseDisplayRepresentations[self]!.title) }
+}
+
+/// On the Lock Screen: the first favourite (or chosen) stop's next buses, or a line's next departure.
+struct LockScreenNextBuses: View {
+    let entry: NextBusesEntry
+    let family: WidgetFamily
+
+    /// The soonest buses at the stop: (line, minutes).
+    private var next: [(String, Int)] {
+        guard let s = entry.stops.first else { return [] }
+        return s.lines.compactMap { l in entry.minutes(l).map { (l.line, $0) } }.sorted { $0.1 < $1.1 }
+    }
+    private func short(_ m: Int) -> String { m == 0 ? String(localized: "Now") : "\(m)'" }
+    private func spoken(_ line: String, _ m: Int) -> Text {
+        m == 0 ? Text("Line \(line), now") : m == 1 ? Text("Line \(line), in 1 minute") : Text("Line \(line), in \(m) minutes")
+    }
+
+    var body: some View {
+        if let t = entry.timetable {
+            let first = t.directions.compactMap { d in d.times.first { $0 >= entry.date }.map { (d.name, $0) } }.min { $0.1 < $1.1 }
+            switch family {
+            case .accessoryInline:
+                Text(first.map { "\(t.line) · \($0.1.formatted(date: .omitted, time: .shortened))" } ?? t.line)
+            case .accessoryCircular:
+                VStack(spacing: 0) {
+                    Text(t.line).font(.system(.caption, design: .rounded, weight: .bold))
+                    Text(first?.1 ?? entry.date, style: .time).font(.system(size: 11, weight: .semibold)).minimumScaleFactor(0.6)
+                }
+            default:
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(t.line).font(.headline)
+                    Text(first.map { "\($0.0) · \($0.1.formatted(date: .omitted, time: .shortened))" } ?? String(localized: "No more today"))
+                        .font(.caption).lineLimit(2)
+                }
+            }
+        } else if let s = entry.stops.first {
+            switch family {
+            case .accessoryInline:
+                if let (l, m) = next.first { Text("\(l) \(short(m)) · \(s.stop.title)").accessibilityLabel(spoken(l, m)) }
+                else { Text(s.stop.title) }
+            case .accessoryCircular:
+                ZStack {
+                    AccessoryWidgetBackground()
+                    if let (l, m) = next.first {
+                        VStack(spacing: -1) {
+                            Text(l).font(.system(size: 12, weight: .bold, design: .rounded)).minimumScaleFactor(0.6)
+                            Text(short(m)).font(.system(size: 17, weight: .bold, design: .rounded)).monospacedDigit()
+                        }
+                        .accessibilityElement(children: .ignore).accessibilityLabel(spoken(l, m))
+                    } else {
+                        Image(systemName: "bus.fill").accessibilityLabel(Text("No live buses"))
+                    }
+                }
+            default:
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(s.stop.title).font(.headline).lineLimit(1)
+                    if next.isEmpty { Text("No live buses").font(.caption) }
+                    ForEach(Array(next.prefix(2)), id: \.0) { l, m in
+                        HStack { Text(l).fontWeight(.bold); Spacer(); Text(short(m)).monospacedDigit() }
+                            .font(.caption).accessibilityElement(children: .ignore).accessibilityLabel(spoken(l, m))
+                    }
+                }
+            }
+        } else {
+            Text("Star a stop in BusMakro").font(.caption)
+        }
+    }
 }

@@ -1,5 +1,6 @@
 import AppIntents
 import BusMakroKit
+import CoreLocation
 import CoreSpotlight
 import Foundation
 
@@ -70,6 +71,71 @@ struct NextBusesIntent: AppIntent {
     }
 }
 
+/// A bus line, for "When is the 040 coming?" (from the saved stop index: no download).
+struct LineEntity: AppEntity {
+    static let typeDisplayRepresentation: TypeDisplayRepresentation = "Bus Line"
+    static let defaultQuery = LineQuery()
+    let id: String
+    var displayRepresentation: DisplayRepresentation { DisplayRepresentation(title: "\(id)", image: .init(systemName: "bus.fill")) }
+}
+
+struct LineQuery: EntityStringQuery {
+    private static var all: [String] { Array(Set(StopIndex.cached()?.stops.values.flatMap(\.lines) ?? [])).sorted() }
+    func entities(for identifiers: [String]) async throws -> [LineEntity] { identifiers.map(LineEntity.init) }
+    func entities(matching string: String) async throws -> [LineEntity] {
+        let q = Translit.lineKey(string)
+        return Self.all.filter { Translit.lineKey($0) == q }.map(LineEntity.init)
+            + Self.all.filter { Translit.lineKey($0).hasPrefix(q) && Translit.lineKey($0) != q }.prefix(10).map(LineEntity.init)
+    }
+    /// Your favourite lines first.
+    func suggestedEntities() async throws -> [LineEntity] {
+        (UserDefaults.standard.stringArray(forKey: "favoriteLines") ?? []).map(LineEntity.init)
+    }
+}
+
+/// "When is the 040 coming?": the line's next buses at your stop. Your stop is a favourite the line
+/// serves, or else its stop nearest to where the phone last was.
+struct WhenIsLineIntent: AppIntent {
+    static let title: LocalizedStringResource = "When Is My Bus Coming"
+    static let description = IntentDescription("The next live buses of a line at your favourite stop, or at its stop nearest you.")
+
+    @Parameter(title: "Line") var line: LineEntity
+
+    static var parameterSummary: some ParameterSummary { Summary("When is \(\.$line) coming") }
+
+    func perform() async throws -> some IntentResult & ProvidesDialog & ReturnsValue<String> {
+        guard let index = StopIndex.cached() else {
+            let t = String(localized: "Open BusMakro once first, so it can learn the stops.")
+            return .result(value: t, dialog: IntentDialog(stringLiteral: t))
+        }
+        let favs = await MainActor.run { Model.loadStops("favorites") }
+        let here = CLLocationManager().location
+        let served = index.stops.filter { $0.value.lines.contains(line.id) }
+        let stop: (id: String, name: String)? =
+            favs.first { served[$0.id] != nil }.map { ($0.id, $0.title) }
+            ?? here.flatMap { loc in
+                served.min { Geo.distance(loc.coordinate.latitude, loc.coordinate.longitude, $0.value.lat, $0.value.lon)
+                           < Geo.distance(loc.coordinate.latitude, loc.coordinate.longitude, $1.value.lat, $1.value.lon) }
+                    .map { ($0.key, $0.value.name) }
+            }
+        guard let stop else {
+            let t = String(localized: "Star a stop the \(line.id) serves, or allow location, so BusMakro knows your stop.")
+            return .result(value: t, dialog: IntentDialog(stringLiteral: t))
+        }
+        let name = Names.place(stop.name, "")
+        let mins = (try? await OASAClient().stopLines(stopID: stop.id))?.first { $0.line == line.id }?.arrivalsMinutes ?? []
+        let text: String
+        if let m = mins.first {
+            let first = m == 0 ? String(localized: "The \(line.id) is arriving at \(name) now")
+                               : String(localized: "The \(line.id) comes to \(name) in \(m) min")
+            text = mins.count > 1 ? first + String(localized: ", then in \(mins[1]) min.") : first + "."
+        } else {
+            text = String(localized: "No \(line.id) is on its way to \(name) right now.")
+        }
+        return .result(value: text, dialog: IntentDialog(stringLiteral: text))
+    }
+}
+
 struct OpenStopIntent: AppIntent {
     static let title: LocalizedStringResource = "Open Stop"
     static let description = IntentDescription("Open a bus stop in BusMakro.")
@@ -135,6 +201,12 @@ struct BusMakroShortcuts: AppShortcutsProvider {
             "Next buses at \(\.$stop) in \(.applicationName)",
             "When is my bus in \(.applicationName)",
         ], shortTitle: "Next Buses", systemImageName: "bus.fill")
+        AppShortcut(intent: WhenIsLineIntent(), phrases: [
+            "When is the \(\.$line) coming in \(.applicationName)",
+            "When is \(\.$line) in \(.applicationName)",
+            "Where is my \(\.$line) in \(.applicationName)",
+            "When is my bus coming in \(.applicationName)",
+        ], shortTitle: "When Is My Bus", systemImageName: "clock.badge")
         AppShortcut(intent: OpenStopIntent(), phrases: [
             "Open \(\.$stop) in \(.applicationName)",
             "Show my stop in \(.applicationName)",

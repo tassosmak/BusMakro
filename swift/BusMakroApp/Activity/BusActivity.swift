@@ -20,5 +20,7 @@ struct BusActivityAttributes: ActivityAttributes {
     let stopName: String
     /// The alert fires at this many stops away.
     let alertAt: Int
+    /// "Wake me at my stop": you're on this bus, and the stop is where you get off.
+    var riding = false
 }
 #endif

@@ -14,3 +14,5 @@
 "Line %@, now" = "Γραμμή %@, τώρα";
 "Line %@, in 1 minute" = "Γραμμή %@, σε 1 λεπτό";
 "Line %@, in %lld minutes" = "Γραμμή %@, σε %lld λεπτά";
+"Get off at %@" = "Κατέβα στη στάση %@";
+"Star a stop in BusMakro" = "Βάλε αστέρι σε μια στάση στο BusMakro";

@@ -24,22 +24,26 @@ extension Model {
             for (n, trip) in trips.enumerated() {
                 group.addTask {
                     var trip = trip
-                    guard let i = trip.legs.firstIndex(where: { $0.mode != .walk }) else { return (n, trip) }
-                    let leg = trip.legs[i]
-                    let walk = trip.legs[..<i].reduce(0) { $0 + $1.minutes }
-                    if leg.mode == .bus {
-                        if let lines = try? await oasa.stopLines(stopID: leg.from.id),
-                           let m = lines.first(where: { $0.line == leg.line })?.arrivalsMinutes.first(where: { $0 >= walk }) {
-                            trip.legs[i].wait = m - walk
-                            trip.legs[i].waitIsLive = true
+                    // every ride in turn, from when you'd get to its stop: the change's wait is the real
+                    // next bus or train then (OASA predicts about an hour ahead), not a typical one
+                    var elapsed = 0
+                    for i in trip.legs.indices {
+                        let leg = trip.legs[i]
+                        if leg.mode == .bus {
+                            if let lines = try? await oasa.stopLines(stopID: leg.from.id),
+                               let m = lines.first(where: { $0.line == leg.line })?.arrivalsMinutes.first(where: { $0 >= elapsed }) {
+                                trip.legs[i].wait = m - elapsed
+                                trip.legs[i].waitIsLive = true
+                            }
+                        } else if leg.mode != .walk, let rail = Rail.shared {
+                            let after = Date().addingTimeInterval(Double(elapsed) * 60)
+                            if let d = rail.next(at: leg.from.id, from: after, count: 1)
+                                .first(where: { $0.line == leg.line && $0.direction == leg.direction }) {
+                                trip.legs[i].wait = d.minutes  // counted from `after`
+                                trip.legs[i].waitIsLive = true
+                            }
                         }
-                    } else if let rail = Rail.shared {
-                        let after = Date().addingTimeInterval(Double(walk) * 60)
-                        if let d = rail.next(at: leg.from.id, from: after, count: 1)
-                            .first(where: { $0.line == leg.line && $0.direction == leg.direction }) {
-                            trip.legs[i].wait = d.minutes
-                            trip.legs[i].waitIsLive = true
-                        }
+                        elapsed += trip.legs[i].wait + trip.legs[i].minutes
                     }
                     return (n, trip)
                 }
@@ -167,7 +171,7 @@ struct TripView: View {
                         .appearing(i)
                     }
                     if !trips.isEmpty {
-                        Text("Times are estimates. The first wait is live (bus) or from the timetable (train) when marked with a dot.")
+                        Text("Times are estimates. Waits come from live arrivals (bus) or the timetable (train) where there are some; tap a trip to see each one.")
                             .font(.scaled(10)).foregroundStyle(.tertiary).multilineTextAlignment(.center).padding(.top, 4)
                     }
                 } else {
@@ -319,6 +323,10 @@ struct TripCard: View {
                         .font(.scaled(11)).foregroundStyle(.secondary)
                         .accessibilityLabel(Speak.join([String(localized: "From \(Names.place(leg.from.name, nil))"), String(localized: "\(leg.stops) stops"), Speak.minutes(leg.minutes)]))
                     Text(String(localized: "Get off at \(Names.place(leg.to.name, nil))")).font(.scaled(11)).foregroundStyle(.secondary)
+                    // each change's wait: the real next bus or train when known, else a typical one
+                    Text(leg.waitIsLive ? (leg.mode == .bus ? String(localized: "Next bus in \(leg.wait) min · live") : String(localized: "Next train in \(leg.wait) min · timetable"))
+                                        : String(localized: "Wait about \(leg.wait) min"))
+                        .font(.scaled(11, .semibold)).foregroundStyle(leg.waitIsLive ? Color.green : .secondary)
                     Button(leg.mode == .bus ? String(localized: "Open the stop") : String(localized: "Open the station")) { onOpen(leg) }
                         .font(.scaled(12, .semibold)).padding(.top, 2)
                 }

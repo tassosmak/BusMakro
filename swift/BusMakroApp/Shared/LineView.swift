@@ -6,6 +6,8 @@ import TipKit
 /// order, with the buses between them), like the Mac app's line tabs.
 struct LineContent: View {
     @Bindable var model: Model
+    /// "Wake me at my stop" chosen: the next stop tapped on the Route tab is where you get off.
+    @State private var choosingWake = false
 
     var body: some View {
         Picker("Line view", selection: $model.lineTab) {
@@ -63,7 +65,7 @@ struct LineContent: View {
                     }
                     if !rows.isEmpty { TipView(BusButtonsTip(), arrowEdge: .bottom).tipBackground(.thinMaterial) }
                     ForEach(Array(rows.enumerated()), id: \.element.id) { i, a in
-                        ArrivalCard(item: a, watching: model.watches[a.vehicle.id].flatMap { $0.notified ? nil : $0.stops },  // normal again once notified
+                        ArrivalCard(item: a, watching: model.watches[a.vehicle.id].flatMap { $0.kind != .alert || $0.notified ? nil : $0.stops },  // normal again once notified
                                     onWatch: { BusButtonsTip().invalidate(reason: .actionPerformed); model.watch(a.vehicle.id, stops: $0) },
                                     following: model.pinned == a.vehicle.id,
                                     onFollow: { BusButtonsTip().invalidate(reason: .actionPerformed); model.pinned = model.pinned == a.vehicle.id ? nil : a.vehicle.id })
@@ -86,7 +88,33 @@ struct LineContent: View {
                 .pickerStyle(.menu).labelsHidden()
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
+            wakeBar
             routeList
+        }
+    }
+
+    /// On the bus you're following: be woken before the stop you get off at.
+    @ViewBuilder private var wakeBar: some View {
+        if let r = model.riding {
+            HStack(spacing: 10) {
+                Image(systemName: "bell.and.waves.left.and.right.fill").foregroundStyle(.orange).accessibilityHidden(true)
+                Text("Waking you before \(Names.place(r.watch.stopName, ""))").font(.scaled(13, .semibold))
+                Spacer(minLength: 4)
+                Button("Cancel") { model.watch(r.bus, stops: nil) }.font(.scaled(13, .semibold))
+            }
+            .padding(10)
+            .background(Color.orange.opacity(0.14), in: RoundedRectangle(cornerRadius: Style.cardRadius))
+            .accessibilityElement(children: .combine)
+        } else if model.pinned != nil {
+            Button { choosingWake.toggle() } label: {
+                Label(choosingWake ? "Tap the stop where you get off" : "On this bus? Wake me at my stop",
+                      systemImage: choosingWake ? "hand.tap" : "bell.and.waves.left.and.right")
+                    .font(.scaled(13, .semibold)).frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    .padding(.horizontal, 10)
+                    .background(Color.orange.opacity(choosingWake ? 0.2 : 0.1), in: RoundedRectangle(cornerRadius: Style.cardRadius))
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint(choosingWake ? Text("Then choose a stop in the list") : Text("Notifies you one stop before you get off"))
         }
     }
 
@@ -99,9 +127,15 @@ struct LineContent: View {
                             let buses = model.vehicles.filter { $0.variant == vid && $0.nextStopID == sid }
                             ForEach(buses) { b in RouteBusRow(id: b.id) }
                             RouteStopRow(name: Names.place(d.stops[sid]?.name ?? sid, ""), id: sid, selected: sid == model.lineStop,
-                                         first: i == 0, last: i == v.stops.count - 1)
+                                         first: i == 0, last: i == v.stops.count - 1, wake: model.riding?.watch.stop == sid)
                                 .id(sid)
-                                .onTapGesture { model.lineStop = sid; Task { await model.refreshLine(currentLine) } }
+                                .onTapGesture {
+                                    if choosingWake, let bus = model.pinned { choosingWake = false; model.ride(bus, to: sid); return }
+                                    model.lineStop = sid; Task { await model.refreshLine(currentLine) }
+                                }
+                                .contextMenu {
+                                    if let bus = model.pinned { Button("Wake Me Here", systemImage: "bell.and.waves.left.and.right") { model.ride(bus, to: sid) } }
+                                }
                                 .accessibilityAddTraits(.isButton)
                         }
                     }
@@ -245,6 +279,8 @@ struct ArrivalCard: View {
 struct RouteStopRow: View {
     let name: String, id: String
     let selected: Bool, first: Bool, last: Bool
+    /// Where "wake me at my stop" is set.
+    var wake = false
 
     var body: some View {
         HStack(spacing: 14) {
@@ -261,13 +297,15 @@ struct RouteStopRow: View {
                 Text("Stop \(id)").font(.scaled(11)).foregroundStyle(.subtle)
             }
             Spacer()
+            if wake { Image(systemName: "bell.and.waves.left.and.right.fill").foregroundStyle(.orange).accessibilityHidden(true) }
         }
         .padding(.horizontal, 6)
         .frame(minHeight: 46)
         .background(selected ? Color.orange.opacity(0.16) : .clear, in: RoundedRectangle(cornerRadius: 10))
         .contentShape(Rectangle())
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Speak.join([name, String(localized: "Stop \(id)"), first ? String(localized: "first stop") : last ? String(localized: "last stop") : nil]))
+        .accessibilityLabel(Speak.join([name, String(localized: "Stop \(id)"), first ? String(localized: "first stop") : last ? String(localized: "last stop") : nil,
+                                        wake ? String(localized: "you'll be woken here") : nil]))
         .accessibilityAddTraits(selected ? .isSelected : [])
         .accessibilityHint(selected ? Text("") : Text("Shows the buses heading to this stop"))
     }

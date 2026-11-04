@@ -31,7 +31,7 @@ struct BusLiveActivity: Widget {
                 }
                 DynamicIslandExpandedRegion(.bottom) {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text(ctx.attributes.stopName).font(.headline).lineLimit(1)
+                        Text(ctx.attributes.riding ? String(localized: "Get off at \(ctx.attributes.stopName)") : ctx.attributes.stopName).font(.headline).lineLimit(1)
                         StopsBar(state: ctx.state, alertAt: ctx.attributes.alertAt)
                     }
                 }
@@ -58,7 +58,7 @@ private struct LockScreenView: View {
             HStack(spacing: 10) {
                 LineBadge(line: ctx.attributes.line)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(ctx.attributes.stopName).font(.headline).lineLimit(1)
+                    Text(ctx.attributes.riding ? String(localized: "Get off at \(ctx.attributes.stopName)") : ctx.attributes.stopName).font(.headline).lineLimit(1)
                     Text("Bus \(ctx.attributes.bus)").font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()

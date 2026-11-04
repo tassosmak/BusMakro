@@ -22,6 +22,7 @@ targets:
       path: BusMakro.entitlements
       properties:
         com.apple.security.application-groups: [group.com.tassosmak.busmakro]  # favourites for the widget
+        com.apple.developer.usernotifications.time-sensitive: true  # "wake me at my stop" gets through Focus
     dependencies:
       - package: BusMakroKit
       - target: BusMakroWidgets  # Live Activity (iPhone only)

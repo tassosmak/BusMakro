@@ -73,7 +73,7 @@ final class Model: NSObject, CLLocationManagerDelegate {
     var timetableDay: String?
     var timetableWeekday = 1
     // follow a bus (the map keeps it centred), buses heading to the open stop, favourites' live times
-    var pinned: String?
+    var pinned: String? { didSet { if pinned != oldValue { followChanged(from: oldValue, to: pinned) } } }
     var pendingPin: String?
     var stopBuses: [(vehicle: Vehicle, line: String)] = []
     var favLines: [String: [StopLine]] = [:]

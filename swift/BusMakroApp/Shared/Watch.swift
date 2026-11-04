@@ -13,14 +13,54 @@ import ActivityKit
 /// On iPhone a Live Activity shows the countdown on the lock screen and in the Dynamic Island,
 /// from when the alert is set until the bus reaches the stop.
 struct BusWatch: Hashable {
+    enum Kind: Hashable {
+        /// 🔔 "notify me when this bus is N stops from my stop"
+        case alert
+        /// ⌖ following it on the map: the Live Activity counts down to your stop, no notification
+        case follow
+        /// "wake me at my stop": you're on the bus; a buzz before the stop you get off at
+        case ride
+    }
     let line: String, stop: String, stopName: String, stops: Int
+    var kind: Kind = .alert
     var seen = Date()
     /// The notification went out; the watch carries on to the stop for the Live Activity.
     var notified = false
+    /// "This is your stop" went out (a ride's second buzz, at the stop itself).
+    var atStopSent = false
 }
 
 extension Model {
     static let watchChoices = [1, 2, 3, 5]
+
+    /// Following a bus on a line: its Live Activity counts down the stops to the selected stop
+    /// (unless an alert or a ride already shows one). Called when `pinned` changes.
+    func followChanged(from old: String?, to new: String?) {
+        if let old, old != new, watches[old]?.kind == .follow { watches[old] = nil; LiveBus.end(old) }
+        guard let bus = new, watches[bus] == nil, case .line(let line, _) = screen, let stop = lineStop else { return }
+        watches[bus] = BusWatch(line: line, stop: stop, stopName: lineDetail?.stops[stop]?.name ?? stop, stops: 0, kind: .follow, notified: true)
+        checkWatches(line: line, vehicles: vehicles)
+        startWatchLoop()
+    }
+
+    /// "Wake me at my stop": on bus `bus`, a notification one stop before `stop`, and again at it;
+    /// the Live Activity counts down to it.
+    func ride(_ bus: String, to stop: String) {
+        guard case .line(let line, _) = screen else { return }
+        let name = lineDetail?.stops[stop]?.name ?? stop
+        LiveBus.end(bus)  // a follow or alert countdown to another stop makes way
+        watches[bus] = BusWatch(line: line, stop: stop, stopName: name, stops: 1, kind: .ride)
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .timeSensitive]) { _, _ in }
+        if pinned != bus { pinned = bus }
+        checkWatches(line: line, vehicles: vehicles)
+        startWatchLoop()
+        AccessibilityNotification.Announcement(String(localized: "You'll be woken before \(Names.place(name, ""))")).post()
+    }
+
+    /// The bus you're riding with a "wake me" set, if any.
+    var riding: (bus: String, watch: BusWatch)? {
+        watches.first { $0.value.kind == .ride }.map { ($0.key, $0.value) }
+    }
 
     func watch(_ bus: String, stops n: Int?) {
         guard let n else {
@@ -52,6 +92,20 @@ extension Model {
                 continue
             }
             LiveBus.update(bus, watch: w, stopsAway: a.stopsAway, seconds: a.seconds)
+            if w.kind == .ride {
+                // one stop before: "your stop is next"; then at the stop itself: "this is your stop"
+                if a.stopsAway == 1 && !w.notified {
+                    UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "ride-\(bus)",
+                        content: Self.wake(stopName: w.stopName, now: false), trigger: nil))
+                    watches[bus]?.notified = true
+                }
+                if a.stopsAway == 0 && !w.atStopSent {
+                    UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "ride-\(bus)",
+                        content: Self.wake(stopName: w.stopName, now: true), trigger: nil))
+                    watches[bus]?.notified = true; watches[bus]?.atStopSent = true
+                }
+                continue
+            }
             if a.stopsAway > w.stops && !w.notified {
                 // not yet: also book it for when the bus should get there, so it still comes if iOS
                 // has suspended the app by then (each reading moves the booking; same identifier)
@@ -70,6 +124,16 @@ extension Model {
                 else { watches[bus] = nil }
             }
         }
+    }
+
+    static func wake(stopName: String, now: Bool) -> UNMutableNotificationContent {
+        let content = UNMutableNotificationContent()
+        let name = Names.place(stopName, "")
+        content.title = now ? String(localized: "This is your stop") : String(localized: "Your stop is next")
+        content.body = now ? String(localized: "Get off at \(name).") : String(localized: "Get ready to get off at \(name).")
+        content.sound = .default
+        content.interruptionLevel = .timeSensitive  // through Focus: it's the one you mustn't miss
+        return content
     }
 
     static func alert(line: String, bus: String, stopsAway: Int, stopName: String) -> UNMutableNotificationContent {
@@ -124,7 +188,7 @@ enum LiveBus {
         if let a = activities[bus] {
             Task { await a.update(content) }
         } else if ActivityAuthorizationInfo().areActivitiesEnabled {
-            let attrs = BusActivityAttributes(line: w.line, bus: bus, stopID: w.stop, stopName: w.stopName, alertAt: w.stops)
+            let attrs = BusActivityAttributes(line: w.line, bus: bus, stopID: w.stop, stopName: w.stopName, alertAt: w.stops, riding: w.kind == .ride)
             do { activities[bus] = try Activity.request(attributes: attrs, content: content) }
             catch { print("Live Activity failed: \(error)") }
         }
