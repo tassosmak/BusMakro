@@ -164,7 +164,7 @@ struct StationContent: View {
                         HStack(spacing: 10) {
                             RailBadge(line: lid)
                             Text("→ \(Names.place(dir.to, rail.stations.values.first { $0.name == dir.to }?.nameEnglish))")
-                                .font(.scaled(13, .semibold)).lineLimit(1)
+                                .font(.scaled(13, .semibold)).lineLimit(3)
                             Spacer()
                             if let n = rail.every(id, line: lid, direction: dir.d, at: now) {
                                 Text("every ~\(n) min").font(.scaled(15, .bold, design: .rounded)).monospacedDigit()
@@ -172,6 +172,10 @@ struct StationContent: View {
                         }
                         .padding(10)
                         .background(.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: Style.cardRadius))
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel(Speak.join([rail.line(lid)?.shown ?? lid,
+                                                        String(localized: "towards \(Names.place(dir.to, rail.stations.values.first { $0.name == dir.to }?.nameEnglish))"),
+                                                        rail.every(id, line: lid, direction: dir.d, at: now).map { String(localized: "about every \(Speak.minutes($0))") }]))
                     }
                 }
                 Text("STASY hasn't published this season's timetable yet, so these are how often trains run, not exact times.")
@@ -202,7 +206,7 @@ struct TrainCard: View {
             RailBadge(line: line)
             VStack(alignment: .leading, spacing: 2) {
                 Text("→ \(Names.place(to, Rail.shared?.stations.values.first { $0.name == to }?.nameEnglish))")
-                    .font(.scaled(13, .semibold)).lineLimit(1)
+                    .font(.scaled(13, .semibold)).lineLimit(3)
                 Text(departures.dropFirst().map { $0.at.formatted(date: .omitted, time: .shortened) }.joined(separator: " · "))
                     .font(.scaled(11)).foregroundStyle(.subtle)
             }
@@ -217,7 +221,12 @@ struct TrainCard: View {
         }
         .padding(10)
         .background(.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: Style.cardRadius))
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Speak.join([Rail.shared?.line(line)?.shown ?? line,
+                                        String(localized: "towards \(Names.place(to, Rail.shared?.stations.values.first { $0.name == to }?.nameEnglish))")]))
+        .accessibilityValue(Speak.join([departures.first.map { $0.minutes == 0 ? String(localized: "leaving now") : String(localized: "in \(Speak.minutes($0.minutes)), at \(Speak.time($0.at))") },
+                                        departures.count > 1 ? String(localized: "then \(departures.dropFirst().map { Speak.time($0.at) }.joined(separator: ", "))") : nil,
+                                        String(localized: "scheduled")]))
     }
 }
 

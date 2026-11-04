@@ -115,6 +115,7 @@ struct TripView: View {
                 Rectangle().fill(.tertiary).frame(width: 2, height: 26)
                 Image(systemName: "mappin.circle.fill").foregroundStyle(.red).font(.scaled(14))
             }
+            .accessibilityHidden(true)
             VStack(spacing: 8) {
                 endButton(from.title, placeholder: "From", field: .from)
                 endButton(to?.title, placeholder: model.pickingPlace?.question ?? "To", field: .to)
@@ -124,9 +125,9 @@ struct TripView: View {
                 (from, to) = (t, from)
                 Task { await plan() }
             } label: {
-                Image(systemName: "arrow.up.arrow.down").font(.scaled(15, .semibold)).frame(width: 36, height: 36)
+                Image(systemName: "arrow.up.arrow.down").font(.scaled(15, .semibold)).frame(width: 44, height: 44).contentShape(Rectangle())
             }
-            .buttonStyle(.plain).accessibilityLabel("Swap")
+            .buttonStyle(.plain).accessibilityLabel("Swap From and To")
         }
     }
 
@@ -142,6 +143,10 @@ struct TripView: View {
             .background(.primary.opacity(editing == field ? 0.12 : 0.07), in: RoundedRectangle(cornerRadius: 10))
         }
         .buttonStyle(.plain)
+        // "From, My Location" / "To, not set"
+        .accessibilityLabel(field == .from ? Text("From") : Text("To"))
+        .accessibilityValue(title.map { Text($0) } ?? Text("Not set"))
+        .accessibilityAddTraits(editing == field ? .isSelected : [])
     }
 
     @ViewBuilder private var results: some View {
@@ -236,6 +241,13 @@ struct TripCard: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            // "39 minutes, arrive 9:07 PM, M2 then M1, leave now" (the chips are drawn, not read)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(Speak.join([Speak.minutes(trip.minutes),
+                                            String(localized: "arrive \(Speak.time(leaving.addingTimeInterval(Double(trip.minutes) * 60)))"),
+                                            spokenLegs, leaveText]))
+            .accessibilityHint(expanded ? Text("Hides the steps") : Text("Shows each step"))
+            .accessibilityAddTraits(expanded ? .isSelected : [])
             if expanded {
                 VStack(alignment: .leading, spacing: 0) {
                     ForEach(Array(trip.legs.enumerated()), id: \.offset) { _, leg in legRow(leg) }
@@ -245,6 +257,19 @@ struct TripCard: View {
         }
         .padding(12)
         .background(.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: Style.cardRadius))
+    }
+
+    /// The rides in order, for VoiceOver: "walk 11 minutes, then M1".
+    private var spokenLegs: String {
+        let legs = trip.legs.filter { $0.mode != .walk || $0.minutes >= 3 || trip.rides.isEmpty }
+        let parts = legs.map { leg -> String in
+            switch leg.mode {
+            case .walk: return String(localized: "walk \(Speak.minutes(leg.minutes))")
+            case .bus: return String(localized: "bus \(leg.line)")
+            case .metro, .tram: return Rail.shared?.line(leg.line)?.shown ?? leg.line
+            }
+        }
+        return parts.joined(separator: String(localized: ", then "))
     }
 
     /// When to set off: the first ride's wait, less nothing (you walk while the bus comes).
@@ -283,13 +308,16 @@ struct TripCard: View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: leg.mode == .walk ? "figure.walk" : leg.mode == .bus ? "bus.fill" : leg.mode == .tram ? "tram.fill" : "tram.fill.tunnel")
                 .frame(width: 22).foregroundStyle(leg.mode == .walk ? Color.secondary : .accentColor).padding(.top, 2)
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 if leg.mode == .walk {
                     Text(String(localized: "Walk \(leg.minutes) min to \(Names.place(leg.to.name, nil))")).font(.scaled(13))
                 } else {
                     Text(String(localized: "\(leg.line) towards \(Names.place(leg.headsign, nil))")).font(.scaled(13, .semibold))
+                        .accessibilityLabel(String(localized: "\(leg.mode == .bus ? String(localized: "Bus \(leg.line)") : Rail.shared?.line(leg.line)?.shown ?? leg.line) towards \(Names.place(leg.headsign, nil))"))
                     Text(String(localized: "From \(Names.place(leg.from.name, nil)) · \(leg.stops) stops · \(leg.minutes) min"))
                         .font(.scaled(11)).foregroundStyle(.secondary)
+                        .accessibilityLabel(Speak.join([String(localized: "From \(Names.place(leg.from.name, nil))"), String(localized: "\(leg.stops) stops"), Speak.minutes(leg.minutes)]))
                     Text(String(localized: "Get off at \(Names.place(leg.to.name, nil))")).font(.scaled(11)).foregroundStyle(.secondary)
                     Button(leg.mode == .bus ? String(localized: "Open the stop") : String(localized: "Open the station")) { onOpen(leg) }
                         .font(.scaled(12, .semibold)).padding(.top, 2)

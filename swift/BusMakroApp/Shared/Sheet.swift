@@ -12,6 +12,7 @@ struct Sheet: View {
     /// The favourite being renamed ("stop:ID" / "line:ID") and the name typed so far.
     @State private var renaming: String?
     @State private var nickname = ""
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -21,6 +22,7 @@ struct Sheet: View {
             // fades out as the panel nears the slim strip (the strip shows just the handle and the menu)
             // fades with the panel's height, so it follows the drag and the snap exactly
             content.opacity(Double(min(1, max(0, (height - 90) / 70))))
+                .accessibilityHidden(height < 120)  // folded away: VoiceOver mustn't read what can't be seen
         }
         // the banner comes and goes with the panel's own spring, not in a jump
         .animation(.spring(response: 0.36, dampingFraction: 1), value: !model.online || model.serviceDown)
@@ -46,6 +48,21 @@ struct Sheet: View {
             .frame(maxWidth: .infinity).padding(.top, Style.gap).padding(.bottom, 1)  // so the strip leaves Style.gap under the menu
             .contentShape(Rectangle())
             .gesture(drag)
+            .accessibilityHidden(true)
+            .overlay {
+                // VoiceOver can't drag: swipe up or down on the handle to resize the panel
+                Color.clear.frame(height: 44).contentShape(Rectangle()).gesture(drag)
+                    .accessibilityElement()
+            .accessibilityLabel(Text("Panel"))
+            .accessibilityValue(height <= range.lowerBound + 20 ? Text("Small") : height >= range.upperBound - 20 ? Text("Full screen") : Text("Half"))
+            .accessibilityHint(Text("Swipe up or down to resize"))
+            .accessibilityAdjustableAction { dir in
+                let stops = [range.lowerBound, min(360, range.upperBound), range.upperBound]
+                let i = stops.firstIndex { $0 >= height - 20 } ?? stops.count - 1
+                let next = dir == .increment ? min(i + 1, stops.count - 1) : max(i - 1, 0)
+                withAnimation(.spring(response: 0.36, dampingFraction: 1)) { height = stops[next] }
+            }
+            }
     }
 
     /// Drag the panel by its handle or header. Measured in screen coordinates: the handle moves with the
@@ -92,44 +109,49 @@ struct Sheet: View {
             .background(Color.orange.opacity(0.14), in: RoundedRectangle(cornerRadius: Style.cardRadius))
         }
         .buttonStyle(.plain)
+        .accessibilityElement(children: .combine)
+        .accessibilityHint(model.online ? Text("Tries again") : Text(""))
     }
 
     @ViewBuilder private var header: some View {
         HStack(spacing: 8) {
             if case .stop = model.screen {
-                Button { withAnimation { model.screen = .home } } label: { Label("Back", systemImage: "chevron.left") }
+                Button { withAnimation { model.screen = .home } } label: { Label("Back", systemImage: "chevron.left").labelStyle(BackLabel(iconOnly: typeSize.isAccessibilitySize)) }
             }
             if case .station = model.screen {
-                Button { withAnimation { model.screen = .home } } label: { Label("Back", systemImage: "chevron.left") }
+                Button { withAnimation { model.screen = .home } } label: { Label("Back", systemImage: "chevron.left").labelStyle(BackLabel(iconOnly: typeSize.isAccessibilitySize)) }
             }
             if case .line = model.screen {
-                Button { withAnimation { model.closeLine() } } label: { Label("Back", systemImage: "chevron.left") }
+                Button { withAnimation { model.closeLine() } } label: { Label("Back", systemImage: "chevron.left").labelStyle(BackLabel(iconOnly: typeSize.isAccessibilitySize)) }
             }
             if let place = placeTitle {
                 // in a stop or station: its name where "Browse a line…" was
-                Text(place).font(.scaled(12, .semibold)).lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 10)
-                    .frame(height: Style.lineMenuHeight)
+                Text(place).font(.scaled(12, .semibold)).lineLimit(3).frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 10).padding(.vertical, 3)
+                    .frame(minHeight: Style.lineMenuHeight)  // grows with the text size instead of cutting it off
                     .background(.primary.opacity(0.10), in: Capsule())
+                    .accessibilityAddTraits(.isHeader)
             } else {
             Menu {
                 ForEach(model.lines) { l in
                     Button("\(l.id) — \(l.shown)") { withAnimation { model.openLine(l.id, at: nil) } }
                 }
             } label: {
-                Text(menuTitle).font(.scaled(12)).lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
+                Text(menuTitle).font(.scaled(12)).lineLimit(typeSize.isAccessibilitySize ? 3 : 1).frame(maxWidth: .infinity, alignment: .leading)
             }
             .buttonStyle(.plain)  // works on both iPhone and Mac (.borderlessButton is Mac-only)
-            .padding(.horizontal, 10)
-            .frame(height: Style.lineMenuHeight)
+            .padding(.horizontal, 10).padding(.vertical, 3)
+            .frame(minHeight: Style.lineMenuHeight)
             // the panel's bottom corners (39 pt) less the gap would be wider than the menu is tall:
             // a capsule is as round as it gets, and follows the corners with the same gap all round
             .background(.primary.opacity(0.10), in: Capsule())
+            .frame(minHeight: 44).contentShape(Rectangle())  // a finger-sized target around the slim capsule
             }
             if case .line(let id, _) = model.screen {
                 Button { model.toggleFavouriteLine(id) } label: {
                     Image(systemName: model.isFavouriteLine(id) ? "star.fill" : "star")
                         .foregroundStyle(model.isFavouriteLine(id) ? .yellow : .secondary)
+                        .frame(minWidth: 44, minHeight: 44).contentShape(Rectangle())  // a finger-sized target
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(model.isFavouriteLine(id) ? "Remove from Favourites" : "Add to Favourites")
@@ -138,7 +160,9 @@ struct Sheet: View {
                 Button { model.toggleFavourite(s) } label: {
                     Image(systemName: model.isFavourite(s) ? "star.fill" : "star")
                         .foregroundStyle(model.isFavourite(s) ? .yellow : .secondary)
+                        .frame(minWidth: 44, minHeight: 44).contentShape(Rectangle())
                 }.buttonStyle(.plain)
+                .accessibilityLabel(model.isFavourite(s) ? "Remove from Favourites" : "Add to Favourites")
             }
         }
     }
@@ -171,7 +195,7 @@ struct Sheet: View {
     @ViewBuilder private var screenContent: some View {
         switch model.screen {
         case .home:
-            Picker("", selection: $model.homeTab) {
+            Picker("Stops", selection: $model.homeTab) {
                 Text("Nearby Stops").tag(Model.HomeTab.nearby)
                 Text("Favourites").tag(Model.HomeTab.favourites)
             }
@@ -193,6 +217,7 @@ struct Sheet: View {
         case .stop(let stop):
             Text(String(localized: "Stop \(stop.id)").uppercased())
                 .font(.scaled(11, .semibold)).foregroundStyle(.secondary)
+                .accessibilityLabel(Speak.join([stop.title, String(localized: "Stop \(stop.id)")])).heading()
             if let at = model.stopLinesSaved { SavedTimesNote(at: at) }
             if let lines = model.stopLines, !lines.isEmpty {
                 ScrollView {
@@ -211,6 +236,8 @@ struct Sheet: View {
                 Text(model.stopLines == nil ? "Loading the lines at this stop…"
                      : model.error == nil ? "No lines stop here." : "Couldn't reach the bus service. Tap ↻ to try again.")
                     .font(.scaled(12)).foregroundStyle(.subtle)
+                    .accessibilityLabel(model.stopLines == nil ? Text("Loading the lines at this stop…")
+                                        : model.error == nil ? Text("No lines stop here.") : Text("Couldn't reach the bus service. Use the Refresh button to try again."))
                     .frame(maxWidth: .infinity).padding(.top, 20)
                 Spacer(minLength: 0)
             }
@@ -235,7 +262,7 @@ struct Sheet: View {
 
     /// Favourites: stops, lines, or both.
     private var favouritesFilter: some View {
-        Picker("", selection: $favFilter) {
+        Picker("Show", selection: $favFilter) {
             Text("All").tag("all")
             Text("Stops").tag("stops")
             Text("Lines").tag("lines")
@@ -293,16 +320,27 @@ struct Reorderable: ViewModifier {
 }
 
 /// Rows ease in one after another: fade, slide up a little, scale from 97 % (motion.appear).
+/// "‹ Back", or just "‹" at the Accessibility text sizes (the name next to it needs the room);
+/// VoiceOver still says "Back".
+struct BackLabel: LabelStyle {
+    let iconOnly: Bool
+    func makeBody(configuration: Configuration) -> some View {
+        if iconOnly { configuration.icon.frame(minWidth: 44, minHeight: 44).contentShape(Rectangle()) }
+        else { HStack(spacing: 4) { configuration.icon; configuration.title }.frame(minHeight: 44).contentShape(Rectangle()) }
+    }
+}
+
 struct Appearing: ViewModifier {
     let index: Int
     @State private var shown = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     func body(content: Content) -> some View {
         content
             .opacity(shown ? 1 : 0)
             .offset(y: shown ? 0 : 10)
             .scaleEffect(shown ? 1 : 0.97)
             .onAppear {
-                if LowPower.shared.on { shown = true; return }  // rows just appear
+                if LowPower.shared.on || reduceMotion { shown = true; return }  // rows just appear (Low Power, Reduce Motion)
                 withAnimation(.easeOut(duration: 0.38).delay(Double(min(index, 12)) * 0.035)) { shown = true }
             }
     }
@@ -320,7 +358,7 @@ struct SavedTimesNote: View {
         TimelineView(.periodic(from: .now, by: 30)) { ctx in
             let ago = max(0, Int(ctx.date.timeIntervalSince(at) / 60))
             HStack(spacing: 10) {
-                Image(systemName: "clock.arrow.circlepath").foregroundStyle(.orange)
+                Image(systemName: "clock.arrow.circlepath").foregroundStyle(.orange).accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(ago == 0 ? String(localized: "Saved just now") : String(localized: "Saved \(ago) min ago, at \(at.formatted(date: .omitted, time: .shortened))"))
                         .font(.scaled(13, .semibold))
@@ -330,6 +368,7 @@ struct SavedTimesNote: View {
                 Spacer(minLength: 0)
             }
             .padding(12)
+            .accessibilityElement(children: .combine)
             .card()
         }
     }

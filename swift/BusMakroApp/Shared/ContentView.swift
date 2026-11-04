@@ -222,6 +222,7 @@ struct ContentView: View {
         #endif
         .buttonStyle(.plain)
         .glass(Circle())
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
         .accessibilityLabel("Map Layers")
     }
 
@@ -243,7 +244,7 @@ struct ContentView: View {
                             Circle().fill(sel ? Color.orange : Color(red: 0.09, green: 0.47, blue: 1.0))
                                 .frame(width: sel ? 15 : 10, height: sel ? 15 : 10)
                                 .overlay(Circle().stroke(.white, lineWidth: sel ? 3 : 2))
-                                .frame(width: 36, height: 36).contentShape(Circle())  // easier to hit than the 10 pt dot
+                                .frame(width: 44, height: 44).contentShape(Circle())  // easier to hit than the 10 pt dot
                                 .onTapGesture { model.lineStop = sid }
                                 .accessibilityLabel(st.name)
                                 .accessibilityAddTraits(sel ? [.isButton, .isSelected] : .isButton)
@@ -254,10 +255,13 @@ struct ContentView: View {
                     Annotation("", coordinate: model.drawn[b.id] ?? CLLocationCoordinate2D(latitude: b.latitude, longitude: b.longitude)) {
                         BusMarker(bearing: b.bearing, faded: (b.positionAt.map { Date().timeIntervalSince($0) > 120 } ?? false),
                                   pinned: model.pinned == b.id, fix: b.positionAt)
+                            .frame(width: 44, height: 44).contentShape(Circle())
+                            .accessibilityElement(children: .ignore)
                             .onTapGesture { model.pinned = model.pinned == b.id ? nil : b.id }
                             .accessibilityLabel(Text("Bus \(b.id)"))
+                            .accessibilityValue(model.spokenArrival(of: b))
                             .accessibilityHint(model.pinned == b.id ? Text("Stop following") : Text("Follow this bus"))
-                            .accessibilityAddTraits(.isButton)
+                            .accessibilityAddTraits(model.pinned == b.id ? [.isButton, .isSelected] : .isButton)
                     }
                 }
             }
@@ -266,8 +270,11 @@ struct ContentView: View {
                 ForEach(showBuses ? model.stopBuses : [], id: \.vehicle.id) { b in
                     Annotation("", coordinate: model.drawn[b.vehicle.id] ?? CLLocationCoordinate2D(latitude: b.vehicle.latitude, longitude: b.vehicle.longitude)) {
                         BusMarker(bearing: b.vehicle.bearing, label: b.line, fix: b.vehicle.positionAt)
+                            .frame(width: 44, height: 44).contentShape(Circle())
+                            .accessibilityElement(children: .ignore)
                             .onTapGesture { model.pendingPin = b.vehicle.id; model.openLine(b.line, at: stop) }
                             .accessibilityLabel(Text("Line \(b.line) bus"))
+                            .accessibilityHint(Text("Opens the line and follows this bus"))
                             .accessibilityAddTraits(.isButton)
                     }
                 }
@@ -285,6 +292,7 @@ struct ContentView: View {
                 Annotation("", coordinate: CLLocationCoordinate2D(latitude: stop.latitude, longitude: stop.longitude)) {
                     let selected = model.screen == .stop(stop)
                     StopPin(selected: selected, favourite: model.isFavourite(stop) ? Color(hex: favColor) : nil)
+                        .accessibilityElement(children: .ignore)
                         .onTapGesture { model.open(stop) }
                         .accessibilityLabel(Text("Stop \(stop.title)"))
                         .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
@@ -385,6 +393,7 @@ struct BusMarker: View {
             .shadow(color: .black.opacity(0.3), radius: 3, y: 1)
         }
         .opacity(faded ? 0.45 : 1)
+        .dynamicTypeSize(...DynamicTypeSize.large)  // a map marker keeps its size (big ones covered the route)
         .animation(.easeInOut(duration: 1.5), value: bearing)
         .onChange(of: fix) {
             ripple = false

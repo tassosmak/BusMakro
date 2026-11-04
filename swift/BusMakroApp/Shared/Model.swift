@@ -342,6 +342,10 @@ final class Model: NSObject, CLLocationManagerDelegate {
         let missed = vehicles.filter { !ids.contains($0.id) && !missedOnce.contains($0.id) }
         missedOnce = Set(missed.map(\.id))
         vehicles = live + missed
+        if lineLoading {
+            AccessibilityNotification.Announcement(live.isEmpty ? String(localized: "No buses on this line right now")
+                                                   : live.count == 1 ? String(localized: "1 bus on this line") : String(localized: "\(live.count) buses on this line")).post()
+        }
         lineLoading = false  // buses in: OASA's minutes follow (they kept the spinner up 10 s)
         serviceDown = false; lastUpdated = .now
         checkWatches(line: id, vehicles: live)
@@ -481,6 +485,22 @@ final class Model: NSObject, CLLocationManagerDelegate {
         let now = Date()
         let here = vehicles.map { v in drawn[v.id].map { v.moved(to: $0.latitude, $0.longitude, at: now) } ?? v }
         return LineMath.approaching(s, detail: d, live: here, official: official, now: now)
+    }
+
+    /// A bus on the map, for VoiceOver: "in 3 minutes to Syntagma, 2 stops away" (or how old its position is).
+    func spokenArrival(of v: Vehicle) -> String {
+        var parts: [String?] = []
+        if let a = approaching.first(where: { $0.vehicle.id == v.id }) {
+            let stop = lineStop.flatMap { lineDetail?.stops[$0] }.map { Names.place($0.name, "") }
+            parts.append(a.seconds < 20 ? String(localized: "Due now") : String(localized: "in \(Speak.minutes(Int(a.seconds) / 60))"))
+            parts.append(stop.map { String(localized: "to \($0)") })
+            parts.append(Speak.stops(a.stopsAway))
+        }
+        if let at = v.positionAt, Date().timeIntervalSince(at) > 120 {
+            parts.append(String(localized: "position from \(Speak.minutes(Int(Date().timeIntervalSince(at) / 60))) ago"))
+        }
+        if pinned == v.id { parts.append(String(localized: "following")) }
+        return Speak.join(parts)
     }
 
     func clearRecents() {

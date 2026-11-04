@@ -74,6 +74,16 @@ targets:
         MARKETING_VERSION: "1.0"
         CURRENT_PROJECT_VERSION: 1
         IPHONEOS_DEPLOYMENT_TARGET: "17.0"
+  BusMakroUITests:  # Apple's accessibility audit on each main screen
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [UITests]
+    dependencies: [{ target: BusMakro }]
+    settings:
+      base:
+        DEVELOPMENT_TEAM: LXL43GG782
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: BusMakro
 schemes:
   BusMakro:  # shared, so a regenerated project still builds from the command line
     build:
@@ -82,3 +92,5 @@ schemes:
         BusMakroWidgets: all
     run:
       config: Debug
+    test:
+      targets: [BusMakroUITests]

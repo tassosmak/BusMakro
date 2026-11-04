@@ -7,7 +7,7 @@ struct LineContent: View {
     @Bindable var model: Model
 
     var body: some View {
-        Picker("", selection: $model.lineTab) {
+        Picker("Line view", selection: $model.lineTab) {
             Text("Arrivals").tag(Model.LineTab.arrivals)
             Text("Route").tag(Model.LineTab.route)
             Text("Timetable").tag(Model.LineTab.timetable)
@@ -42,13 +42,14 @@ struct LineContent: View {
             Text(text).font(.scaled(12)).foregroundStyle(.subtle)
         }
         .frame(maxWidth: .infinity).padding(.top, 20)
+        .accessibilityElement(children: .combine)
     }
 
     private var arrivals: some View {
         VStack(alignment: .leading, spacing: 8) {
             // which stop: picked for you when the line opened without one
             Text(stopName.map { String(localized: "Buses to \($0)") } ?? String(localized: "Approaching buses"))
-                .textCase(.uppercase).font(.scaled(11, .semibold)).foregroundStyle(.subtle).lineLimit(1)
+                .textCase(.uppercase).font(.scaled(11, .semibold)).foregroundStyle(.subtle).lineLimit(2).heading()
             ScrollView {
                 LazyVStack(spacing: 6) {
                     ForEach(model.alerts(for: [currentLine])) { AlertCard(alert: $0) }
@@ -75,7 +76,7 @@ struct LineContent: View {
         VStack(spacing: 8) {
             if let d = model.lineDetail, d.variants.count > 1 {
                 // lines with several routes: pick which one (the Mac app's variant menu)
-                Picker("", selection: Binding(get: { model.variantID ?? "" }, set: { model.chosenVariant = $0 })) {
+                Picker("Direction", selection: Binding(get: { model.variantID ?? "" }, set: { model.chosenVariant = $0 })) {
                     ForEach(d.variants.keys.sorted(), id: \.self) { k in
                         Text(Names.place(d.variants[k]!.headsign, "")).tag(k)
                     }
@@ -134,16 +135,24 @@ struct ArrivalCard: View {
                      + (item.waiting ? " · " + String(localized: "waiting to set off") : ""))
                     .font(.scaled(11)).foregroundStyle(.subtle)
             }
+            // the time and stops as one sentence; long press (bus number, delay, trip) as an action
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(spokenTime)
+            .accessibilityValue(Speak.join([Speak.stops(item.stopsAway), item.waiting ? String(localized: "waiting to set off") : nil,
+                                            following ? String(localized: "following on the map") : nil]))
+            .accessibilityAction(named: Text("Bus details")) { showDetails = true }
             Spacer(minLength: 0)
             // 🔔: notify me when this bus is N stops from my stop
             Menu { watchMenu } label: {
                 circle(watching != nil ? "bell.fill" : "bell", on: watching != nil)
             }
             .accessibilityLabel(Text("Notify Me"))
+            .accessibilityValue(watching.map { Speak.join([String(localized: "On"), Speak.stops($0)]) } ?? String(localized: "Off"))
             // ⌖: follow this bus on the map
             Button(action: onFollow) { circle(following ? "location.fill" : "scope", on: following) }
                 .buttonStyle(.plain)
                 .accessibilityLabel(Text("Follow on Map"))
+                .accessibilityAddTraits(following ? .isSelected : [])
         }
         .padding(.horizontal, 14)
         .frame(minHeight: 72)
@@ -209,6 +218,14 @@ struct ArrivalCard: View {
             .frame(width: 40, height: 40)
             .background(on ? Color.orange.opacity(0.16) : Color.primary.opacity(0.06), in: Circle())
             .contentShape(Circle())
+            .frame(width: 44, height: 44)
+            .dynamicTypeSize(...DynamicTypeSize.xxxLarge)  // the symbol stays inside its circle
+    }
+
+    private var spokenTime: String {
+        let live = item.official ? String(localized: "live") : String(localized: "estimated")
+        if item.seconds < 20 { return Speak.join([String(localized: "Due now"), live]) }
+        return Speak.join([String(localized: "in \(Speak.minutes(Int(item.seconds) / 60))"), live])
     }
 
     private var time: String {
@@ -247,6 +264,10 @@ struct RouteStopRow: View {
         .frame(minHeight: 46)
         .background(selected ? Color.orange.opacity(0.16) : .clear, in: RoundedRectangle(cornerRadius: 10))
         .contentShape(Rectangle())
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Speak.join([name, String(localized: "Stop \(id)"), first ? String(localized: "first stop") : last ? String(localized: "last stop") : nil]))
+        .accessibilityAddTraits(selected ? .isSelected : [])
+        .accessibilityHint(selected ? Text("") : Text("Shows the buses heading to this stop"))
     }
 }
 
@@ -266,6 +287,8 @@ struct RouteBusRow: View {
         }
         .padding(.horizontal, 6)
         .frame(height: 34)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("Bus \(id), on its way to the next stop"))
     }
 }
 
@@ -281,9 +304,9 @@ struct TimetableList: View {
         VStack(alignment: .leading, spacing: 8) {
             if model.timetableDays.count > 1 {
                 // the days of the week, Monday first; each shows the timetable that applies to it
-                Picker("", selection: Binding(get: { model.timetableWeekday },
+                Picker("Day", selection: Binding(get: { model.timetableWeekday },
                                               set: { w in Task { await model.loadTimetable(weekday: w) } })) {
-                    ForEach(1...7, id: \.self) { Text(Self.dayLetters[$0 - 1]).tag($0) }
+                    ForEach(1...7, id: \.self) { Text(Self.dayLetters[$0 - 1]).accessibilityLabel(Self.dayNames[$0 - 1]).tag($0) }
                 }
                 .pickerStyle(.segmented).labelsHidden()
                 if let d = model.timetableDays.first(where: { $0.code == model.timetableDay }) {
@@ -291,7 +314,7 @@ struct TimetableList: View {
                 }
             }
             Text(today ? LocalizedStringKey("TODAY'S DEPARTURES FROM EACH END") : "DEPARTURES FROM EACH END")
-                .font(.scaled(11, .semibold)).foregroundStyle(.subtle)
+                .font(.scaled(11, .semibold)).foregroundStyle(.subtle).heading()
             if let tt = model.timetable?.variants {
                 ScrollViewReader { proxy in
                     ScrollView {
@@ -327,6 +350,14 @@ struct TimetableList: View {
         return Array(s[1...]) + [s[0]]
     }
 
+    /// Monday … Sunday, in full, for VoiceOver.
+    private static var dayNames: [String] {
+        var cal = Calendar(identifier: .gregorian)
+        cal.locale = Locale(identifier: Names.greek ? "el" : "en")
+        let s = cal.weekdaySymbols
+        return Array(s[1...]) + [s[0]]
+    }
+
     /// Which timetable the chosen day uses: "Timetable: Monday to Friday", "…: Friday", …
     private func dayName(_ d: OASAClient.ScheduleDay) -> String {
         let w = d.weekdays.sorted()
@@ -343,6 +374,8 @@ struct TimetableList: View {
 
     private func header(_ text: String) -> some View {
         Text(text).font(.scaled(11, .semibold)).foregroundStyle(.subtle).padding(.top, 8)
+            .accessibilityLabel(text.replacingOccurrences(of: "·", with: ","))
+            .heading()
     }
 
     @ViewBuilder private func section(_ times: [Date], from place: String, key: String) -> some View {
@@ -363,6 +396,8 @@ struct TimetableList: View {
                             .frame(maxWidth: .infinity).frame(height: 24)
                             .background(isNext ? Color.green.opacity(0.22) : .clear, in: Capsule())
                             .padding(.horizontal, 4)
+                            .accessibilityLabel(Speak.time(t))
+                            .accessibilityValue(isNext ? String(localized: "next departure") : t < now ? String(localized: "departed") : "")
                     }
                     ForEach(0..<(5 - row.count), id: \.self) { _ in Color.clear.frame(maxWidth: .infinity) }
                 }

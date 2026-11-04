@@ -44,6 +44,7 @@ struct TopBar: View {
             }
         }
         .animation(.easeInOut(duration: 0.28), value: expanded)
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)  // the bar is one fixed-height capsule over the map
     }
 }
 
@@ -60,11 +61,14 @@ struct RecentChips: View {
                         Label(name, systemImage: "clock.arrow.circlepath")
                             .font(.scaled(11, .semibold)).lineLimit(1)
                             .padding(.horizontal, 10).frame(height: Style.chipHeight)
+                            .glass(Capsule())
+                            .frame(minHeight: 44).contentShape(Rectangle())  // a finger-sized target around the slim chip
                     }
                     .buttonStyle(.plain)
-                    .glass(Capsule())
+                    .accessibilityLabel(Text("Recent stop \(name)"))
                 }
             }
         }
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
     }
 }

@@ -33,14 +33,17 @@ enum Style {
 /// Frosted pane on the glass: a faint fill and a hairline edge (card_base in widgets.py).
 extension ShapeStyle where Self == Color {
     /// Second lines on cards: .secondary turned nearly invisible on the panel's glass in dark mode.
-    static var subtle: Color { Color.primary.opacity(0.62) }
+    static var subtle: Color { Color.primary.opacity(0.72) }  // 4.5:1 on the glass (0.62 failed the contrast audit)
+    // (Increase Contrast: the system makes .primary itself stronger, and the cards and glass get solid edges)
 }
 
 struct CardBackground: ViewModifier {
+    @Environment(\.colorSchemeContrast) private var contrast
     func body(content: Content) -> some View {
         content
-            .background(.background.opacity(0.32), in: RoundedRectangle(cornerRadius: Style.cardRadius))
-            .overlay(RoundedRectangle(cornerRadius: Style.cardRadius).strokeBorder(.primary.opacity(0.10), lineWidth: 0.5))
+            .background(.background.opacity(contrast == .increased ? 0.85 : 0.45), in: RoundedRectangle(cornerRadius: Style.cardRadius))
+            .overlay(RoundedRectangle(cornerRadius: Style.cardRadius)
+                .strokeBorder(.primary.opacity(contrast == .increased ? 0.45 : 0.10), lineWidth: contrast == .increased ? 1 : 0.5))
     }
 }
 
@@ -48,20 +51,26 @@ struct CardBackground: ViewModifier {
 /// flashed dark on every frame of the minimize animation).
 struct PanelGlass<S: Shape>: ViewModifier {
     let shape: S
+    @Environment(\.accessibilityReduceTransparency) private var solid
+    @Environment(\.colorSchemeContrast) private var contrast
     func body(content: Content) -> some View {
+        // thick enough that the map behind doesn't wash out the text (ultra-thin failed the contrast
+        // audit over busy streets); solid with Reduce Transparency, edged with Increase Contrast
         content
-            .background(.ultraThinMaterial, in: shape)
-            .overlay(shape.stroke(.separator, lineWidth: 0.5))
+            .background(solid ? AnyShapeStyle(.background) : AnyShapeStyle(.regularMaterial), in: shape)
+            .overlay(shape.stroke(contrast == .increased ? AnyShapeStyle(.primary.opacity(0.5)) : AnyShapeStyle(.separator), lineWidth: contrast == .increased ? 1 : 0.5))
     }
 }
 
 /// The app's glass (glass() in widgets.py): thin material, rounded, with a separator-coloured hairline.
 struct Glass<S: Shape>: ViewModifier {
     let shape: S
+    @Environment(\.accessibilityReduceTransparency) private var solid
+    @Environment(\.colorSchemeContrast) private var contrast
     func body(content: Content) -> some View {
         content
-            .background(.ultraThinMaterial, in: shape)
-            .overlay(shape.stroke(.separator, lineWidth: 0.5))
+            .background(solid ? AnyShapeStyle(.background.secondary) : AnyShapeStyle(.thinMaterial), in: shape)
+            .overlay(shape.stroke(contrast == .increased ? AnyShapeStyle(.primary.opacity(0.5)) : AnyShapeStyle(.separator), lineWidth: contrast == .increased ? 1 : 0.5))
     }
 }
 
@@ -94,6 +103,8 @@ struct RoundButton: View {
         }
         .buttonStyle(.plain)
         .glass(Circle())
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)  // the symbol must fit its circle (Large Content Viewer shows it big)
+        .accessibilityShowsLargeContentViewer()
         .help(help)
         .accessibilityLabel(help)  // VoiceOver reads the name, not the symbol
         .onChange(of: spinning) { active = spinning; if spinning { spin() } }
@@ -113,8 +124,9 @@ struct LineBadge: View {
         Text(line)
             .font(.scaled(15, .bold, design: .rounded))
             .foregroundStyle(.white)
-            .frame(width: width, height: 28)
-            .background(.blue, in: RoundedRectangle(cornerRadius: 8))
+            .padding(.horizontal, 6).padding(.vertical, 2)
+            .frame(minWidth: width, minHeight: 28)  // grows with the text size (a fixed box cut "040" off)
+            .background(Color(red: 0.0, green: 0.40, blue: 0.92), in: RoundedRectangle(cornerRadius: 8))  // white text at 4.5:1
     }
 }
 
@@ -137,15 +149,9 @@ extension Font {
     static func scaled(_ size: CGFloat, _ weight: Font.Weight = .regular, design: Font.Design = .default) -> Font {
         let styles: [(CGFloat, Font.TextStyle)] = [(11, .caption2), (12, .caption), (13, .footnote), (15, .subheadline),
                                                    (16, .callout), (17, .body), (20, .title3), (22, .title2), (28, .title), (34, .largeTitle)]
+        // always the text style itself (a size worked out once at launch didn't follow a later Text Size
+        // change, and the audit counted it as fixed): in-between sizes take the nearest style
         let nearest = styles.min { abs($0.0 - size) < abs($1.0 - size) }!
-        if nearest.0 == size { return .system(nearest.1, design: design, weight: weight) }
-        #if canImport(UIKit)
-        let uiStyle: [Font.TextStyle: UIFont.TextStyle] = [.caption2: .caption2, .caption: .caption1, .footnote: .footnote,
-            .subheadline: .subheadline, .callout: .callout, .body: .body, .title3: .title3, .title2: .title2, .title: .title1, .largeTitle: .largeTitle]
-        let scaled = UIFontMetrics(forTextStyle: uiStyle[nearest.1]!).scaledValue(for: size)
-        return .system(size: scaled, weight: weight, design: design)
-        #else
-        return .system(size: size, weight: weight, design: design)
-        #endif
+        return .system(nearest.1, design: design, weight: weight)
     }
 }

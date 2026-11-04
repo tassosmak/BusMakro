@@ -1,3 +1,4 @@
+import SwiftUI
 import BusMakroKit
 import Foundation
 import UserNotifications
@@ -25,6 +26,7 @@ extension Model {
         guard let n else {
             watches[bus] = nil; LiveBus.end(bus)
             UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: ["watch-\(bus)"])
+            AccessibilityNotification.Announcement(String(localized: "Alert off")).post()
             return
         }
         guard case .line(let line, _) = screen, let stop = lineStop else { return }
@@ -32,6 +34,7 @@ extension Model {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
         checkWatches(line: line, vehicles: vehicles)
         startWatchLoop()
+        AccessibilityNotification.Announcement(String(localized: "You'll be notified when this bus is \(Speak.stops(n))")).post()
     }
 
     /// Compare watched buses in a fresh response; notify (once) when one is close enough.

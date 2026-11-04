@@ -7,6 +7,6 @@ struct BusMakroApp: App {
     #endif
 
     var body: some Scene {
-        WindowGroup { ContentView().dynamicTypeSize(...DynamicTypeSize.xxxLarge) }  // follows Text Size, up to where the layout still holds
+        WindowGroup { ContentView() }  // follows Text Size all the way, Accessibility sizes included (the map's buttons cap their own)
     }
 }
