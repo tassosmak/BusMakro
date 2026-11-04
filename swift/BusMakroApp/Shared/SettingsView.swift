@@ -62,6 +62,10 @@ struct SettingsView: View {
                     Link("Privacy Policy", destination: URL(string: "https://tassosmak.github.io/BusMakro-Swift/privacy.html")!)
                     Link("Website", destination: URL(string: "https://tassosmak.github.io/BusMakro-Swift/")!)
                     LabeledContent("Version", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")
+                    // iOS's crash and battery reports, kept on the phone: shared only if you choose to
+                    if let report = Diagnostics.shared.bundle() {
+                        ShareLink("Share Diagnostic Reports", item: report)
+                    }
                 } header: {
                     Text("About")
                 } footer: {

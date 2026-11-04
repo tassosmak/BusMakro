@@ -2,6 +2,7 @@ import BusMakroKit
 import CoreSpotlight
 import MapKit
 import SwiftUI
+import StoreKit
 #if os(iOS)
 import WidgetKit
 #endif
@@ -27,6 +28,7 @@ struct ContentView: View {
     @State private var visibleRegion: MKCoordinateRegion?
     /// The stops inside the visible map (from the stop index), worked out when the map stops moving.
     @State private var regionStops: [Stop] = []
+    @Environment(\.requestReview) private var requestReview
     @AppStorage("mapStyle") private var mapStyle = "system"
     @AppStorage("showRecents") private var showRecents = true
     @AppStorage("map3D") private var map3D = false
@@ -123,6 +125,12 @@ struct ContentView: View {
             }
         }
         .onChange(of: model.screen) { old, new in
+            // back home after looking up a stop or line (it worked): the moment to ask for a rating,
+            // never while an alert or a followed bus is on
+            if new == .home, old != .home, RatingPrompt.due, model.watches.isEmpty, model.pinned == nil {
+                RatingPrompt.asked()
+                Task { try? await Task.sleep(for: .seconds(1.5)); requestReview() }
+            }
             // a line takes over the map; leaving it puts the map back where it was
             if case .line = new { if case .line = old {} else { beforeLine = visibleRegion }; return }
             guard case .line = old else { return }

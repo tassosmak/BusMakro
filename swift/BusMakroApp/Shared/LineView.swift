@@ -1,5 +1,6 @@
 import BusMakroKit
 import SwiftUI
+import TipKit
 
 /// The line view's panel content: Arrivals (buses heading to your stop) and Route (the stops in
 /// order, with the buses between them), like the Mac app's line tabs.
@@ -60,11 +61,12 @@ struct LineContent: View {
                         Text(model.lineStop == nil ? String(localized: "Choose a stop to see approaching buses.") : String(localized: "No bus is heading to this stop right now."))
                             .font(.scaled(12)).foregroundStyle(.subtle).padding(.top, 20)
                     }
+                    if !rows.isEmpty { TipView(BusButtonsTip(), arrowEdge: .bottom).tipBackground(.thinMaterial) }
                     ForEach(Array(rows.enumerated()), id: \.element.id) { i, a in
                         ArrivalCard(item: a, watching: model.watches[a.vehicle.id].flatMap { $0.notified ? nil : $0.stops },  // normal again once notified
-                                    onWatch: { model.watch(a.vehicle.id, stops: $0) },
+                                    onWatch: { BusButtonsTip().invalidate(reason: .actionPerformed); model.watch(a.vehicle.id, stops: $0) },
                                     following: model.pinned == a.vehicle.id,
-                                    onFollow: { model.pinned = model.pinned == a.vehicle.id ? nil : a.vehicle.id })
+                                    onFollow: { BusButtonsTip().invalidate(reason: .actionPerformed); model.pinned = model.pinned == a.vehicle.id ? nil : a.vehicle.id })
                             .appearing(i)
                     }
                 }

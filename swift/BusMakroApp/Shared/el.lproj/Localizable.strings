@@ -288,3 +288,6 @@
 "About" = "Πληροφορίες";
 "Arrivals, routes and timetables from OASA's telematics; metro and tram timetables from STASY (data.gov.gr); live bus positions via the open-source athens-transit-rt project. BusMakro is an independent app, not affiliated with OASA or STASY." = "Αφίξεις, διαδρομές και δρομολόγια από την τηλεματική του ΟΑΣΑ· δρομολόγια μετρό και τραμ από τη ΣΤΑΣΥ (data.gov.gr)· θέσεις λεωφορείων μέσω του ανοιχτού έργου athens-transit-rt. Το BusMakro είναι ανεξάρτητη εφαρμογή, χωρίς σχέση με τον ΟΑΣΑ ή τη ΣΤΑΣΥ.";
 "now" = "τώρα";
+"Never miss your bus" = "Μη χάσεις ποτέ το λεωφορείο σου";
+"Tap the bell to be notified when this bus is a few stops from you, even with the phone locked. Tap the target to follow it on the map." = "Πάτησε το καμπανάκι για να ειδοποιηθείς όταν το λεωφορείο είναι λίγες στάσεις μακριά, ακόμα και με κλειδωμένο κινητό. Πάτησε τον στόχο για να το ακολουθήσεις στον χάρτη.";
+"Share Diagnostic Reports" = "Κοινοποίηση αναφορών διαγνωστικών";

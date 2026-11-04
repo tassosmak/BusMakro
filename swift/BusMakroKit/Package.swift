@@ -11,5 +11,7 @@ let package = Package(
     targets: [
         .target(name: "BusMakroKit"),
         .executableTarget(name: "busmakro-check", dependencies: ["BusMakroKit"]),
+        // offline tests of the arrival maths: `swift test`
+        .testTarget(name: "BusMakroKitTests", dependencies: ["BusMakroKit"]),
     ]
 )
