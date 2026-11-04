@@ -74,6 +74,8 @@ extension Model {
         guard case .line(let line, _) = screen, let stop = lineStop else { return }
         if let old = watches[bus], old.kind != .alert || old.stop != stop { LiveBus.end(bus) }  // the countdown starts afresh for the alert
         watches[bus] = BusWatch(line: line, stop: stop, stopName: Names.place(lineDetail?.stops[stop]?.name ?? stop, ""), stops: n)
+        // an earlier alert's notification still in Notification Center would count as this one gone off
+        UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: ["watch-\(bus)"])
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
         checkWatches(line: line, vehicles: vehicles)
         startWatchLoop()
@@ -90,7 +92,13 @@ extension Model {
             }
             watches[bus]?.seen = Date()
             guard let a = LineMath.approaching(w.stop, detail: detail, live: [v], official: w.stop == lineStop ? official : [:]).first else {
-                watches[bus] = nil  // passed the stop
+                // passed the stop. OASA's fixes are 20-40 s apart, so a short stop can fall between two
+                // readings: a ride that never saw the bus at the stop still gets its buzz, late but sent
+                if w.kind == .ride && !w.atStopSent {
+                    UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "ride-\(bus)",
+                        content: Self.wake(stopName: w.stopName, now: true), trigger: nil))
+                }
+                watches[bus] = nil
                 LiveBus.end(bus, arrived: true)
                 continue
             }
@@ -121,8 +129,15 @@ extension Model {
                 }
             }
             if a.stopsAway <= w.stops && !w.notified {
-                let content = Self.alert(line: line, bus: bus, stopsAway: a.stopsAway, stopName: w.stopName)
-                UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "watch-\(bus)", content: content, trigger: nil))
+                // the booked one may have gone off already while the app was asleep: then not again
+                let id = "watch-\(bus)", stopsAway = a.stopsAway, stopName = w.stopName
+                Task { @MainActor in
+                    let center = UNUserNotificationCenter.current()
+                    guard !(await center.deliveredNotifications()).contains(where: { $0.request.identifier == id }) else { return }
+                    center.removePendingNotificationRequests(withIdentifiers: [id])
+                    let content = Self.alert(line: line, bus: bus, stopsAway: stopsAway, stopName: stopName)
+                    try? await center.add(UNNotificationRequest(identifier: id, content: content, trigger: nil))
+                }
                 if LiveBus.running(bus) { watches[bus]?.notified = true }  // keep the countdown going to the stop
                 else { watches[bus] = nil }
             }
@@ -174,6 +189,17 @@ enum LiveBus {
     #if os(iOS)
     private static var activities: [String: Activity<BusActivityAttributes>] = [:]
     #endif
+
+    /// At launch: end the Live Activities a previous run left behind. Watches live only in memory, so
+    /// after iOS closed the app (or it was swiped away) nothing updated or ended them: they sat on the
+    /// Lock Screen with a frozen countdown for up to 8 hours.
+    static func endLeftovers() {
+        #if os(iOS)
+        for a in Activity<BusActivityAttributes>.activities where !activities.values.contains(where: { $0.id == a.id }) {
+            Task { await a.end(nil, dismissalPolicy: .immediate) }
+        }
+        #endif
+    }
 
     static func running(_ bus: String) -> Bool {
         #if os(iOS)

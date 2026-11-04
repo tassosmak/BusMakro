@@ -11,6 +11,7 @@ struct BusMakroApp: App {
         try? Tips.configure([.displayFrequency(.immediate)])
         RatingPrompt.noteUse()
         Diagnostics.shared.start()
+        LiveBus.endLeftovers()
     }
 
     var body: some Scene {
