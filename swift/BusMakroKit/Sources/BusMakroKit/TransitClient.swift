@@ -39,7 +39,20 @@ public struct TransitClient: Sendable {
             let oasa = Task { try? await OASAClient().buses(line: line) }
             do {
                 let live = try await get(Self.live.appendingPathComponent("v1/lines").appendingPathComponent(line), as: LineLive.self)
-                return fresher(live, oasa: await Self.within(3, oasa))
+                let fixes = await Self.within(3, oasa)
+                var out = fresher(live, oasa: fixes)
+                // buses OASA sees that the feed doesn't (in November 2026 the feed sent none at all):
+                // added on the route they're driving, so arrivals and the map still have them
+                let known = Set(out.vehicles.map(\.id))
+                let missing = (fixes ?? []).filter { !known.contains($0.id) }
+                if !missing.isEmpty, let d = try? await detail(line: line) {
+                    out = LineLive(line: line, vehicles: out.vehicles + missing.compactMap { o in
+                        LineMath.bestVariant(for: o, detail: d).map {
+                            Vehicle(id: o.id, latitude: o.latitude, longitude: o.longitude, bearing: o.bearing, positionAt: o.positionAt, variant: $0)
+                        }
+                    })
+                }
+                return out
             }
             catch {
                 if error is CancellationError || (error as? URLError)?.code == .cancelled { throw error }

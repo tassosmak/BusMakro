@@ -25,6 +25,17 @@ if CommandLine.arguments.dropFirst().first == "approach", CommandLine.arguments.
     }
     exit(0)
 }
+if CommandLine.arguments.dropFirst().first == "timetable", CommandLine.arguments.count > 2 {
+    // `timetable 040`: today's departures from each end, as the Timetable tab shows them
+    let line = CommandLine.arguments[2], o = OASAClient()
+    let codes = (try? await o.lineCodes()) ?? [:]
+    print("line codes: \(codes.count) lines; \(line): \(codes[line]?.map(\.code) ?? [])")
+    for t in await o.timetable(line: line, codes: codes) {
+        print("  \(t.name): \(t.go.count) from one end, \(t.come.count) from the other; first \(t.go.first.map { "\($0)" } ?? "-")")
+    }
+    exit(0)
+}
+
 if CommandLine.arguments.dropFirst().first == "oasa", CommandLine.arguments.count > 2 {
     // busmakro-check oasa Χ25: a line and its buses from OASA alone (the backup)
     let line = CommandLine.arguments[2], o = OASAClient()

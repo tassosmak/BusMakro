@@ -21,8 +21,8 @@ extension OASAClient {
     public func lineCodes() async throws -> [String: [(code: String, name: String, nameEnglish: String)]] {
         var out: [String: [(code: String, name: String, nameEnglish: String)]] = [:]
         for l in (try await call("webGetLines")) as? [[String: Any]] ?? [] {
-            guard let id = l["LineID"] as? String, let code = l["LineCode"] as? String else { continue }
-            out[id, default: []].append((code, l["LineDescr"] as? String ?? "", l["LineDescrEng"] as? String ?? ""))
+            guard let id = OASAClient.opt(l["LineID"]), let code = OASAClient.opt(l["LineCode"]) else { continue }
+            out[id, default: []].append((code, OASAClient.opt(l["LineDescr"]) ?? "", OASAClient.opt(l["LineDescrEng"]) ?? ""))
         }
         return out
     }
@@ -36,7 +36,7 @@ extension OASAClient {
         func times(_ key: String, _ field: String) -> [Date] {
             let rows = raw[key] as? [[String: Any]] ?? []
             let set = Set(rows.compactMap { r -> Date? in
-                guard let s = r[field] as? String, let t = fmt.date(from: s) else { return nil }
+                guard let s = OASAClient.opt(r[field]), let t = fmt.date(from: s) else { return nil }
                 let hm = cal.dateComponents([.hour, .minute, .second], from: t)
                 return cal.date(bySettingHour: hm.hour!, minute: hm.minute!, second: hm.second!, of: day)
             })
@@ -75,7 +75,7 @@ extension OASAClient {
     public func masterCodes() async throws -> [String: String] {
         var out: [String: String] = [:]
         for m in (try await call("webGetMasterLines")) as? [[String: Any]] ?? [] {
-            if let id = m["ml_id"] as? String, let ml = m["ml_code"] as? String, out[id] == nil { out[id] = ml }
+            if let id = OASAClient.opt(m["ml_id"]), let ml = OASAClient.opt(m["ml_code"]), out[id] == nil { out[id] = ml }
         }
         return out
     }
@@ -83,8 +83,8 @@ extension OASAClient {
     /// The kinds of day a variant has timetables for.
     public func scheduleDays(code: String) async throws -> [ScheduleDay] {
         ((try await call("getScheduleDaysMasterline", [code])) as? [[String: Any]] ?? []).compactMap { r in
-            guard let c = r["sdc_code"] as? String else { return nil }
-            return ScheduleDay(code: c, name: r["sdc_descr"] as? String ?? "", nameEnglish: r["sdc_descr_eng"] as? String ?? "")
+            guard let c = OASAClient.opt(r["sdc_code"]) else { return nil }
+            return ScheduleDay(code: c, name: OASAClient.opt(r["sdc_descr"]) ?? "", nameEnglish: OASAClient.opt(r["sdc_descr_eng"]) ?? "")
         }
     }
 
@@ -96,7 +96,7 @@ extension OASAClient {
         func times(_ key: String, _ field: String) -> [Date] {
             let rows = raw[key] as? [[String: Any]] ?? []
             return Set(rows.compactMap { r -> Date? in
-                guard let s = r[field] as? String, let t = fmt.date(from: s) else { return nil }
+                guard let s = OASAClient.opt(r[field]), let t = fmt.date(from: s) else { return nil }
                 let hm = cal.dateComponents([.hour, .minute], from: t)
                 return cal.date(bySettingHour: hm.hour!, minute: hm.minute!, second: 0, of: day)
             }).sorted()

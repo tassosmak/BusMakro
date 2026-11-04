@@ -60,6 +60,18 @@ public enum LineMath {
     /// The stop a bus drives to next, from its position: the end of the stretch between two stops
     /// it is nearest (within 300 m of the road between them).
     static func nextStop(_ v: Vehicle, on route: [String], detail: LineDetail) -> Int? {
+        fit(v, on: route, detail: detail)?.i
+    }
+
+    /// Which of the line's routes a bus is on, from where it is and which way it heads (OASA's own
+    /// bus positions name OASA's route codes, not the feed's): the one whose road it is nearest to.
+    public static func bestVariant(for v: Vehicle, detail: LineDetail) -> String? {
+        detail.variants.compactMap { id, r in fit(v, on: r.stops, detail: detail).map { (id, $0.off) } }
+            .min { $0.1 < $1.1 }?.0
+    }
+
+    /// The stretch between two stops a bus is nearest (within 300 m), and how far off it is.
+    static func fit(_ v: Vehicle, on route: [String], detail: LineDetail) -> (i: Int, off: Double)? {
         let k = cos(v.latitude * .pi / 180)
         var best: (i: Int, off: Double)?
         for i in 1..<max(1, route.count) {
@@ -76,7 +88,7 @@ public enum LineMath {
             }
             if off < (best?.off ?? 300) { best = (i, off) }
         }
-        return best?.i
+        return best
     }
 
     /// The buses still heading to `stop`, nearest first. `official` maps vehicle code → minutes (OASA).

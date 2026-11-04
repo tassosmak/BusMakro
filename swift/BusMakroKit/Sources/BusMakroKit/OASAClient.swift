@@ -45,9 +45,18 @@ public struct OASAClient: Sendable {
 
     private static func rows(_ any: Any) -> [[String: Any]] { any as? [[String: Any]] ?? [] }
     /// A field as text; OASA sends JSON null for missing ones (NSNull, which would print "<null>").
-    private static func str(_ v: Any?) -> String {
-        guard let v, !(v is NSNull) else { return "" }
-        return (v as? String) ?? "\(v)"
+    static func str(_ v: Any?) -> String { opt(v) ?? "" }
+
+    /// A field as text, whether OASA sent it as text or as a number (in November 2026 it switched
+    /// codes like LineCode from "1151" to 1151, and every `as? String` came back empty); nil if missing.
+    static func opt(_ v: Any?) -> String? {
+        guard let v, !(v is NSNull) else { return nil }
+        if let s = v as? String { return s.isEmpty ? nil : s }
+        if let n = v as? NSNumber {
+            let d = n.doubleValue
+            return d == d.rounded() && abs(d) < 1e15 ? String(Int64(d)) : n.stringValue
+        }
+        return "\(v)"
     }
 
     /// The stops nearest a point, nearest first.
