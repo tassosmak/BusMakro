@@ -5,7 +5,7 @@ Paste the text below into App Review Information → Notes, attach the screen re
 ---
 
 1. Screen recording
-Attached: a recording on an iPhone running the latest iOS, starting from launch. It shows: nearby stops, a stop's live arrivals, opening a line with its buses on the map, the route and timetable tabs, setting a bus alert, a metro station, and the trip planner. The app has no accounts, no user-generated content and no paid content.
+Attached: a recording on an iPhone running the latest iOS, starting from launch. It shows: nearby stops, a stop's live arrivals, opening a line with its buses on the map, the route and timetable tabs, setting a bus alert with its Live Activity on the Lock Screen, the Home Screen widgets, a metro station, and the trip planner. The app has no accounts, no user-generated content and no paid content.
 
 2. Purpose and audience
 BusMakro is a public transport app for Athens, Greece, for residents and visitors who ride OASA buses and trolleys, the metro and the tram. It solves "when is my bus coming and where is it now": it shows official live arrival times for any stop, every bus moving on the map, line routes and timetables, metro and tram frequencies, a trip planner, and a notification when your bus is a few stops away.
@@ -19,7 +19,9 @@ No login, setup or sample files are needed. On first launch, tap Continue (and o
 - Follow: tap the target button to keep the map on a bus.
 - Metro/tram: tap a red M or tram station on the map.
 - Trip planner: side menu → Plan a Trip.
-- Favourites: tap the star on a stop or line. They also appear in the Home Screen widget.
+- Favourites: tap the star on a stop or line.
+- Live Activity: setting a bus alert or following a bus shows its minutes and stops left on the Lock Screen and in the Dynamic Island.
+- Widgets: long-press the Home Screen → Edit → Add Widget → BusMakro. Long-press the widget → Edit Widget to choose a stop's next buses or a line's timetable for a day.
 
 4. External services
 - OASA Telematics API (telematics.oasa.gr): official live arrivals, bus positions, routes and timetables. Public, no key.
