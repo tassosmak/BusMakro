@@ -27,6 +27,9 @@ struct SearchResults: View {
                         }
                         .padding(10)
                         .background(.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: Style.cardRadius))
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel(Speak.join([String(localized: "Station \(r.station.shown)"),
+                                                        r.station.lines.map { Rail.shared?.line($0)?.shown ?? $0 }.joined(separator: ", ")]))
                     }
                     .buttonStyle(.plain).appearing(lines.count + i)
                 }
@@ -38,7 +41,7 @@ struct SearchResults: View {
                 ForEach(Array(stops.enumerated()), id: \.element.stop.id) { i, r in
                     Button { close(); model.open(r.stop) } label: {
                         StopCard(stop: r.stop, metres: model.distance(to: r.stop),
-                                 subtitle: String(localized: "Lines \(r.lines.prefix(8).joined(separator: ", "))"))
+                                 subtitle: String(localized: "Stop \(r.stop.id) · Lines \(r.lines.prefix(8).joined(separator: ", "))"))  // same-named stops told apart
                     }
                     .buttonStyle(.plain).appearing(lines.count + i)
                 }
@@ -62,6 +65,6 @@ struct SearchResults: View {
     }
 
     private func sectionTitle(_ t: LocalizedStringKey) -> some View {
-        Text(t).font(.scaled(11, .semibold)).foregroundStyle(.secondary).padding(.top, 4)
+        Text(t).font(.scaled(11, .semibold)).foregroundStyle(.secondary).padding(.top, 4).heading()
     }
 }

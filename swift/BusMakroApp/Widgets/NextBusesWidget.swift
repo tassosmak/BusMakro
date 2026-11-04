@@ -121,6 +121,8 @@ struct NextBusesView: View {
                         .font(.system(.body, design: .rounded, weight: .semibold)).monospacedDigit()
                         .foregroundStyle(m <= 2 ? .green : .primary)
                 }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(m == 0 ? Text("Line \(l.line), now") : m == 1 ? Text("Line \(l.line), in 1 minute") : Text("Line \(l.line), in \(m) minutes"))
             }
         }
     }

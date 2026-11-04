@@ -151,7 +151,9 @@ struct ContentView: View {
                     .transition(.opacity.combined(with: .move(edge: .top)))
             }
             if showChips {
-                RecentChips(stops: model.recents.map(\.title)) { i in model.open(model.recents[i]) }
+                // two "SYNTAGMA"s (one each side of the road) were told apart by nothing: add their stop number
+                let titles = model.recents.map(\.title)
+                RecentChips(stops: model.recents.map { s in titles.filter { $0 == s.title }.count > 1 ? "\(s.title) · \(s.id)" : s.title }) { i in model.open(model.recents[i]) }
             }
         }
         .animation(.spring(response: 0.32, dampingFraction: 1), value: showResults)

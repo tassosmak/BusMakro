@@ -7,3 +7,10 @@
 "The next buses at your favourite stops." = "Τα επόμενα λεωφορεία στις αγαπημένες σου στάσεις.";
 "Star a stop in BusMakro to see its next buses here." = "Βάλε αστέρι σε μια στάση στο BusMakro για να βλέπεις εδώ τα επόμενα λεωφορεία της.";
 "No live buses" = "Κανένα λεωφορείο";
+
+/* VoiceOver */
+"in 1 minute" = "σε 1 λεπτό";
+"in %lld minutes" = "σε %lld λεπτά";
+"Line %@, now" = "Γραμμή %@, τώρα";
+"Line %@, in 1 minute" = "Γραμμή %@, σε 1 λεπτό";
+"Line %@, in %lld minutes" = "Γραμμή %@, σε %lld λεπτά";

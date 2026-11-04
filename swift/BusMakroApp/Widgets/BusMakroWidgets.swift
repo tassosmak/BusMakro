@@ -67,6 +67,7 @@ private struct LockScreenView: View {
             StopsBar(state: ctx.state, alertAt: ctx.attributes.alertAt)
         }
         .padding(16)
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -82,7 +83,9 @@ private struct Countdown: View {
         } else if stale {
             Text(state.arrival, style: .time).monospacedDigit()
         } else {
-            Text("\(max(1, Int((state.arrival.timeIntervalSinceNow / 60).rounded(.up))))'").monospacedDigit()
+            let m = max(1, Int((state.arrival.timeIntervalSinceNow / 60).rounded(.up)))
+            Text("\(m)'").monospacedDigit()
+                .accessibilityLabel(m == 1 ? Text("in 1 minute") : Text("in \(m) minutes"))  // not "4 apostrophe"
         }
     }
 }
@@ -99,6 +102,7 @@ private struct StopsBar: View {
                 }
                 Image(systemName: "mappin.circle.fill").foregroundStyle(.orange).font(.system(size: 13))
             }
+            .accessibilityHidden(true)  // the dots say what the words next to them say
             Text(state.arrived || state.stopsAway == 0 ? String(localized: "Arriving")
                  : state.stopsAway == 1 ? String(localized: "1 stop away")
                  : String(localized: "\(state.stopsAway) stops away"))

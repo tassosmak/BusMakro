@@ -31,8 +31,10 @@ struct StopCard: View {
                 VStack(alignment: typeSize.isAccessibilitySize ? .leading : .trailing, spacing: 2) {
                     Text(Geo.format(metres: m)).font(Style.rounded(20))
                         .foregroundStyle(closest ? .orange : .primary)
-                    Text("~\(max(1, Int((m / 80).rounded()))) min walk")
-                        .font(.scaled(11)).foregroundStyle(.subtle)
+                    if m <= 2500 {  // "~192 min walk" helped no one: farther stops show just the distance
+                        Text("~\(max(1, Int((m / 80).rounded()))) min walk")
+                            .font(.scaled(11)).foregroundStyle(.subtle)
+                    }
                 }
             }
         }
@@ -44,7 +46,7 @@ struct StopCard: View {
         .accessibilityLabel(Speak.join([stop.title,
                                         subtitle ?? Speak.join([stop.street, String(localized: "Stop \(stop.id)")]),
                                         metres.map { Speak.distance($0) },
-                                        metres.map { String(localized: "about \(Speak.minutes(max(1, Int(($0 / 80).rounded())))) walk") },
+                                        metres.flatMap { $0 <= 2500 ? String(localized: "about \(Speak.minutes(max(1, Int(($0 / 80).rounded())))) walk") : nil },
                                         favourite ? String(localized: "Favourite") : nil]))
     }
 }
@@ -107,7 +109,8 @@ struct LineCard: View {
     /// Live minutes, or (no bus on the road yet) the clock time the timetable says it gets here.
     private var eta: String {
         if let m = line.arrivalsMinutes.first {
-            return String(localized: "\(History.shared.learnedMinutes(line: line.line, minutes: m) ?? m) min")
+            let shown = History.shared.learnedMinutes(line: line.line, minutes: m) ?? m
+            return shown <= 0 ? String(localized: "Now") : String(localized: "\(shown) min")
         }
         if let s = line.scheduled { return Self.clock.string(from: s.arrive) }
         return "—"
@@ -225,5 +228,5 @@ func favouriteSubtitle(_ lines: [StopLine]?) -> String? {
     guard let lines else { return nil }
     let live = lines.filter { !$0.arrivalsMinutes.isEmpty }.sorted { $0.arrivalsMinutes[0] < $1.arrivalsMinutes[0] }.prefix(3)
     if live.isEmpty { return String(localized: "No live buses") }
-    return live.map { "\($0.line) " + String(localized: "\($0.arrivalsMinutes[0]) min") }.joined(separator: " · ")
+    return live.map { "\($0.line) " + ($0.arrivalsMinutes[0] <= 0 ? String(localized: "now") : String(localized: "\($0.arrivalsMinutes[0]) min")) }.joined(separator: " · ")  // not "810 0 min"
 }

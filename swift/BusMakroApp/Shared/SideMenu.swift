@@ -50,7 +50,7 @@ struct SideMenu: View {
                 }
                 .padding(.top, 14)
                 Spacer()
-                Text("Data: OASA · athens-transit-rt. Unofficial app, not affiliated with OASA or STASY.")
+                Text("Data: OASA and STASY; live positions via athens-transit-rt. Unofficial app, not affiliated with OASA or STASY.")
                     .font(.scaled(11)).foregroundStyle(.tertiary).padding(.bottom, 30)
             }
             .padding(.horizontal, 22)

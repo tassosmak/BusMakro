@@ -95,11 +95,10 @@
 "Version %@" = "Έκδοση %@";
 "Athens buses, live" = "Τα λεωφορεία της Αθήνας, ζωντανά";
 "Metro Map" = "Χάρτης μετρό";
-"Data: OASA · athens-transit-rt. Unofficial app, not affiliated with OASA or STASY." = "Δεδομένα: ΟΑΣΑ · athens-transit-rt. Ανεπίσημη εφαρμογή, χωρίς σχέση με τον ΟΑΣΑ ή τη ΣΤΑΣΥ.";
+"Data: OASA and STASY; live positions via athens-transit-rt. Unofficial app, not affiliated with OASA or STASY." = "Δεδομένα: ΟΑΣΑ και ΣΤΑΣΥ· θέσεις λεωφορείων μέσω athens-transit-rt. Ανεπίσημη εφαρμογή, χωρίς σχέση με τον ΟΑΣΑ ή τη ΣΤΑΣΥ.";
 "Map: STASY S.A." = "Χάρτης: ΣΤΑΣΥ Α.Ε.";
 "Search" = "Αναζήτηση";
 "Menu" = "Μενού";
-"Bus %@" = "Λεωφορείο %@";
 "Stop following" = "Διακοπή παρακολούθησης";
 "Follow this bus" = "Παρακολούθηση αυτού του λεωφορείου";
 "Line %@ bus" = "Λεωφορείο της γραμμής %@";
@@ -282,3 +281,10 @@
 "%lld buses on this line" = "%lld λεωφορεία στη γραμμή";
 "Alert off" = "Η ειδοποίηση απενεργοποιήθηκε";
 "You'll be notified when this bus is %@" = "Θα ειδοποιηθείτε όταν το λεωφορείο είναι %@";
+"Stop %@ · Lines %@" = "Στάση %@ · Γραμμές %@";
+"Privacy Policy" = "Πολιτική απορρήτου";
+"Website" = "Ιστότοπος";
+"Version" = "Έκδοση";
+"About" = "Πληροφορίες";
+"Arrivals, routes and timetables from OASA's telematics; metro and tram timetables from STASY (data.gov.gr); live bus positions via the open-source athens-transit-rt project. BusMakro is an independent app, not affiliated with OASA or STASY." = "Αφίξεις, διαδρομές και δρομολόγια από την τηλεματική του ΟΑΣΑ· δρομολόγια μετρό και τραμ από τη ΣΤΑΣΥ (data.gov.gr)· θέσεις λεωφορείων μέσω του ανοιχτού έργου athens-transit-rt. Το BusMakro είναι ανεξάρτητη εφαρμογή, χωρίς σχέση με τον ΟΑΣΑ ή τη ΣΤΑΣΥ.";
+"now" = "τώρα";
