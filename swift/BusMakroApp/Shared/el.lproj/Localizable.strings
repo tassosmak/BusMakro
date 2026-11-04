@@ -289,6 +289,7 @@
 "now" = "τώρα";
 "Never miss your bus" = "Μη χάσεις ποτέ το λεωφορείο σου";
 "Tap the bell to be notified when this bus is a few stops from you, even with the phone locked. Tap the target to follow it on the map." = "Πάτησε το καμπανάκι για να ειδοποιηθείς όταν το λεωφορείο είναι λίγες στάσεις μακριά, ακόμα και με κλειδωμένο κινητό. Πάτησε τον στόχο για να το ακολουθήσεις στον χάρτη.";
+"Tap the bell to be notified when this bus is a few stops from you, even with the phone locked. Tap the target to follow it on the map. On the bus? Tap the waves to be woken before your stop." = "Πάτησε το καμπανάκι για να ειδοποιηθείς όταν το λεωφορείο είναι λίγες στάσεις μακριά, ακόμα και με κλειδωμένο κινητό. Πάτησε τον στόχο για να το ακολουθήσεις στον χάρτη. Είσαι μέσα; Πάτα τα κύματα για να σε ξυπνήσει πριν τη στάση σου.";
 "Share Diagnostic Reports" = "Κοινοποίηση αναφορών διαγνωστικών";
 
 "You'll be woken before %@" = "Θα σε ξυπνήσουμε πριν από τη στάση %@";
@@ -317,3 +318,8 @@
 "Next bus in %lld min · live" = "Επόμενο λεωφορείο σε %lld λεπ. · ζωντανά";
 "Next train in %lld min · timetable" = "Επόμενος συρμός σε %lld λεπ. · πρόγραμμα";
 "Wait about %lld min" = "Αναμονή περίπου %lld λεπ.";
+
+"Wake Me at My Stop" = "Ξύπνα με στη στάση μου";
+"On, at %@" = "Ενεργό, στη στάση %@";
+"Don't Wake Me" = "Μη με ξυπνήσεις";
+"On this bus? Wake me before…" = "Είσαι σε αυτό το λεωφορείο; Ξύπνα με πριν…";

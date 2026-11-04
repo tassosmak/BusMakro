@@ -6,7 +6,7 @@ import TipKit
 struct BusButtonsTip: Tip {
     var title: Text { Text("Never miss your bus") }
     var message: Text? {
-        Text("Tap the bell to be notified when this bus is a few stops from you, even with the phone locked. Tap the target to follow it on the map.")
+        Text("Tap the bell to be notified when this bus is a few stops from you, even with the phone locked. Tap the target to follow it on the map. On the bus? Tap the waves to be woken before your stop.")
     }
     var image: Image? { Image(systemName: "bell.badge") }
 }
