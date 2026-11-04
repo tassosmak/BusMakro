@@ -4,30 +4,155 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>BusMakro</title>
-<meta name="description" content="Athens buses, metro and tram, live, for iPhone and Mac.">
+<meta name="description" content="Athens buses, metro and tram, live. Arrivals from OASA, buses moving on the map, alerts, Live Activities and widgets. For iPhone, in Greek and English.">
+<meta property="og:title" content="BusMakro: Athens buses, live">
+<meta property="og:description" content="Live OASA arrivals, every bus moving on the map, and a buzz before your stop.">
+<meta property="og:image" content="https://tassosmak.github.io/BusMakro-Swift/shots/en-3-line.jpg">
 <link rel="icon" href="icon.png">
-<link rel="stylesheet" href="style.css">
+<link rel="apple-touch-icon" href="icon.png">
+<link rel="stylesheet" href="home.css">
 </head>
 <body>
-<main>
-  <header>
-    <img src="icon.png" width="96" height="96" alt="BusMakro icon">
-    <h1>BusMakro</h1>
-    <p class="muted">Athens buses, metro and tram, live. For iPhone and Mac, in Greek and English.</p>
-  </header>
 
-  <p>Open it and see the stops around you. Tap one for every line that stops there and when the next bus comes, with the buses moving live on the map.</p>
-
-  <div class="links">
-    <a href="privacy.html">Privacy Policy</a>
-    <a href="mailto:amakrostergios@icloud.com">Support &amp; feedback</a>
-    <a href="https://github.com/tassosmak/BusMakro-Swift">Source code</a>
+<nav class="top">
+  <a class="brand" href="#"><img src="icon.png" alt="" width="32" height="32">BusMakro</a>
+  <div class="lang" role="group" aria-label="Language">
+    <button data-set="en" aria-pressed="true">EN</button>
+    <button data-set="el" aria-pressed="false">ΕΛ</button>
   </div>
+</nav>
 
-  <h2>Support</h2>
-  <p>Found a bug or have an idea? <a href="mailto:amakrostergios@icloud.com">Email amakrostergios@icloud.com</a>, with your iPhone or Mac model and what you were doing.</p>
+<header class="hero">
+  <div class="hero-text">
+    <p class="badge" data-en="Now in beta on TestFlight · Coming soon to the App Store" data-el="Σε beta στο TestFlight · Σύντομα στο App Store">Now in beta on TestFlight · Coming soon to the App Store</p>
+    <h1 data-en="Your bus, &lt;span&gt;live.&lt;/span&gt;" data-el="Το λεωφορείο σου, &lt;span&gt;ζωντανά.&lt;/span&gt;">Your bus, <span>live.</span></h1>
+    <p class="lead" data-en="Athens buses, metro and tram in one app. OASA's own arrival times, every bus moving on the map, and a buzz before your stop."
+       data-el="Λεωφορεία, μετρό και τραμ της Αθήνας σε μία εφαρμογή. Οι επίσημοι χρόνοι άφιξης του ΟΑΣΑ, κάθε λεωφορείο να κινείται στον χάρτη, και μια ειδοποίηση πριν τη στάση σου.">
+      Athens buses, metro and tram in one app. OASA's own arrival times, every bus moving on the map, and a buzz before your stop.</p>
+    <ul class="facts">
+      <li data-en="Free" data-el="Δωρεάν">Free</li>
+      <li data-en="No ads, no tracking" data-el="Χωρίς διαφημίσεις, χωρίς παρακολούθηση">No ads, no tracking</li>
+      <li data-en="Greek &amp; English" data-el="Ελληνικά &amp; Αγγλικά">Greek &amp; English</li>
+    </ul>
+  </div>
+  <div class="hero-phone">
+    <img class="phone" src="shots/en-3-line.jpg" data-shot="3-line" alt="A bus line on the map with its buses and their arrival times" width="506" height="1100">
+  </div>
+</header>
 
-  <footer class="muted">Unofficial app, not affiliated with OASA, OSY or STASY. Data: OASA, STASY, athens-transit-rt.</footer>
+<main>
+  <section>
+    <h2 data-en="Everything you need on the way" data-el="Ό,τι χρειάζεσαι στον δρόμο">Everything you need on the way</h2>
+    <div class="grid">
+      <article class="card">
+        <div class="ic">🕒</div>
+        <h3 data-en="Live arrivals" data-el="Ζωντανές αφίξεις">Live arrivals</h3>
+        <p data-en="The times come straight from OASA Telematics, the same as the screens at the stops." data-el="Οι χρόνοι έρχονται κατευθείαν από την Τηλεματική του ΟΑΣΑ, όπως στις οθόνες των στάσεων.">The times come straight from OASA Telematics, the same as the screens at the stops.</p>
+      </article>
+      <article class="card">
+        <div class="ic">🗺️</div>
+        <h3 data-en="Buses on the map" data-el="Λεωφορεία στον χάρτη">Buses on the map</h3>
+        <p data-en="Watch every bus on a line glide along its route, and follow the one you're waiting for." data-el="Δες κάθε λεωφορείο της γραμμής να κινείται στη διαδρομή, και ακολούθησε αυτό που περιμένεις.">Watch every bus on a line glide along its route, and follow the one you're waiting for.</p>
+      </article>
+      <article class="card">
+        <div class="ic">🔔</div>
+        <h3 data-en="Bus alerts" data-el="Ειδοποιήσεις">Bus alerts</h3>
+        <p data-en="Get a notification when your bus is a few stops away, even with the phone locked." data-el="Πάρε ειδοποίηση όταν το λεωφορείο σου είναι λίγες στάσεις μακριά, ακόμα και με κλειδωμένο κινητό.">Get a notification when your bus is a few stops away, even with the phone locked.</p>
+      </article>
+      <article class="card">
+        <div class="ic">⏰</div>
+        <h3 data-en="Wake me at my stop" data-el="Ξύπνα με στη στάση μου">Wake me at my stop</h3>
+        <p data-en="On the bus? Choose where you get off and get a buzz one stop before, and again at the stop." data-el="Μέσα στο λεωφορείο; Διάλεξε πού κατεβαίνεις και θα δονηθεί μία στάση πριν, και ξανά στη στάση.">On the bus? Choose where you get off and get a buzz one stop before, and again at the stop.</p>
+      </article>
+      <article class="card">
+        <div class="ic">📱</div>
+        <h3 data-en="Live Activity &amp; widgets" data-el="Live Activity &amp; widgets">Live Activity &amp; widgets</h3>
+        <p data-en="The countdown on your Lock Screen and in the Dynamic Island, and your favourite stops on the Home Screen." data-el="Η αντίστροφη μέτρηση στην οθόνη κλειδώματος και στο Dynamic Island, και οι αγαπημένες σου στάσεις στην αρχική οθόνη.">The countdown on your Lock Screen and in the Dynamic Island, and your favourite stops on the Home Screen.</p>
+      </article>
+      <article class="card">
+        <div class="ic">🚇</div>
+        <h3 data-en="Metro, tram &amp; trips" data-el="Μετρό, τραμ &amp; διαδρομές">Metro, tram &amp; trips</h3>
+        <p data-en="Metro and tram times work offline. Plan a trip and see the live wait for every leg." data-el="Οι ώρες μετρό και τραμ δουλεύουν χωρίς σύνδεση. Σχεδίασε μια διαδρομή και δες τη ζωντανή αναμονή σε κάθε σκέλος.">Metro and tram times work offline. Plan a trip and see the live wait for every leg.</p>
+      </article>
+      <article class="card">
+        <div class="ic">🎙️</div>
+        <h3 data-en="Siri &amp; Shortcuts" data-el="Siri &amp; Συντομεύσεις">Siri &amp; Shortcuts</h3>
+        <p data-en="Ask “When is the 040 coming?” for your favourite or nearest stop, without opening the app." data-el="Ρώτα «Πότε έρχεται το 040;» για την αγαπημένη ή την κοντινότερη στάση, χωρίς να ανοίξεις την εφαρμογή.">Ask “When is the 040 coming?” for your favourite or nearest stop, without opening the app.</p>
+      </article>
+      <article class="card">
+        <div class="ic">♿️</div>
+        <h3 data-en="Made for everyone" data-el="Για όλους">Made for everyone</h3>
+        <p data-en="Full VoiceOver, large text, high contrast and Reduce Motion support." data-el="Πλήρης υποστήριξη VoiceOver, μεγάλων γραμμάτων, υψηλής αντίθεσης και μειωμένης κίνησης.">Full VoiceOver, large text, high contrast and Reduce Motion support.</p>
+      </article>
+    </div>
+  </section>
+
+  <section>
+    <h2 data-en="A look inside" data-el="Μια ματιά">A look inside</h2>
+    <div class="gallery" tabindex="0" aria-label="Screenshots">
+      <figure><img src="shots/en-1-nearby.jpg" data-shot="1-nearby" alt="Stops near you" loading="lazy" width="506" height="1100"><figcaption data-en="The stops around you" data-el="Οι στάσεις γύρω σου">The stops around you</figcaption></figure>
+      <figure><img src="shots/en-2-stop.jpg" data-shot="2-stop" alt="Arrivals at a stop" loading="lazy" width="506" height="1100"><figcaption data-en="Every line at a stop" data-el="Κάθε γραμμή στη στάση">Every line at a stop</figcaption></figure>
+      <figure><img src="shots/en-4-route.jpg" data-shot="4-route" alt="A line's route" loading="lazy" width="506" height="1100"><figcaption data-en="The whole route" data-el="Όλη η διαδρομή">The whole route</figcaption></figure>
+      <figure><img src="shots/en-6-metro.jpg" data-shot="6-metro" alt="Metro station times" loading="lazy" width="506" height="1100"><figcaption data-en="Metro and tram" data-el="Μετρό και τραμ">Metro and tram</figcaption></figure>
+      <figure><img src="shots/en-7-trip.jpg" data-shot="7-trip" alt="A planned trip" loading="lazy" width="506" height="1100"><figcaption data-en="Trip planner" data-el="Σχεδιασμός διαδρομής">Trip planner</figcaption></figure>
+    </div>
+  </section>
+
+  <section>
+    <h2 data-en="Questions" data-el="Ερωτήσεις">Questions</h2>
+    <details>
+      <summary data-en="Is it an official OASA app?" data-el="Είναι επίσημη εφαρμογή του ΟΑΣΑ;">Is it an official OASA app?</summary>
+      <p data-en="No. BusMakro is an independent app, not affiliated with OASA, OSY or STASY. It uses their public data." data-el="Όχι. Το BusMakro είναι ανεξάρτητη εφαρμογή, χωρίς σχέση με ΟΑΣΑ, ΟΣΥ ή ΣΤΑΣΥ. Χρησιμοποιεί τα δημόσια δεδομένα τους.">No. BusMakro is an independent app, not affiliated with OASA, OSY or STASY. It uses their public data.</p>
+    </details>
+    <details>
+      <summary data-en="Does it cost anything?" data-el="Κοστίζει κάτι;">Does it cost anything?</summary>
+      <p data-en="No. It's free, with no ads and no in-app purchases." data-el="Όχι. Είναι δωρεάν, χωρίς διαφημίσεις και χωρίς αγορές.">No. It's free, with no ads and no in-app purchases.</p>
+    </details>
+    <details>
+      <summary data-en="What does it do with my location?" data-el="Τι κάνει με την τοποθεσία μου;">What does it do with my location?</summary>
+      <p data-en="It finds the stops near you and keeps an alert working with the phone locked. It never stores your location or sends it to us. Details in the privacy policy." data-el="Βρίσκει τις στάσεις κοντά σου και κρατά μια ειδοποίηση ενεργή με κλειδωμένο κινητό. Δεν αποθηκεύει ποτέ την τοποθεσία σου ούτε μας τη στέλνει. Λεπτομέρειες στην πολιτική απορρήτου.">It finds the stops near you and keeps an alert working with the phone locked. It never stores your location or sends it to us. Details in the privacy policy.</p>
+    </details>
+    <details>
+      <summary data-en="Why is a time marked with ~?" data-el="Γιατί κάποιος χρόνος έχει ~;">Why is a time marked with ~?</summary>
+      <p data-en="A green dot means the time is OASA's own. A ~ means BusMakro worked it out from where the bus is, when OASA had no time for it." data-el="Η πράσινη τελεία σημαίνει ότι ο χρόνος είναι του ΟΑΣΑ. Το ~ σημαίνει ότι το BusMakro τον υπολόγισε από τη θέση του λεωφορείου, όταν ο ΟΑΣΑ δεν έδινε χρόνο.">A green dot means the time is OASA's own. A ~ means BusMakro worked it out from where the bus is, when OASA had no time for it.</p>
+    </details>
+    <details>
+      <summary data-en="Which devices does it run on?" data-el="Σε ποιες συσκευές δουλεύει;">Which devices does it run on?</summary>
+      <p data-en="iPhone with iOS 17 or later." data-el="iPhone με iOS 17 ή νεότερο.">iPhone with iOS 17 or later.</p>
+    </details>
+  </section>
+
+  <section class="support">
+    <h2 data-en="Support" data-el="Υποστήριξη">Support</h2>
+    <p data-en="Found a bug or have an idea? Email me with your iPhone model and what you were doing." data-el="Βρήκες κάποιο πρόβλημα ή έχεις μια ιδέα; Στείλε μου email με το μοντέλο του iPhone σου και τι έκανες.">Found a bug or have an idea? Email me with your iPhone model and what you were doing.</p>
+    <div class="links">
+      <a class="primary" href="mailto:amakrostergios@icloud.com">amakrostergios@icloud.com</a>
+      <a href="privacy.html" data-en="Privacy Policy" data-el="Πολιτική απορρήτου">Privacy Policy</a>
+      <a href="https://github.com/tassosmak/BusMakro-Swift" data-en="Source code" data-el="Κώδικας">Source code</a>
+    </div>
+  </section>
 </main>
+
+<footer>
+  <p data-en="Made in Athens by Anastasios Makrostergios." data-el="Φτιαγμένο στην Αθήνα από τον Anastasios Makrostergios.">Made in Athens by Anastasios Makrostergios.</p>
+  <p class="muted" data-en="Unofficial app, not affiliated with OASA, OSY or STASY. Data: OASA, STASY, athens-transit-rt." data-el="Ανεπίσημη εφαρμογή, χωρίς σχέση με ΟΑΣΑ, ΟΣΥ ή ΣΤΑΣΥ. Δεδομένα: ΟΑΣΑ, ΣΤΑΣΥ, athens-transit-rt.">Unofficial app, not affiliated with OASA, OSY or STASY. Data: OASA, STASY, athens-transit-rt.</p>
+</footer>
+
+<script>
+(function () {
+  function apply(lang) {
+    document.documentElement.lang = lang;
+    document.querySelectorAll("[data-en]").forEach(function (el) { el.innerHTML = el.getAttribute("data-" + lang); });
+    document.querySelectorAll("img[data-shot]").forEach(function (img) { img.src = "shots/" + lang + "-" + img.getAttribute("data-shot") + ".jpg"; });
+    document.querySelectorAll(".lang button").forEach(function (b) { b.setAttribute("aria-pressed", b.dataset.set === lang); });
+    try { localStorage.setItem("lang", lang); } catch (e) {}
+  }
+  var saved = null;
+  try { saved = localStorage.getItem("lang"); } catch (e) {}
+  var lang = saved || ((navigator.language || "").toLowerCase().indexOf("el") === 0 ? "el" : "en");
+  if (lang !== "en") apply(lang);
+  document.querySelectorAll(".lang button").forEach(function (b) { b.addEventListener("click", function () { apply(b.dataset.set); }); });
+})();
+</script>
 </body>
 </html>
