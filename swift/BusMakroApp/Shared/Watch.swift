@@ -38,7 +38,7 @@ extension Model {
     func followChanged(from old: String?, to new: String?) {
         if let old, old != new, watches[old]?.kind == .follow { watches[old] = nil; LiveBus.end(old) }
         guard let bus = new, watches[bus] == nil, case .line(let line, _) = screen, let stop = lineStop else { return }
-        watches[bus] = BusWatch(line: line, stop: stop, stopName: lineDetail?.stops[stop]?.name ?? stop, stops: 0, kind: .follow, notified: true)
+        watches[bus] = BusWatch(line: line, stop: stop, stopName: Names.place(lineDetail?.stops[stop]?.name ?? stop, ""), stops: 0, kind: .follow, notified: true)
         checkWatches(line: line, vehicles: vehicles)
         startWatchLoop()
     }
@@ -47,7 +47,7 @@ extension Model {
     /// the Live Activity counts down to it.
     func ride(_ bus: String, to stop: String) {
         guard case .line(let line, _) = screen else { return }
-        let name = lineDetail?.stops[stop]?.name ?? stop
+        let name = Names.place(lineDetail?.stops[stop]?.name ?? stop, "")  // in the app's language (the Live Activity showed Greek)
         LiveBus.end(bus)  // a follow or alert countdown to another stop makes way
         watches[bus] = BusWatch(line: line, stop: stop, stopName: name, stops: 1, kind: .ride)
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .timeSensitive]) { _, _ in }
@@ -65,12 +65,15 @@ extension Model {
     func watch(_ bus: String, stops n: Int?) {
         guard let n else {
             watches[bus] = nil; LiveBus.end(bus)
-            UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: ["watch-\(bus)"])
+            UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: ["watch-\(bus)", "ride-\(bus)"])
             AccessibilityNotification.Announcement(String(localized: "Alert off")).post()
+            // still following it: its countdown comes back (an alert or a ride had taken its place)
+            if pinned == bus { followChanged(from: nil, to: bus) }
             return
         }
         guard case .line(let line, _) = screen, let stop = lineStop else { return }
-        watches[bus] = BusWatch(line: line, stop: stop, stopName: lineDetail?.stops[stop]?.name ?? stop, stops: n)
+        if let old = watches[bus], old.kind != .alert || old.stop != stop { LiveBus.end(bus) }  // the countdown starts afresh for the alert
+        watches[bus] = BusWatch(line: line, stop: stop, stopName: Names.place(lineDetail?.stops[stop]?.name ?? stop, ""), stops: n)
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
         checkWatches(line: line, vehicles: vehicles)
         startWatchLoop()

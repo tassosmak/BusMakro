@@ -19,7 +19,8 @@ struct BusLiveActivity: Widget {
         ActivityConfiguration(for: BusActivityAttributes.self) { ctx in
             LockScreenView(ctx: ctx)
                 .activityBackgroundTint(nil)
-                .widgetURL(URL(string: "busmakro://stop/\(ctx.attributes.stopID)"))
+                // a ride opens its line (your bus on the map); an alert opens the stop you're waiting at
+                .widgetURL(URL(string: ctx.attributes.riding ? "busmakro://line/\(ctx.attributes.line)" : "busmakro://stop/\(ctx.attributes.stopID)"))
         } dynamicIsland: { ctx in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
@@ -46,7 +47,7 @@ struct BusLiveActivity: Widget {
             } minimal: {
                 Image(systemName: "bus.fill").foregroundStyle(Self.green)
             }
-            .widgetURL(URL(string: "busmakro://stop/\(ctx.attributes.stopID)"))
+            .widgetURL(URL(string: ctx.attributes.riding ? "busmakro://line/\(ctx.attributes.line)" : "busmakro://stop/\(ctx.attributes.stopID)"))
         }
     }
 }
