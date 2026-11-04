@@ -289,7 +289,7 @@
 "now" = "τώρα";
 "Never miss your bus" = "Μη χάσεις ποτέ το λεωφορείο σου";
 "Tap the bell to be notified when this bus is a few stops from you, even with the phone locked. Tap the target to follow it on the map." = "Πάτησε το καμπανάκι για να ειδοποιηθείς όταν το λεωφορείο είναι λίγες στάσεις μακριά, ακόμα και με κλειδωμένο κινητό. Πάτησε τον στόχο για να το ακολουθήσεις στον χάρτη.";
-"Tap the bell to be notified when this bus is a few stops from you, even with the phone locked. Tap the target to follow it on the map. On the bus? Tap the person in the bus to be woken before your stop." = "Πάτησε το καμπανάκι για να ειδοποιηθείς όταν το λεωφορείο είναι λίγες στάσεις μακριά, ακόμα και με κλειδωμένο κινητό. Πάτησε τον στόχο για να το ακολουθήσεις στον χάρτη. Είσαι μέσα; Πάτα το ανθρωπάκι στο λεωφορείο για να σε ξυπνήσει πριν τη στάση σου.";
+"Tap the bell to be notified when this bus is a few stops from you, even with the phone locked. Tap the target to follow it on the map. On the bus? Tap the alarm clock to be woken before your stop." = "Πάτησε το καμπανάκι για να ειδοποιηθείς όταν το λεωφορείο είναι λίγες στάσεις μακριά, ακόμα και με κλειδωμένο κινητό. Πάτησε τον στόχο για να το ακολουθήσεις στον χάρτη. Είσαι μέσα; Πάτα το ξυπνητήρι για να σε ξυπνήσει πριν τη στάση σου.";
 "Share Diagnostic Reports" = "Κοινοποίηση αναφορών διαγνωστικών";
 
 "You'll be woken before %@" = "Θα σε ξυπνήσουμε πριν από τη στάση %@";
@@ -323,3 +323,7 @@
 "On, at %@" = "Ενεργό, στη στάση %@";
 "Don't Wake Me" = "Μη με ξυπνήσεις";
 "On this bus? Wake me before…" = "Είσαι σε αυτό το λεωφορείο; Ξύπνα με πριν…";
+"Where do you get off?" = "Πού κατεβαίνεις;";
+"You'll get a buzz one stop before and another at the stop, even with the phone locked." = "Θα δονηθεί μία στάση πριν και ξανά στη στάση, ακόμα και με κλειδωμένο κινητό.";
+"You'll be woken one stop before, and at the stop" = "Θα σε ξυπνήσει μία στάση πριν, και στη στάση";
+"1 stop" = "1 στάση";

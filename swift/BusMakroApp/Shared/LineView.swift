@@ -102,7 +102,7 @@ struct LineContent: View {
     @ViewBuilder private var wakeBar: some View {
         if let r = model.riding {
             HStack(spacing: 10) {
-                RiderIcon(on: true).foregroundStyle(.orange)
+                Image(systemName: "alarm.fill").foregroundStyle(.orange).accessibilityHidden(true)
                 Text("Waking you before \(Names.place(r.watch.stopName, ""))").font(.scaled(13, .semibold))
                 Spacer(minLength: 4)
                 Button("Cancel") { model.watch(r.bus, stops: nil) }.font(.scaled(13, .semibold))
@@ -128,7 +128,7 @@ struct LineContent: View {
                                     model.lineStop = sid; Task { await model.refreshLine(currentLine) }
                                 }
                                 .contextMenu {
-                                    if let bus = model.pinned { Button("Wake Me Here", systemImage: "figure.seated.side.right") { model.ride(bus, to: sid) } }
+                                    if let bus = model.pinned { Button("Wake Me Here", systemImage: "alarm") { model.ride(bus, to: sid) } }
                                 }
                                 .accessibilityAddTraits(.isButton)
                         }
@@ -151,20 +151,43 @@ struct LineContent: View {
     }
 }
 
-/// "Wake me at my stop": a person sitting inside a bus (SF Symbols has no such symbol).
-struct RiderIcon: View {
-    var on = false
-    @ScaledMetric(relativeTo: .callout) private var size: CGFloat = 19
+/// "Wake me at my stop": choose where you get off, from the stops this bus has ahead.
+struct WakeSheet: View {
+    let stops: [(id: String, name: String)]
+    let waking: String?
+    let choose: (String?) -> Void
+
     var body: some View {
-        // the bus seen from the front, a passenger in its windscreen
-        Image(systemName: "bus")
-            .font(.system(size: size, weight: .medium))
-            .overlay(alignment: .top) {
-                Image(systemName: "person.fill")
-                    .font(.system(size: size * 0.46, weight: .bold))
-                    .offset(y: size * 0.14)
+        NavigationStack {
+            List {
+                if let waking {
+                    Section {
+                        Label("Waking you before \(waking)", systemImage: "alarm.fill").foregroundStyle(.orange)
+                        Button("Don't Wake Me", role: .destructive) { choose(nil) }
+                    }
+                }
+                Section {
+                    ForEach(Array(stops.enumerated()), id: \.element.id) { i, st in
+                        Button { choose(st.id) } label: {
+                            HStack {
+                                Text(st.name).foregroundStyle(.primary)
+                                Spacer()
+                                Text(i == 0 ? String(localized: "1 stop") : String(localized: "\(i + 1) stops"))
+                                    .font(.scaled(13)).foregroundStyle(.secondary).monospacedDigit()
+                            }
+                        }
+                        .tint(.primary)
+                        .accessibilityHint(Text("You'll be woken one stop before, and at the stop"))
+                    }
+                } header: {
+                    Text("Where do you get off?")
+                } footer: {
+                    Text("You'll get a buzz one stop before and another at the stop, even with the phone locked.")
+                }
             }
-            .accessibilityHidden(true)
+            .navigationTitle("Wake Me at My Stop")
+            .navigationBarTitleDisplayMode(.inline)
+        }
     }
 }
 
@@ -181,6 +204,7 @@ struct ArrivalCard: View {
     var waking: String? = nil
     var onWake: (String?) -> Void = { _ in }
     @State private var showDetails = false
+    @State private var showWake = false
 
     var body: some View {
         HStack(alignment: .center, spacing: 10) {
@@ -213,9 +237,8 @@ struct ArrivalCard: View {
                 .accessibilityAddTraits(following ? .isSelected : [])
             // ⏰: on this bus? wake me before the stop I get off at
             if !wakeStops.isEmpty || waking != nil {
-                Menu { wakeMenu } label: {
-                    face(on: waking != nil) { RiderIcon(on: waking != nil) }
-                }
+                Button { showWake = true } label: { circle(waking != nil ? "alarm.fill" : "alarm", on: waking != nil) }
+                .buttonStyle(.plain)
                 .accessibilityLabel(Text("Wake Me at My Stop"))
                 .accessibilityValue(waking.map { String(localized: "On, at \($0)") } ?? String(localized: "Off"))
             }
@@ -231,6 +254,11 @@ struct ArrivalCard: View {
         .sensoryFeedback(.impact(weight: .medium), trigger: showDetails) { _, on in on }
         .popover(isPresented: $showDetails, arrowEdge: .bottom) {
             details.presentationCompactAdaptation(.popover)
+        }
+        // a sheet, not a menu: a menu was rebuilt by every countdown tick and jumped back to the top
+        .sheet(isPresented: $showWake) {
+            WakeSheet(stops: wakeStops, waking: waking) { onWake($0); showWake = false }
+                .presentationDetents([.medium, .large])
         }
     }
 
@@ -274,16 +302,6 @@ struct ArrivalCard: View {
             Button(n == 1 ? String(localized: "1 stop away") : String(localized: "\(n) stops away")) { onWatch(n) }
         }
         if watching != nil { Button("Don't Notify Me", role: .destructive) { onWatch(nil) } }
-    }
-
-    @ViewBuilder private var wakeMenu: some View {
-        if let waking {
-            Text("Waking you before \(waking)")
-            Button("Don't Wake Me", role: .destructive) { onWake(nil) }
-        } else {
-            Text("On this bus? Wake me before…")
-            ForEach(wakeStops, id: \.id) { st in Button(st.name) { onWake(st.id) } }
-        }
     }
 
     /// A round, finger-sized button face (44 pt), tinted orange while on.
@@ -340,7 +358,7 @@ struct RouteStopRow: View {
                 Text("Stop \(id)").font(.scaled(11)).foregroundStyle(.subtle)
             }
             Spacer()
-            if wake { RiderIcon(on: true).foregroundStyle(.orange) }
+            if wake { Image(systemName: "alarm.fill").foregroundStyle(.orange).accessibilityHidden(true) }
         }
         .padding(.horizontal, 6)
         .frame(minHeight: 46)
