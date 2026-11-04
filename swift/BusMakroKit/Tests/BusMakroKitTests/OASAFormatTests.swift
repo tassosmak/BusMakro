@@ -44,3 +44,26 @@ final class OASAFormatTests: XCTestCase {
         XCTAssertNil(LineMath.bestVariant(for: far, detail: d), "nowhere near the line")
     }
 }
+
+final class OASAOnlyMovementTests: XCTestCase {
+    let shape: [[Double]] = (0...20).map { [37.95 + 0.001 * Double($0), 23.70] }  // ~2.2 km due north
+
+    func testFreshBusGlidesAlongItsRoad() {
+        let v = Vehicle(id: "B", latitude: 37.955, longitude: 23.70, bearing: 0, positionAt: Date().addingTimeInterval(-20), variant: "go")
+            .onRoad(shape, start: (37.95, 23.70))
+        let r = Movement.route(for: v)
+        XCTAssertNotNil(r, "has a road ahead")
+        let now = Movement.position(v, route: r, hold: 0)
+        XCTAssertGreaterThan(Geo.distance(37.955, 23.70, now.0, now.1), 30, "driven on from a 20 s old fix")
+        XCTAssertGreaterThan(now.0, 37.955, "forwards, the way the route goes")
+    }
+
+    func testWaitingAtTheStartOrOldFixStaysPut() {
+        for v in [Vehicle(id: "T", latitude: 37.9501, longitude: 23.70, bearing: 0, positionAt: Date(), variant: "go"),
+                  Vehicle(id: "O", latitude: 37.955, longitude: 23.70, bearing: 0, positionAt: Date().addingTimeInterval(-300), variant: "go")] {
+            let w = v.onRoad(shape, start: (37.95, 23.70))
+            let p = Movement.position(w, route: Movement.route(for: w), hold: 0)
+            XCTAssertLessThan(Geo.distance(v.latitude, v.longitude, p.0, p.1), 1, "\(v.id) doesn't drift")
+        }
+    }
+}

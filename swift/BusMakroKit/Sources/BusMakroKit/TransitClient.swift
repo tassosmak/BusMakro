@@ -47,8 +47,10 @@ public struct TransitClient: Sendable {
                 let missing = (fixes ?? []).filter { !known.contains($0.id) }
                 if !missing.isEmpty, let d = try? await detail(line: line) {
                     out = LineLive(line: line, vehicles: out.vehicles + missing.compactMap { o in
-                        LineMath.bestVariant(for: o, detail: d).map {
-                            Vehicle(id: o.id, latitude: o.latitude, longitude: o.longitude, bearing: o.bearing, positionAt: o.positionAt, variant: $0)
+                        LineMath.bestVariant(for: o, detail: d).map { vid in
+                            let r = d.variants[vid], first = r?.stops.first.flatMap { d.stops[$0] }
+                            return Vehicle(id: o.id, latitude: o.latitude, longitude: o.longitude, bearing: o.bearing, positionAt: o.positionAt, variant: vid)
+                                .onRoad(r?.shape ?? [], start: first.map { ($0.lat, $0.lon) })
                         }
                     })
                 }

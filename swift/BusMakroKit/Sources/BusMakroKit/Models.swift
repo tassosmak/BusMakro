@@ -63,6 +63,23 @@ public struct Vehicle: Identifiable, Hashable, Sendable, Decodable {
         nextStopID = nil; delaySeconds = nil; speed = nil; tripLabel = nil; path = nil; pathBeyond = nil; pathSpeeds = nil
     }
 
+    /// A bus known only from OASA (no road from the feed): given the road ahead from its route's
+    /// shape, so it glides between OASA's fixes (20-40 s apart) instead of sitting still and jumping.
+    /// It only drives on while its fix is fresh and it isn't waiting at the start of its route.
+    public func onRoad(_ shape: [[Double]], start: (Double, Double)?, ahead: Double = 1500) -> Vehicle {
+        guard let r = Movement.make(shape) else { return self }
+        let a = Movement.along(r, (latitude, longitude))
+        guard a.off < 60 else { return self }
+        var v = self
+        let i = r.cum.firstIndex { $0 > a.d } ?? r.pts.count
+        let end = r.cum.firstIndex { $0 > a.d + ahead } ?? r.pts.count
+        v.path = [[latitude, longitude]] + r.pts[i..<max(i, end)].map { [$0.0, $0.1] }
+        let fresh = positionAt.map { Date().timeIntervalSince($0) < 90 } ?? false
+        let atStart = start.map { Geo.distance(latitude, longitude, $0.0, $0.1) < 60 } ?? false
+        v.speed = fresh && !atStart ? LineMath.defaultSpeed * 0.8 : nil  // a little under the usual pace: never far ahead of it
+        return v
+    }
+
     /// The same bus at a newer fix (from OASA, when the feed's is stale): its road starts again from
     /// there, and a bus the feed thought standing that has clearly moved drives on at a typical pace.
     public func moved(to lat: Double, _ lon: Double, at when: Date, bearing: Double? = nil) -> Vehicle {

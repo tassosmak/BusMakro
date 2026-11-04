@@ -17,6 +17,15 @@ public enum Movement {
         public var total: Double { cum.last ?? 0 }
     }
 
+    /// A route through these [latitude, longitude] points (nil with fewer than two).
+    static func make(_ points: [[Double]], speed: Double? = nil) -> Route? {
+        guard points.count >= 2 else { return nil }
+        let pts = points.map { ($0[0], $0[1]) }
+        var cum = [0.0]
+        for i in 1..<pts.count { cum.append(cum[i - 1] + Geo.distance(pts[i - 1].0, pts[i - 1].1, pts[i].0, pts[i].1)) }
+        return Route(pts: pts, cum: cum, speeds: [], speed: speed)
+    }
+
     public static func route(for v: Vehicle) -> Route? {
         // the road to the next stop, then on past it: GPS fixes arrive 30-50 s old, so a bus driven
         // only to its next stop had usually already reached it and sat still until the next fix
