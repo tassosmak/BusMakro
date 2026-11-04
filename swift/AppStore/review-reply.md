@@ -20,7 +20,7 @@ No login, setup or sample files are needed. On first launch, tap Continue (and o
 - Metro/tram: tap a red M or tram station on the map.
 - Trip planner: side menu → Plan a Trip.
 - Favourites: tap the star on a stop or line.
-- Live Activity: setting a bus alert or following a bus shows its minutes and stops left on the Lock Screen and in the Dynamic Island.
+- Live Activity: setting a bus alert (the bell) shows the bus's minutes and stops left on the Lock Screen and, on iPhones that have one, in the Dynamic Island.
 - Widgets: long-press the Home Screen → Edit → Add Widget → BusMakro. Long-press the widget → Edit Widget to choose a stop's next buses or a line's timetable for a day.
 
 4. External services
