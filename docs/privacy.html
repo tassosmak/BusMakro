@@ -13,7 +13,7 @@
   <header>
     <a href="./"><img src="icon.png" width="64" height="64" alt=""></a>
     <h1>BusMakro Privacy Policy</h1>
-    <p class="muted">Last updated: 2 November 2026</p>
+    <p class="muted">Last updated: 4 November 2026</p>
   </header>
 
   <p>BusMakro is an unofficial app for Athens buses, metro and tram. It is not affiliated with OASA, OSY or STASY.</p>
@@ -24,26 +24,30 @@
   </div>
 
   <h2>Location</h2>
-  <p>If you allow it, BusMakro uses your location to show the stops near you, centre the map and plan trips from where you are. Your location is used only on your device, while the app is open. It is never sent to us or anyone else, and it is never stored.</p>
-  <p>Nearby stops are found on the device. The app downloads bus times for the stop or line you open, not for where you are.</p>
+  <p>If you allow it, BusMakro uses your location to show the stops near you, centre the map and plan trips from where you are. It is never sent to us and never stored, on the device or anywhere else.</p>
+  <p>To find the stops near you, the app sends a position (yours, or the centre of the map when you move it) to OASA Telematics, which returns the nearest stops. The request carries only the coordinates, with nothing that identifies you. Bus times are then downloaded for the stop or line you open.</p>
+  <p><strong>In the background:</strong> only while you have a bus alert or "wake me at my stop" on, BusMakro keeps using your location with the app closed or the phone locked, so it can keep checking the bus and notify you in time. When the alert ends, the bus arrives or you cancel it, background use stops. Your location is not sent anywhere during this; the app checks the bus's position, not yours.</p>
   <p>You can turn location access off at any time in Settings → Privacy &amp; Security → Location Services.</p>
 
   <h2>Notifications and Live Activities</h2>
-  <p>If you set a bus alert ("notify me when the bus is N stops away"), BusMakro shows a local notification and a Live Activity on your device. They are created on the device; nothing is sent to a push server.</p>
+  <p>If you set a bus alert ("notify me when the bus is N stops away"), follow a bus, or ask to be woken at your stop, BusMakro shows local notifications and a Live Activity on your device. They are created on the device; nothing is sent to a push server.</p>
 
   <h2>What stays on your device</h2>
-  <p>Your favourite stops and lines, their nicknames, recent stops and settings are saved only on your device. To let you find them from Siri, Shortcuts and Spotlight, your favourite stops are added to the device's own search index. Deleting the app deletes all of it.</p>
+  <p>Your favourite stops and lines, their nicknames, recent stops and settings are saved only on your device. To let you find them from Siri, Shortcuts and Spotlight, your favourite stops are added to the device's own search index. The Home Screen and Lock Screen widgets read your favourites from a space shared only between BusMakro and its own widgets, and fetch bus times the same way the app does. Asking Siri "When is the 040 coming?" is handled by the app on your device. Deleting the app deletes all of it.</p>
+
+  <h2>Diagnostics</h2>
+  <p>BusMakro receives Apple's anonymous crash and performance reports (MetricKit) and keeps the last few on your device. They contain no personal data and are never sent automatically. They leave your device only if you choose Settings → Share Diagnostic Reports and send them yourself, for example by email.</p>
 
   <h2>Network requests</h2>
   <p>To show live data, the app requests public transit data from:</p>
   <ul>
     <li><strong>OASA Telematics</strong> (telematics.oasa.gr): arrival times, lines, routes, stops and timetables</li>
-    <li><strong>athens-transit-rt</strong>: live bus positions and routes</li>
+    <li><strong>athens-transit-rt</strong> (and its public route files on GitHub Pages): live bus positions and routes</li>
     <li><strong>OASA's website</strong>: service alerts and strike notices</li>
     <li><strong>Apple Maps</strong> (MapKit): the map and place search, under <a href="https://www.apple.com/legal/privacy/">Apple's privacy policy</a></li>
   </ul>
   <p>Metro and tram timetables are built into the app and need no connection.</p>
-  <p>These requests contain only what is needed to fetch the data, such as a stop or line number. Like any internet request, they reveal your IP address to those servers. BusMakro adds no identifiers to them.</p>
+  <p>These requests contain only what is needed to fetch the data, such as a stop or line number, or for nearby stops a position. Like any internet request, they reveal your IP address to those servers. BusMakro adds no identifiers to them.</p>
 
   <h2>Children</h2>
   <p>BusMakro collects no data from anyone, including children.</p>
